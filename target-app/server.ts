@@ -114,8 +114,31 @@ createServer(async (req, res) => {
 </frameset></html>`);
 
     case '/hdr':   return send(200, header(t));
+
+    // Re-authentication exists so the escalation demo has a real resolution:
+    // automation is not permitted to handle credentials, so a human must do
+    // this. The password field is here to exercise redaction -- its value must
+    // never reach the event log.
+    case '/login':
+      return send(200, shell(t, `
+<table cellpadding="6" cellspacing="1" bgcolor="#808080"><tr><td bgcolor="${t.theme.face}">
+ <table cellpadding="4">
+  <tr><td colspan="2" bgcolor="${t.theme.bar}"><font color="#ffffff"><b>Sign In</b></font></td></tr>
+  <form action="/signin" method="get">
+  <input type="hidden" name="tenant" value="${t.id}">
+  <tr><td align="right"><font size="2">Operator ID</font></td><td><input type="text" name="op" size="16"></td></tr>
+  <tr><td align="right"><font size="2">Password</font></td><td><input type="password" name="pw" size="16"></td></tr>
+  <tr><td colspan="2" align="right"><input type="submit" value="Sign In"></td></tr>
+  </form>
+ </table></td></tr></table>`));
+
+    case '/signin':
+      sessionOf(sid).expired = false;
+      return send(200, lookup(t));
     case '/lookup':
-      if (sessionOf(sid).expired) return send(200, banner(t, '#800000', 'Your session has expired. Please sign in again.', false));
+      if (sessionOf(sid).expired) return send(200, shell(t, `<table cellpadding="6"><tr><td bgcolor="#ffffcc">
+  <font color="#800000"><b>Your session has expired. Please sign in again.</b></font></td></tr></table>
+<br><a href="/login?${qs(t)}">Sign In</a>`));
       return send(200, lookup(t));
 
     case '/img/go.svg':
@@ -143,7 +166,9 @@ createServer(async (req, res) => {
           return send(500, banner(t, '#800000', 'MemberDesk error 0x5F: unable to complete request.', false));
         case 'session_expired':
           sessionOf(sid).expired = true;
-          return send(200, banner(t, '#800000', 'Your session has expired. Please sign in again.', false));
+          return send(200, shell(t, `<table cellpadding="6"><tr><td bgcolor="#ffffcc">
+  <font color="#800000"><b>Your session has expired. Please sign in again.</b></font></td></tr></table>
+<br><a href="/login?${qs(t)}">Sign In</a>`));
         case 'interstitial':
           return send(200, shell(t, `
 <table cellpadding="8" cellspacing="1" bgcolor="#808080"><tr><td bgcolor="${t.theme.face}">

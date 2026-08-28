@@ -33,6 +33,14 @@ export interface ReplayOptions {
   /** Unattended callers may not run a draft artifact. */
   unattended?: boolean;
   stepTimeoutMs?: number;
+  /**
+   * Resume an interrupted run at this step, rather than starting over.
+   * Supplied by re-localisation after a human handed control back — never
+   * chosen by the caller, because only observed state can say where we are.
+   */
+  resumeFrom?: number;
+  /** The session is already positioned; do not navigate and lose its state. */
+  skipNavigation?: boolean;
 }
 
 interface Matched {
@@ -67,10 +75,23 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   const steps: StepReport[] = [];
   const stepTimeout = opts.stepTimeoutMs ?? 15000;
 
+  /**
+   * The CALLER gets real values; the LOG and the evidence file get redacted
+   * ones. Those are different audiences and conflating them is how regulated
+   * data ends up on disk: the agent needs the balance to act on it, the
+   * evidence directory has no business retaining it.
+   */
+  const redactOutputs = (o: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(
+      Object.entries(o).map(([k, v]) => [k, a.outputs.find((s) => s.name === k)?.sensitive ? '[REDACTED]' : v]),
+    );
+
   const done = (r: Omit<ReplayResult, 'runId' | 'ms' | 'steps'>): ReplayResult => {
     const out = { ...r, runId, steps, ms: Date.now() - t0 } as ReplayResult;
-    log.append('system', `replay.${out.status}`, { ...out, steps: undefined });
-    log.writeJson('result.json', out);
+    const persistable =
+      out.status === 'success' ? { ...out, outputs: redactOutputs(out.outputs) } : out;
+    log.append('system', `replay.${out.status}`, { ...persistable, steps: undefined });
+    log.writeJson('result.json', persistable);
     return out;
   };
 
@@ -105,13 +126,21 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     });
   }
 
-  const entryUrl = new URL(a.app.entryPath + (opts.baseUrl.includes('?') ? '' : ''), opts.baseUrl).toString();
-  await surface.navigate(opts.baseUrl);
-  await surface.waitForStable();
-  log.append('agent', 'navigate', { url: entryUrl });
+  if (opts.skipNavigation) {
+    log.append('system', 'replay.resume', { fromStep: opts.resumeFrom ?? 1, note: 'continuing in the existing session' });
+  } else {
+    await surface.navigate(opts.baseUrl);
+    await surface.waitForStable();
+    log.append('agent', 'navigate', { url: opts.baseUrl });
+  }
 
   // --- Steps --------------------------------------------------------------
   for (const step of a.steps) {
+    if (opts.resumeFrom !== undefined && step.index < opts.resumeFrom) {
+      steps.push({ index: step.index, id: step.id, kind: step.kind, status: 'skipped', ms: 0,
+                   note: 'completed before the handoff' });
+      continue;
+    }
     const sT0 = Date.now();
     const report: StepReport = { index: step.index, id: step.id, kind: step.kind, status: 'ok', ms: 0 };
     if (step.target) report.target = describeTarget(step.target);
@@ -299,11 +328,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     }
     outputs[spec.name] = applyTransform(r.node.name || r.node.value, spec.transform);
   }
-  log.append('agent', 'outputs', {
-    outputs: Object.fromEntries(
-      Object.entries(outputs).map(([k, v]) => [k, a.outputs.find((o) => o.name === k)?.sensitive ? '[REDACTED]' : v]),
-    ),
-  });
+  log.append('agent', 'outputs', { outputs: redactOutputs(outputs) });
 
   return done({ status: 'success', outputs } as never);
 

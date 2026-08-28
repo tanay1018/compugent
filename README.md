@@ -6,8 +6,8 @@ successful run is compiled into a typed, versioned **capability artifact**;
 that artifact then replays deterministically with **no model in the decision
 loop**, which is the path an AI agent invokes in production.
 
-> Status: **Phase 5 — deterministic replay.** See `../ROADMAP.md` for the plan
-> and `REPORT.md` (pending) for the design write-up.
+> Status: **Phase 6 — human-in-the-loop handoff.** See `../ROADMAP.md` for the
+> plan and `REPORT.md` (pending) for the design write-up.
 
 ## Setup
 
@@ -214,6 +214,71 @@ legitimate answer while "error 0x5F" is a fault.
 Add `--unattended` to any of these and a draft artifact is refused outright: an
 artifact executed exactly once, by a model, against one tenant has not earned
 unattended production use.
+
+## Human-in-the-loop handoff
+
+```bash
+npm run handoff                # opens a real operator console and waits for you
+npm run handoff -- --simulate  # scripted operator, for reproducible evidence
+```
+
+The scenario: a lookup dies because the session expired. Automation is not
+permitted to handle credentials, so it cannot recover — it escalates. A human
+signs in **on the same live session** and hands back. Replay then works out
+where it is and finishes.
+
+```
+1. REPLAY        ESCALATED — session expired, automation cannot re-authenticate
+2. ESCALATION    console at http://localhost:8790/ · control: pause_requested
+3. TAKEOVER      control: operator — the human drives THE SAME session
+4. HAND BACK     control: relocalizing — it does NOT snap back to the agent
+5. RE-LOCALISE   LOCATED: steps 1,2 share this screen; resuming at 1 — safe to redo
+6. RESUME        SUCCESS { savingsBalance: 4182.55, memberName: "Sarah Chen" }
+```
+
+### The control token
+
+There is **no "both" state**. While automation holds control, operator input
+does not leak through — it raises a pause request. While the operator holds it,
+the executor is hard-blocked. Barge-in is atomic at *step* boundaries: waits are
+interruptible, actions are not, so every logged event has an unambiguous actor.
+Illegal transitions throw rather than silently corrupting who is driving.
+
+### Re-localisation
+
+> The plan is a map, not a program counter.
+
+After a takeover the step index is meaningless — the human may have gone
+forward, backward, somewhere unrelated, or finished the job. So replay observes
+and asks *where am I*:
+
+| waypoints matching | response |
+|---|---|
+| the checkpoint | the human finished it — extract outputs |
+| exactly one | resume there, **even if that is backward** |
+| several, all safe to redo | resume at the earliest |
+| several, one irreversible | **stop** — we cannot tell if it already ran |
+| none | **stop** — automation will not guess its position |
+
+Re-entry is effect-aware. Before re-running an irreversible step, its
+idempotency probe must answer "has this already happened?" — because an
+operator who already submitted the form, then handed back, must not have a
+second sub-account opened on their behalf.
+
+### One log, both actors
+
+```
+agent     step.click       {"target":"button named \"Search\"","via":"name"}
+system    outcome.matched  {"name":"session_expired","classification":"escalate"}
+operator  manual.input     {"control":"Operator ID","value":"jchen"}
+operator  manual.input     {"control":"Password"}          <- value never captured
+system    control.transition {"from":"relocalizing","to":"agent"}
+```
+
+The operator's actions are captured *semantically*, not as pixels — an auditor
+needs "typed into the Member ID field", not a video. Attribution is decided by
+**who holds the token**, not by the event, since the agent's own input fires the
+same DOM listeners.
 
 ## Demo path
 

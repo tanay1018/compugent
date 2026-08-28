@@ -3,7 +3,7 @@
   "id": "member.readSavingsBalance",
   "version": 2,
   "name": "Read member savings balance",
-  "description": "Looks up a member by their Member ID in the Member Inquiry screen and returns the current balance of their Savings account, along with the member name and Member ID shown on the loaded record for verification. Use this when an agent needs a member's savings balance or needs to confirm a member record exists before acting on it.",
+  "description": "Looks up a member by Member ID in the Member Inquiry screen and returns the current balance of their Savings account, along with the member name and Member ID shown on the loaded record so the caller can confirm the correct member was retrieved. Reach for this when an agent needs a member's savings balance or needs to verify a member record exists for a given ID.",
   "app": {
     "vendorProduct": "Corelink MemberDesk 7.2",
     "recordedTenant": "meridian",
@@ -25,7 +25,7 @@
     {
       "name": "savingsBalance",
       "type": "string",
-      "description": "Current balance of the member's Savings account, read from the Savings row of the Account/Balance table.",
+      "description": "Current balance of the account in the row labelled 'Savings'.",
       "from": {
         "role": "text",
         "nameMatch": "normalized",
@@ -47,7 +47,7 @@
     {
       "name": "memberName",
       "type": "string",
-      "description": "Member name shown on the detail screen, used to confirm the correct record was loaded.",
+      "description": "Member name shown beside the 'Name' label on the member detail screen, used to confirm the correct record loaded.",
       "from": {
         "role": "text",
         "nameMatch": "normalized",
@@ -69,7 +69,7 @@
     {
       "name": "memberId",
       "type": "string",
-      "description": "Member ID displayed on the detail screen, used to verify it matches the searched input.",
+      "description": "Member ID displayed on the member detail screen, used to verify it matches the searched input.",
       "from": {
         "role": "text",
         "nameMatch": "normalized",
@@ -136,7 +136,7 @@
           },
           "fallbacks": [],
           "provenance": {
-            "discoveredAt": "2026-08-28T03:15:05.074Z"
+            "discoveredAt": "2026-08-28T03:33:11.525Z"
           }
         },
         "maxAttempts": 1
@@ -191,31 +191,22 @@
         "param": "memberId"
       },
       "waypoint": {
-        "kind": "all",
-        "of": [
-          {
-            "kind": "locationMatches",
-            "pattern": "^/(\\?|$)"
+        "kind": "nodeExists",
+        "target": {
+          "role": "textbox",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "inSameRowAs",
+            "text": "Member ID"
           },
-          {
-            "kind": "nodeExists",
-            "target": {
-              "role": "textbox",
-              "nameMatch": "normalized",
-              "anchor": {
-                "relation": "inSameRowAs",
-                "text": "Member ID"
-              },
-              "scope": {
-                "frame": "main"
-              },
-              "fallbacks": [],
-              "provenance": {
-                "discoveredAt": "2026-08-28T03:14:32.974Z"
-              }
-            }
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-28T03:14:32.974Z"
           }
-        ]
+        }
       },
       "effect": "reversible",
       "rationale": "The Member ID textbox is the input for the member lookup; typing the target member number here parameterizes the search for replay."
@@ -241,32 +232,23 @@
         }
       },
       "waypoint": {
-        "kind": "all",
-        "of": [
-          {
-            "kind": "locationMatches",
-            "pattern": "^/lookup(\\?|$)"
+        "kind": "nodeExists",
+        "target": {
+          "role": "button",
+          "name": "Search",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Search Type"
           },
-          {
-            "kind": "nodeExists",
-            "target": {
-              "role": "button",
-              "name": "Search",
-              "nameMatch": "normalized",
-              "anchor": {
-                "relation": "follows",
-                "text": "Search Type"
-              },
-              "scope": {
-                "frame": "main"
-              },
-              "fallbacks": [],
-              "provenance": {
-                "discoveredAt": "2026-08-28T03:14:36.745Z"
-              }
-            }
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-28T03:14:36.745Z"
           }
-        ]
+        }
       },
       "effect": "reversible",
       "rationale": "Submits the Member Inquiry form to retrieve the member record for the entered Member ID."

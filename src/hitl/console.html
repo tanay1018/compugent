@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Operator Console</title><style>
+*{box-sizing:border-box} body{margin:0;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:#14161a;color:#d7dae0}
+header{display:flex;align-items:center;gap:14px;padding:10px 14px;background:#1c1f26;border-bottom:1px solid #2b2f38}
+#who{padding:3px 9px;border-radius:3px;font-weight:700;letter-spacing:.04em}
+.agent{background:#1d3a5c;color:#8fc4ff} .operator{background:#5c3a1d;color:#ffc48f} .nobody{background:#3a3a3a;color:#aaa}
+button{font:inherit;padding:6px 13px;border:1px solid #3a4150;background:#252a33;color:#d7dae0;border-radius:3px;cursor:pointer}
+button:hover:not(:disabled){background:#2f3540} button:disabled{opacity:.35;cursor:not-allowed}
+main{display:grid;grid-template-columns:1fr 340px;gap:12px;padding:12px;align-items:start}
+#screen{width:100%;border:1px solid #2b2f38;background:#000;display:block;cursor:crosshair}
+#screen.locked{cursor:not-allowed;opacity:.82}
+aside{background:#1c1f26;border:1px solid #2b2f38;border-radius:4px;padding:11px;max-height:78vh;overflow:auto}
+h2{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:#7d8595}
+.ev{padding:4px 0;border-bottom:1px solid #23272f;font-size:11.5px;line-height:1.45}
+.ev .a{font-weight:700} .a-agent{color:#8fc4ff} .a-operator{color:#ffc48f} .a-system{color:#9aa3b2}
+#why{background:#2a1f14;border:1px solid #5c3a1d;border-radius:4px;padding:10px;margin-bottom:11px;font-size:12px;line-height:1.5;color:#ffd9ad}
+#why b{display:block;color:#ffb35c;margin-bottom:4px}
+</style></head><body>
+<header>
+  <strong>Operator Console</strong>
+  <span id="who" class="agent">AGENT</span>
+  <button id="take">Take control</button>
+  <button id="give" disabled>Hand back</button>
+  <span id="hint" style="color:#7d8595"></span>
+</header>
+<main>
+  <canvas id="screen" width="1024" height="700"></canvas>
+  <aside>
+    <div id="why" style="display:none"></div>
+    <h2>Session log</h2><div id="log"></div>
+  </aside>
+</main>
+<script>
+const cv=document.getElementById('screen'),cx=cv.getContext('2d');
+const who=document.getElementById('who'),take=document.getElementById('take'),give=document.getElementById('give');
+const log=document.getElementById('log'),why=document.getElementById('why'),hint=document.getElementById('hint');
+let holder='agent',img=new Image();
+img.onload=()=>{cv.width=img.width;cv.height=img.height;cx.drawImage(img,0,0);};
+
+new EventSource('/events').onmessage=(m)=>{
+  const d=JSON.parse(m.data);
+  if(d.frame) img.src='data:image/jpeg;base64,'+d.frame;
+  if(d.state){
+    holder=d.state.holder; who.textContent=d.state.holder.toUpperCase(); who.className=d.state.holder;
+    hint.textContent=d.state.control;
+    take.disabled=d.state.holder==='operator'; give.disabled=d.state.holder!=='operator';
+    cv.classList.toggle('locked',d.state.holder!=='operator');
+  }
+  if(d.escalation){
+    why.style.display='block';
+    why.innerHTML='<b>Intervention requested</b>'+d.escalation.reason+
+      '<br><br>capability: '+d.escalation.capability+
+      (d.escalation.atStep?'<br>stopped at step '+d.escalation.atStep:'')+
+      (d.escalation.expected?'<br>waiting for: '+d.escalation.expected:'');
+  }
+  if(d.event){
+    const e=document.createElement('div');e.className='ev';
+    e.innerHTML='<span class="a a-'+d.event.actor+'">'+d.event.actor+'</span> '+d.event.kind+
+      (d.event.detail?' <span style="color:#7d8595">'+JSON.stringify(d.event.detail).slice(0,120)+'</span>':'');
+    log.prepend(e);
+  }
+};
+
+const post=(p,b)=>fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
+take.onclick=()=>post('/control',{action:'take'});
+give.onclick=()=>post('/control',{action:'handback'});
+
+// Raw coordinates into the live session -- no selectors, exactly what a remote
+// console would send to a containerised browser.
+const at=(e)=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*(cv.width/r.width),y:(e.clientY-r.top)*(cv.height/r.height)};};
+cv.onmousedown=(e)=>{const p=at(e);post('/input',{type:'mouse',action:'down',x:p.x,y:p.y});};
+cv.onmouseup=(e)=>{const p=at(e);post('/input',{type:'mouse',action:'up',x:p.x,y:p.y});};
+window.onkeydown=(e)=>{
+  if(holder!=='operator'||e.target!==document.body)return; e.preventDefault();
+  if(e.key.length===1) post('/input',{type:'text',text:e.key});
+  else post('/input',{type:'key',action:'down',key:e.key});
+};
+</script></body></html>

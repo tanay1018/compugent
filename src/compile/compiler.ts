@@ -68,12 +68,22 @@ export interface CompileResult {
   warnings: string[];
 }
 
-/** The state a step expects BEFORE it acts. */
-function waypointFor(step: TraceStep, locationBefore: string): StateAssertion {
-  const { pattern } = canonicaliseLocation(locationBefore);
-  const parts: StateAssertion[] = [{ kind: 'locationMatches', pattern }];
-  if (step.target) parts.push({ kind: 'nodeExists', target: step.target });
-  return parts.length === 1 ? parts[0]! : { kind: 'all', of: parts as never };
+/**
+ * The state a step expects BEFORE it acts.
+ *
+ * Deliberately node existence and NOT a URL match. Legacy apps render the same
+ * screen at many different URLs — a form handler that re-renders its own form,
+ * a POST target, a post-login landing route. Pinning a waypoint to the URL
+ * observed during recording makes re-localisation fail on a screen that is
+ * visibly correct, which is exactly what happened the first time an operator
+ * signed back in at /signin and got handed the lookup form.
+ *
+ * What a step actually depends on is that the control it is about to use is
+ * there. Location remains useful for outcome detection, where it discriminates
+ * between screens rather than identifying one.
+ */
+function waypointFor(step: TraceStep, _locationBefore: string): StateAssertion | undefined {
+  return step.target ? { kind: 'nodeExists', target: step.target } : undefined;
 }
 
 export async function compileTrace(opts: CompileOptions): Promise<CompileResult> {
@@ -173,7 +183,7 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       kind: s.kind,
       target: s.target,
       ...(value ? { value } : {}),
-      waypoint: waypointFor(s, locationBefore),
+      ...(waypointFor(s, locationBefore) ? { waypoint: waypointFor(s, locationBefore)! } : {}),
       effect: s.effect,
       ...(s.rationale ? { rationale: s.rationale } : {}),
       ...(s.targetVerified ? {} : { fragile: s.targetProblem ?? 'descriptor could not be verified at record time' }),

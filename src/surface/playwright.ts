@@ -284,6 +284,12 @@ export class PlaywrightSurface implements Surface {
     }
   }
 
+  /** Viewport centre of a node. Exposed because an operator console forwards
+   *  RAW COORDINATES -- it has no notion of selectors or descriptors. */
+  async boundsOf(node: UINode): Promise<{ x: number; y: number }> {
+    return this.centreOf(node);
+  }
+
   async screenshot(): Promise<Buffer> {
     return this.page.screenshot({ fullPage: false });
   }
@@ -388,6 +394,55 @@ export class PlaywrightSurface implements Surface {
     } else {
       await this.cdp.send('Input.insertText', { text: e.text });
     }
+  }
+
+  /**
+   * Capture what a HUMAN does in this session, semantically.
+   *
+   * Recording pixels would satisfy nobody: 3.6 asks us to record what the
+   * human did, and in a regulated environment an auditor needs "typed into the
+   * Member ID field", not a video. Hooking DOM events at the capture phase and
+   * resolving a label for the target gives the same vocabulary the agent's own
+   * steps use, so both actors land in one log with one shape.
+   *
+   * Note this fires for agent-driven input too, because we dispatch real
+   * events. Attribution is therefore decided by WHO HOLDS THE TOKEN, not by
+   * the event — which is the honest answer, and the reason the control token
+   * is the single source of truth about who is driving.
+   */
+  async installOperatorCapture(onEvent: (e: { kind: string; label: string; tag: string; value?: string }) => void): Promise<void> {
+    await this.page.exposeBinding('__cua_op', (_src, ev) => {
+      onEvent(ev as { kind: string; label: string; tag: string; value?: string });
+    });
+    await this.page.addInitScript(`(() => {
+      const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
+      const labelFor = (el) => {
+        if (!el || !el.getAttribute) return '';
+        const a = el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('alt');
+        if (a) return clean(a);
+        if (el.value && el.type === 'submit') return clean(el.value);
+        const td = el.closest && el.closest('td');
+        if (td) for (let p = td.previousElementSibling; p; p = p.previousElementSibling) {
+          const t = clean(p.textContent); if (t) return t;
+        }
+        return clean(el.textContent);
+      };
+      const send = (kind, e) => {
+        const el = e.target;
+        if (!el || !el.tagName) return;
+        const tag = el.tagName.toLowerCase();
+        const isSecret = /password|hidden/i.test(el.type || '');
+        try {
+          window.__cua_op({
+            kind, tag, label: labelFor(el),
+            ...(kind === 'input' && !isSecret ? { value: String(el.value ?? '').slice(0, 80) } : {}),
+          });
+        } catch {}
+      };
+      document.addEventListener('click', (e) => send('click', e), true);
+      document.addEventListener('change', (e) => send('input', e), true);
+      document.addEventListener('submit', (e) => send('submit', e), true);
+    })()`);
   }
 
   async close(): Promise<void> {
