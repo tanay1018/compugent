@@ -12,7 +12,8 @@
     "test": "tsx --test test/*.test.ts",
     "test:integration": "tsx --test test/*.itest.ts",
     "observe": "tsx scripts/observe.ts",
-    "discover": "tsx scripts/discover.ts"
+    "discover": "tsx scripts/discover.ts",
+    "compile": "tsx scripts/compile.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",

@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "id": "member.readSavingsBalance",
+  "version": 1,
+  "name": "Read member savings balance",
+  "description": "Looks up a credit union member by their member number and returns the current savings account balance, along with the member ID and name from the loaded member detail record for verification. Use this when an agent needs a member's current savings balance given their member number.",
+  "app": {
+    "vendorProduct": "Corelink MemberDesk 7.2",
+    "recordedTenant": "meridian",
+    "surfaceKind": "web",
+    "entryPathPattern": "^/(\\?|$)",
+    "entryPath": "/"
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "The member number to look up in the member inquiry search.",
+      "example": "12345",
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savingsBalance",
+      "type": "number",
+      "description": "Current balance of the member's savings account.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Savings"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T02:51:34.797Z"
+        }
+      },
+      "transform": "currency",
+      "sensitive": true
+    },
+    {
+      "name": "memberId",
+      "type": "string",
+      "description": "Member ID shown on the loaded Member Detail screen, used to confirm the correct record was retrieved.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T02:51:34.798Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": true
+    },
+    {
+      "name": "memberName",
+      "type": "string",
+      "description": "Full name of the member whose savings balance was read.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Name"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T02:51:34.798Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": true
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "s1",
+      "index": 1,
+      "kind": "select",
+      "target": {
+        "role": "combobox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T02:51:25.479Z"
+        }
+      },
+      "value": {
+        "from": "literal",
+        "value": "Member Number"
+      },
+      "waypoint": {
+        "kind": "all",
+        "of": [
+          {
+            "kind": "locationMatches",
+            "pattern": "^/(\\?|$)"
+          },
+          {
+            "kind": "nodeExists",
+            "target": {
+              "role": "combobox",
+              "nameMatch": "normalized",
+              "anchor": {
+                "relation": "inSameRowAs",
+                "text": "Search Type"
+              },
+              "scope": {
+                "frame": "main"
+              },
+              "fallbacks": [],
+              "provenance": {
+                "discoveredAt": "2026-08-28T02:51:25.479Z"
+              }
+            }
+          }
+        ]
+      },
+      "effect": "reversible",
+      "rationale": "Search Type must be \"Member Number\" because the given input 12345 is a member number, not an SSN fragment."
+    },
+    {
+      "id": "s2",
+      "index": 2,
+      "kind": "type",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T02:51:25.464Z"
+        }
+      },
+      "value": {
+        "from": "param",
+        "param": "memberId"
+      },
+      "waypoint": {
+        "kind": "all",
+        "of": [
+          {
+            "kind": "locationMatches",
+            "pattern": "^/(\\?|$)"
+          },
+          {
+            "kind": "nodeExists",
+            "target": {
+              "role": "textbox",
+              "nameMatch": "normalized",
+              "anchor": {
+                "relation": "inSameRowAs",
+                "text": "Member ID"
+              },
+              "scope": {
+                "frame": "main"
+              },
+              "fallbacks": [],
+              "provenance": {
+                "discoveredAt": "2026-08-28T02:51:25.464Z"
+              }
+            }
+          }
+        ]
+      },
+      "effect": "reversible",
+      "rationale": "The Member ID textbox is the input for the member lookup; it is anchored to the \"Member ID\" label."
+    },
+    {
+      "id": "s3",
+      "index": 3,
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T02:51:28.023Z"
+        }
+      },
+      "waypoint": {
+        "kind": "all",
+        "of": [
+          {
+            "kind": "locationMatches",
+            "pattern": "^/(\\?|$)"
+          },
+          {
+            "kind": "nodeExists",
+            "target": {
+              "role": "button",
+              "name": "Search",
+              "nameMatch": "normalized",
+              "anchor": {
+                "relation": "follows",
+                "text": "Search Type"
+              },
+              "scope": {
+                "frame": "main"
+              },
+              "fallbacks": [],
+              "provenance": {
+                "discoveredAt": "2026-08-28T02:51:28.023Z"
+              }
+            }
+          }
+        ]
+      },
+      "effect": "reversible",
+      "rationale": "Submit the member inquiry to load the member's account record."
+    }
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "Member Detail",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "main"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-08-28T02:51:39.493Z"
+      }
+    },
+    "description": "Searched Member Inquiry for member ID 12345 with Search Type \"Member Number\", landing on the Member Detail screen for Sarah Chen (Active). Read the Savings row of the Account/Balance table: current savings balance $4,182.55. Recorded outputs: savingsBalance, memberId, memberName. Checkpoint is the stable \"Member Detail\" heading rather than a balance figure, which changes between runs."
+  },
+  "approval": "draft",
+  "provenance": {
+    "recordedAt": "2026-08-28T02:51:44.332Z",
+    "discoveryRunId": "discovery-2026-08-28T02-51-20-623Z",
+    "model": "anthropic/claude-opus-5",
+    "goal": "look up member 12345 and read their current savings balance",
+    "warnings": []
+  }
+}

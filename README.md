@@ -6,7 +6,7 @@ successful run is compiled into a typed, versioned **capability artifact**;
 that artifact then replays deterministically with **no model in the decision
 loop**, which is the path an AI agent invokes in production.
 
-> Status: **Phase 3 — discovery.** See `../ROADMAP.md` for the plan and
+> Status: **Phase 4 — compilation.** See `../ROADMAP.md` for the plan and
 > `REPORT.md` (pending) for the design write-up.
 
 ## Setup
@@ -130,6 +130,45 @@ than in production:
   payload, not its identity — recording `"$4,182.55"` as the locator would pin
   the artifact to one member. If a value has no anchor, the run refuses to
   record it and says so.
+
+## Compilation (trace → capability)
+
+```bash
+npm run compile          # compiles the newest discovery run
+```
+
+Two passes. The **mechanical** one derives steps, targets, waypoints, outputs
+and the checkpoint straight from the trace — possible only because the model's
+action vocabulary was constrained to what a step can express. The
+**generalisation** pass is a single LLM call that decides which run-constants
+are really parameters:
+
+```
+1. select   combobox inSameRowAs "Search Type"   "Member Number"   <- fixed config
+2. type     textbox  inSameRowAs "Member ID"     <memberId>        <- lifted to a param
+3. click    button   "Search"
+```
+
+Getting that split wrong either pins the capability to one record or exposes a
+knob no caller should think about. The proposal is **validated, not trusted**:
+every proposed parameter must correspond to a literal that actually appears at
+the step it claims, or it is dropped and recorded as a warning.
+
+The model runs here exactly once, offline, on a run a human is about to
+review. Replay never calls it.
+
+Compiled artifacts land in `artifacts/<id>/v<n>.json` and project directly to
+an agent-callable tool:
+
+```json
+{ "name": "member_readSavingsBalance",
+  "description": "...\nReturns: { savingsBalance: number, memberId: string, memberName: string }",
+  "input_schema": { "type": "object", "properties": { "memberId": { "type": "string" } },
+                    "required": ["memberId"], "additionalProperties": false } }
+```
+
+Artifacts compile as `draft`. Unattended replay has to be opted into, because
+a fresh artifact has been executed exactly once, by a model, on one tenant.
 
 ## Demo path
 
