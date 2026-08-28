@@ -73,6 +73,13 @@ export class HandoffSession {
   /** The executor yields at a step boundary — never mid-action. */
   yield(): void { this.control.yieldToOperator(); }
 
+  /** A still of the current screen. The screencast is change-driven, so a
+   *  static page emits nothing — an operator opening the console mid-incident
+   *  would otherwise stare at black. */
+  async snapshot(): Promise<string> {
+    return (await this.surface.screenshot()).toString('base64');
+  }
+
   async startStreaming(): Promise<void> {
     await this.surface.startStream((frame) => { for (const l of this.frameListeners) l(frame); });
   }

@@ -22,6 +22,7 @@ export class OperatorConsole {
   private server?: Server;
   private clients: import('node:http').ServerResponse[] = [];
   private seen = 0;
+  private lastFrameAt = 0;
 
   constructor(
     private readonly session: HandoffSession,
@@ -41,16 +42,24 @@ export class OperatorConsole {
   async start(): Promise<string> {
     const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'console.html'), 'utf8');
 
-    this.session.onFrame((frame) => this.broadcast({ frame }));
+    this.session.onFrame((frame) => { this.lastFrameAt = Date.now(); this.broadcast({ frame }); });
     this.session.control.onChange(() => this.broadcast({ state: this.state() }));
-    // Drain the shared event log so the operator sees the agent's history too
-    // -- one log, both actors, which is the point of the actor tag.
+
+    // Stream NEW events. The backlog is replayed per client on connect, since
+    // an operator arriving mid-incident needs the history that led here.
     setInterval(() => {
       while (this.seen < this.log.events.length) {
         const e: RunEvent = this.log.events[this.seen++]!;
         this.broadcast({ event: { actor: e.actor, kind: e.kind, detail: e.detail } });
       }
     }, 250).unref();
+
+    // Heartbeat still. CDP only emits a screencast frame on repaint, so a
+    // paused session -- exactly when an operator is looking -- produces none.
+    setInterval(() => {
+      if (!this.clients.length || Date.now() - this.lastFrameAt < 900) return;
+      this.session.snapshot().then((f) => { this.lastFrameAt = Date.now(); this.broadcast({ frame: f }); }).catch(() => {});
+    }, 1000).unref();
 
     this.server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', `http://localhost:${this.port}`);
@@ -65,6 +74,13 @@ export class OperatorConsole {
         this.clients.push(res);
         res.write(`data: ${JSON.stringify({ state: this.state() })}\n\n`);
         if (this.session.escalation) res.write(`data: ${JSON.stringify({ escalation: this.session.escalation })}\n\n`);
+        // Backlog: the agent's history is what explains why we stopped here.
+        for (const e of this.log.events) {
+          res.write(`data: ${JSON.stringify({ event: { actor: e.actor, kind: e.kind, detail: e.detail } })}\n\n`);
+        }
+        this.session.snapshot()
+          .then((f) => res.write(`data: ${JSON.stringify({ frame: f })}\n\n`))
+          .catch(() => {});
         req.on('close', () => { this.clients = this.clients.filter((c) => c !== res); });
         return;
       }

@@ -1,0 +1,50 @@
+{"seq":1,"ts":"2026-08-28T04:05:02.846Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v2","approval":"draft","inputs":{"memberId":"[REDACTED]"}}}
+{"seq":2,"ts":"2026-08-28T04:05:03.027Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
+{"seq":3,"ts":"2026-08-28T04:05:03.462Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
+{"seq":4,"ts":"2026-08-28T04:05:03.686Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
+{"seq":5,"ts":"2026-08-28T04:05:03.721Z","actor":"system","kind":"outcome.matched","detail":{"name":"session_expired","classification":"escalate","detail":"text \"Your session has expired. Please sign in again.\" present","location":"http://localhost:8710/?tenant=meridian"},"screenshot":"screenshots/004-outcome-session_expired.png"}
+{"seq":6,"ts":"2026-08-28T04:05:03.730Z","actor":"system","kind":"replay.escalated","detail":{"status":"escalated","reason":"The session expired. Automation cannot re-authenticate; a human must sign in.","context":{"location":"http://localhost:8710/?tenant=meridian","screenshot":"screenshots/005-escalate.png"},"runId":"handoff-2026-08-28T04-05-02-706Z","ms":884}}
+{"seq":7,"ts":"2026-08-28T04:05:03.754Z","actor":"system","kind":"control.transition","detail":{"from":"agent","to":"pause_requested","reason":"The session expired. Automation cannot re-authenticate; a human must sign in."}}
+{"seq":8,"ts":"2026-08-28T04:05:03.754Z","actor":"system","kind":"escalation.raised","detail":{"reason":"The session expired. Automation cannot re-authenticate; a human must sign in.","capability":"member.readSavingsBalance v2","location":"http://localhost:8710/?tenant=meridian","screenshot":"screenshots/006-escalation.png"}}
+{"seq":9,"ts":"2026-08-28T04:05:19.751Z","actor":"agent","kind":"control.transition","detail":{"from":"pause_requested","to":"operator","reason":"automation paused at a step boundary"}}
+{"seq":10,"ts":"2026-08-28T04:05:27.164Z","actor":"operator","kind":"manual.click","detail":{"control":"Sign In"}}
+{"seq":11,"ts":"2026-08-28T04:05:29.616Z","actor":"operator","kind":"manual.click","detail":{"control":"Operator ID"}}
+{"seq":12,"ts":"2026-08-28T04:06:14.943Z","actor":"operator","kind":"manual.input","detail":{"control":"Operator ID","value":"jchen"}}
+{"seq":13,"ts":"2026-08-28T04:06:14.955Z","actor":"operator","kind":"manual.click","detail":{"control":"Password"}}
+{"seq":14,"ts":"2026-08-28T04:06:25.318Z","actor":"operator","kind":"manual.input","detail":{"control":"Password"}}
+{"seq":15,"ts":"2026-08-28T04:06:25.325Z","actor":"operator","kind":"manual.click","detail":{"control":"Sign In"}}
+{"seq":16,"ts":"2026-08-28T04:06:25.325Z","actor":"operator","kind":"manual.submit","detail":{"control":"form"}}
+{"seq":17,"ts":"2026-08-28T04:06:34.277Z","actor":"operator","kind":"control.transition","detail":{"from":"operator","to":"resume_requested","reason":"operator handed control back"}}
+{"seq":18,"ts":"2026-08-28T04:06:34.278Z","actor":"system","kind":"control.transition","detail":{"from":"resume_requested","to":"relocalizing","reason":"establishing where the operator left the session"}}
+{"seq":19,"ts":"2026-08-28T04:06:34.292Z","actor":"system","kind":"control.transition","detail":{"from":"relocalizing","to":"agent","reason":"re-localised: steps 1, 2 share this screen; resuming at the earliest (1) — all are safe to redo"}}
+{"seq":20,"ts":"2026-08-28T04:06:34.293Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v2","approval":"draft","inputs":{"memberId":"[REDACTED]"}}}
+{"seq":21,"ts":"2026-08-28T04:06:34.293Z","actor":"system","kind":"replay.resume","detail":{"fromStep":1,"note":"continuing in the existing session"}}
+{"seq":22,"ts":"2026-08-28T04:06:34.717Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
+{"seq":23,"ts":"2026-08-28T04:06:34.943Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
+{"seq":24,"ts":"2026-08-28T04:06:34.962Z","actor":"agent","kind":"outputs","detail":{"outputs":{"savingsBalance":"[REDACTED]","memberName":"[REDACTED]","memberId":"[REDACTED]"}}}
+{"seq":25,"ts":"2026-08-28T04:06:34.962Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"savingsBalance":"[REDACTED]","memberName":"[REDACTED]","memberId":"[REDACTED]"},"runId":"handoff-2026-08-28T04-05-02-706Z","ms":669}}
+{"seq":26,"ts":"2026-08-28T04:07:02.358Z","actor":"operator","kind":"control.transition","detail":{"from":"agent","to":"pause_requested","reason":"operator interacted with the live session"}}
+{"seq":27,"ts":"2026-08-28T04:07:02.359Z","actor":"operator","kind":"barge_in","detail":{"note":"input withheld until the agent yields at a step boundary"}}
+{"seq":28,"ts":"2026-08-28T04:07:03.885Z","actor":"agent","kind":"control.transition","detail":{"from":"pause_requested","to":"operator","reason":"automation paused at a step boundary"}}
+{"seq":29,"ts":"2026-08-28T04:07:04.965Z","actor":"operator","kind":"manual.click","detail":{"control":"Savings"}}
+{"seq":30,"ts":"2026-08-28T04:07:06.177Z","actor":"operator","kind":"manual.click","detail":{"control":"Member Detail NameSarah Chen Member ID12345 StatusActive Acc"}}
+{"seq":31,"ts":"2026-08-28T04:07:06.879Z","actor":"operator","kind":"manual.click","detail":{"control":"New Search"}}
+{"seq":32,"ts":"2026-08-28T04:07:07.829Z","actor":"operator","kind":"manual.click","detail":{"control":"Member ID"}}
+{"seq":33,"ts":"2026-08-28T04:07:08.110Z","actor":"operator","kind":"manual.click","detail":{"control":"Search Type"}}
+{"seq":34,"ts":"2026-08-28T04:07:08.776Z","actor":"operator","kind":"manual.click","detail":{"control":"Member ID"}}
+{"seq":35,"ts":"2026-08-28T04:07:09.158Z","actor":"operator","kind":"manual.click","detail":{"control":"Member ID"}}
+{"seq":36,"ts":"2026-08-28T04:07:11.919Z","actor":"operator","kind":"manual.input","detail":{"control":"Member ID","value":"12344"}}
+{"seq":37,"ts":"2026-08-28T04:07:11.994Z","actor":"operator","kind":"manual.click","detail":{"control":"Search"}}
+{"seq":38,"ts":"2026-08-28T04:07:11.995Z","actor":"operator","kind":"manual.submit","detail":{"control":"form"}}
+{"seq":39,"ts":"2026-08-28T04:07:13.299Z","actor":"operator","kind":"manual.click","detail":{"control":"Return to Member Inquiry"}}
+{"seq":40,"ts":"2026-08-28T04:07:13.908Z","actor":"operator","kind":"manual.click","detail":{"control":"Member ID"}}
+{"seq":41,"ts":"2026-08-28T04:07:17.062Z","actor":"operator","kind":"manual.input","detail":{"control":"Member ID","value":"12345"}}
+{"seq":42,"ts":"2026-08-28T04:07:17.136Z","actor":"operator","kind":"manual.click","detail":{"control":"Search"}}
+{"seq":43,"ts":"2026-08-28T04:07:17.137Z","actor":"operator","kind":"manual.submit","detail":{"control":"form"}}
+{"seq":44,"ts":"2026-08-28T04:07:18.623Z","actor":"operator","kind":"manual.click","detail":{"control":"MemberDesk 7.2 Meridian Credit Union | op: jchen"}}
+{"seq":45,"ts":"2026-08-28T04:07:18.896Z","actor":"operator","kind":"manual.click","detail":{"control":"MemberDesk 7.2"}}
+{"seq":46,"ts":"2026-08-28T04:07:19.075Z","actor":"operator","kind":"manual.click","detail":{"control":"MemberDesk 7.2"}}
+{"seq":47,"ts":"2026-08-28T04:07:19.387Z","actor":"operator","kind":"manual.click","detail":{"control":"MemberDesk 7.2"}}
+{"seq":48,"ts":"2026-08-28T04:07:20.290Z","actor":"operator","kind":"manual.click","detail":{"control":"MemberDesk 7.2"}}
+{"seq":49,"ts":"2026-08-28T04:07:20.463Z","actor":"operator","kind":"manual.click","detail":{"control":"MemberDesk 7.2"}}
+{"seq":50,"ts":"2026-08-28T04:07:21.060Z","actor":"operator","kind":"control.transition","detail":{"from":"operator","to":"resume_requested","reason":"operator handed control back"}}

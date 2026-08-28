@@ -23,7 +23,7 @@ h2{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.09em;c
   <span id="hint" style="color:#7d8595"></span>
 </header>
 <main>
-  <canvas id="screen" width="1024" height="700"></canvas>
+  <canvas id="screen" width="1024" height="700" tabindex="0"></canvas>
   <aside>
     <div id="why" style="display:none"></div>
     <h2>Session log</h2><div id="log"></div>
@@ -56,7 +56,7 @@ new EventSource('/events').onmessage=(m)=>{
     const e=document.createElement('div');e.className='ev';
     e.innerHTML='<span class="a a-'+d.event.actor+'">'+d.event.actor+'</span> '+d.event.kind+
       (d.event.detail?' <span style="color:#7d8595">'+JSON.stringify(d.event.detail).slice(0,120)+'</span>':'');
-    log.prepend(e);
+    log.prepend(e); if(log.childElementCount>200) log.lastElementChild.remove();
   }
 };
 
@@ -69,9 +69,15 @@ give.onclick=()=>post('/control',{action:'handback'});
 const at=(e)=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*(cv.width/r.width),y:(e.clientY-r.top)*(cv.height/r.height)};};
 cv.onmousedown=(e)=>{const p=at(e);post('/input',{type:'mouse',action:'down',x:p.x,y:p.y});};
 cv.onmouseup=(e)=>{const p=at(e);post('/input',{type:'mouse',action:'up',x:p.x,y:p.y});};
-window.onkeydown=(e)=>{
-  if(holder!=='operator'||e.target!==document.body)return; e.preventDefault();
+// Keys go to the SESSION, not to this page. Guarded only against the console's
+// own form controls, so focus landing on the canvas (which clicking it does)
+// does not silently swallow every keystroke.
+window.addEventListener('keydown',(e)=>{
+  if(holder!=='operator')return;
+  const t=e.target&&e.target.tagName;
+  if(t==='INPUT'||t==='TEXTAREA')return;
+  e.preventDefault();
   if(e.key.length===1) post('/input',{type:'text',text:e.key});
   else post('/input',{type:'key',action:'down',key:e.key});
-};
+});
 </script></body></html>
