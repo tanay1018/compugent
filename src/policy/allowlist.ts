@@ -1,0 +1,146 @@
+import { z } from 'zod';
+import type { Action, UINode } from '../surface/types.js';
+
+/**
+ * Safety & policy layer.
+ *
+ * Two jobs that are deliberately kept apart:
+ *
+ *   1. CLASSIFY (compile time) — propose an `effect` for each recorded step.
+ *      Runs once, when a discovery trace becomes an artifact, where a human
+ *      can review the result.
+ *   2. ENFORCE (run time)      — allow or refuse an action against the saved
+ *      artifact and the active policy. Never re-classifies.
+ *
+ * Collapsing these is the tempting mistake: it would mean guessing "is this
+ * button destructive?" from a control's label in the middle of a production
+ * run. Guessing at replay time is exactly where you post a duplicate
+ * transaction. Replay enforces a decision that was already reviewed.
+ */
+
+/** How reversible an action is. Drives BOTH the safety gate and re-entry
+ *  after a human takeover — one field, two consumers. */
+export const Effect = z.enum(['read', 'reversible', 'irreversible']);
+export type Effect = z.infer<typeof Effect>;
+
+export const PolicyConfig = z.object({
+  /** Exact origins the agent may operate against. No wildcards: a wildcard in
+   *  a bank allowlist is how you end up driving a production console. */
+  allowedOrigins: z.array(z.string().url()),
+  /** Path prefixes permitted within those origins. */
+  allowedPathPrefixes: z.array(z.string()).default(['/']),
+  allowedActions: z.array(z.enum(['click', 'type', 'select', 'press', 'navigate', 'read'])),
+  /** Control labels that mark an action as irreversible when CLASSIFYING. */
+  irreversiblePatterns: z.array(z.string()).default([
+    'submit', 'confirm', 'post', 'transfer', 'delete', 'remove', 'approve',
+    'authorize', 'close account', 'disburse', 'issue', 'send', 'pay',
+  ]),
+  /** What ENFORCEMENT does when a step declares itself irreversible. */
+  onIrreversible: z.enum(['block', 'require_approval', 'flag']).default('require_approval'),
+  /** Field labels whose values must never be logged or persisted. */
+  sensitiveFieldPatterns: z.array(z.string()).default([
+    'password', 'passcode', 'pin', 'ssn', 'social security', 'tax id', 'tin',
+    'card number', 'cvv', 'security code', 'account number', 'routing',
+    'date of birth', 'dob', 'mother', 'secret',
+  ]),
+});
+export type PolicyConfig = z.infer<typeof PolicyConfig>;
+
+export type Decision =
+  | { allow: true }
+  | { allow: false; reason: string; code: 'origin' | 'path' | 'action' | 'irreversible' }
+  | { allow: 'needs_approval'; reason: string };
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** CLASSIFY — compile time only. */
+export function classifyEffect(policy: PolicyConfig, action: Action, node?: UINode): Effect {
+  if (action.kind === 'read') return 'read';
+  if (action.kind === 'navigate') return 'reversible';
+  // Typing is reversible on its own; it is the submit that commits.
+  if (action.kind === 'type' || action.kind === 'select' || action.kind === 'press') return 'reversible';
+
+  const label = norm([node?.name, node?.anchorText, node?.value].filter(Boolean).join(' '));
+  if (!label) return 'reversible';
+  return policy.irreversiblePatterns.some((p) => label.includes(norm(p)))
+    ? 'irreversible'
+    : 'reversible';
+}
+
+export function checkNavigation(policy: PolicyConfig, url: string): Decision {
+  let u: URL;
+  try { u = new URL(url); } catch { return { allow: false, reason: `unparseable url: ${url}`, code: 'origin' }; }
+
+  if (!policy.allowedOrigins.includes(u.origin)) {
+    return { allow: false, code: 'origin', reason: `origin ${u.origin} is not in the allowlist` };
+  }
+  if (!policy.allowedPathPrefixes.some((p) => u.pathname.startsWith(p))) {
+    return { allow: false, code: 'path', reason: `path ${u.pathname} is outside the permitted prefixes` };
+  }
+  return { allow: true };
+}
+
+/**
+ * ENFORCE — run time. `declaredEffect` comes from the artifact, where it was
+ * classified and reviewed; it is not re-derived here.
+ */
+export function checkAction(policy: PolicyConfig, action: Action, declaredEffect: Effect): Decision {
+  if (!policy.allowedActions.includes(action.kind)) {
+    return { allow: false, code: 'action', reason: `action "${action.kind}" is not permitted by policy` };
+  }
+  if (action.kind === 'navigate' && action.url) {
+    const nav = checkNavigation(policy, action.url);
+    if (nav.allow !== true) return nav;
+  }
+  if (declaredEffect === 'irreversible') {
+    switch (policy.onIrreversible) {
+      case 'block':
+        return { allow: false, code: 'irreversible', reason: 'policy blocks irreversible actions' };
+      case 'require_approval':
+        // Not a failure — this is the designed route into human escalation.
+        return { allow: 'needs_approval', reason: 'irreversible action requires operator approval' };
+      case 'flag':
+        return { allow: true };
+    }
+  }
+  return { allow: true };
+}
+
+// --- Redaction ------------------------------------------------------------
+// Applied at CAPTURE time, never as a cleanup pass. A value that reaches a log
+// unredacted has already been persisted; scrubbing afterwards is theatre.
+
+const VALUE_PATTERNS: Array<[RegExp, string]> = [
+  [/\b\d{3}-\d{2}-\d{4}\b/g, '[REDACTED:SSN]'],
+  [/\b(?:\d[ -]*?){13,19}\b/g, '[REDACTED:PAN]'],
+  [/\b\d{9,17}\b/g, '[REDACTED:ACCT]'],
+  [/\b[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, '[REDACTED:EMAIL]'],
+];
+
+export function isSensitiveField(policy: PolicyConfig, label: string | undefined): boolean {
+  if (!label) return false;
+  const l = norm(label);
+  return policy.sensitiveFieldPatterns.some((p) => l.includes(norm(p)));
+}
+
+/** Redact a value about to be logged, given the label of the field it came from. */
+export function redactValue(policy: PolicyConfig, label: string | undefined, value: string): string {
+  if (isSensitiveField(policy, label)) return '[REDACTED]';
+  return redactText(value);
+}
+
+/** Redact free text (page content, error messages, model rationales). */
+export function redactText(text: string): string {
+  let out = text;
+  for (const [re, rep] of VALUE_PATTERNS) out = out.replace(re, rep);
+  return out;
+}
+
+/** Default policy for the bundled target app. */
+export const defaultPolicy = (origin: string): PolicyConfig =>
+  PolicyConfig.parse({
+    allowedOrigins: [origin],
+    allowedPathPrefixes: ['/'],
+    allowedActions: ['click', 'type', 'select', 'press', 'navigate', 'read'],
+    onIrreversible: 'require_approval',
+  });
