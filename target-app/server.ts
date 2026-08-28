@@ -38,12 +38,19 @@ function header(t: TenantConfig) {
 }
 
 function lookup(t: TenantConfig) {
-  // L2 replaces the named submit button with an unlabelled image input, so the
-  // button itself becomes anonymous and must be anchored positionally too.
+  // L2 replaces the named submit with an unlabelled image input. Note the
+  // browser then SYNTHESISES the accessible name "Submit" — author-provided
+  // nothing, Chrome-provided default. Targeting that name looks safe and is
+  // not: it is a browser-version artefact, not app content. L2 therefore also
+  // gives the control a labelled cell so the anchor can carry it instead.
   const submit =
     t.hostility === 'L2'
       ? `<input type="image" src="/img/go.svg" name="go" width="64" height="22">`
       : `<input type="submit" value="${t.labels.submit}">`;
+  const submitRow =
+    t.hostility === 'L2'
+      ? `<tr><td align="right"><font size="2">Action</font></td><td>${submit}</td></tr>`
+      : `<tr><td colspan="2" align="right">${submit}</td></tr>`;
   const sel = (v: string) => (t.defaultSearchType === v ? ' selected' : '');
   return shell(t, `
 <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td>
@@ -60,7 +67,7 @@ function lookup(t: TenantConfig) {
           <option value="M"${sel('M')}>Member Number</option>
           <option value="S"${sel('S')}>SSN (last 4)</option>
         </select></td></tr>
-    <tr><td colspan="2" align="right">${submit}</td></tr>
+    ${submitRow}
     </form>
    </table>
   </td></tr></table>

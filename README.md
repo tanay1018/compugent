@@ -6,8 +6,8 @@ successful run is compiled into a typed, versioned **capability artifact**;
 that artifact then replays deterministically with **no model in the decision
 loop**, which is the path an AI agent invokes in production.
 
-> Status: **Phase 0 — foundations.** See `../ROADMAP.md` for the plan and
-> `REPORT.md` (pending) for the design write-up.
+> Status: **Phase 2 — perception & acting.** See `../ROADMAP.md` for the plan
+> and `REPORT.md` (pending) for the design write-up.
 
 ## Setup
 
@@ -68,6 +68,41 @@ evidence/        discovery + replay runs
 The split between `src/schema` and `src/surface` is the central boundary: if a
 platform detail can reach a stored artifact, that artifact stops being
 portable across surfaces and tenants.
+
+## Seeing what the system perceives
+
+```bash
+npm run app                                              # terminal 1
+npm run observe -- http://localhost:8710/?tenant=harbor   # terminal 2
+```
+
+```
+frame "main"
+  [5] textbox   anchor="Account Number" (inSameRowAs)
+  [7] combobox  anchor="Lookup By" (inSameRowAs) value="Member Number"
+  [9] button    "Submit" anchor="Action" (inSameRowAs)
+```
+
+Two things that output makes concrete:
+
+- The lookup field has **no accessible name**. Name-based targeting is dead on
+  arrival here; the adjacent-cell anchor is the only durable identity.
+- The submit button reports `"Submit"` — a name **the browser synthesised**,
+  because the author gave the image input no alt text. Trusting it would pin
+  the artifact to a Chrome default rather than to app content. Descriptors
+  therefore record name *and* anchor, and resolution prefers the name but
+  falls through to the anchor.
+
+## Tests
+
+```bash
+npm test               # resolver — pure, fixture-driven, no browser (10 tests)
+npm run test:integration   # real surface against the real legacy app (4 tests)
+```
+
+Target resolution is a pure function of `(Observation, TargetDescriptor)`, so
+the most safety-critical logic in the system — anchor matching and ambiguity
+detection — is tested without launching anything.
 
 ## Demo path
 

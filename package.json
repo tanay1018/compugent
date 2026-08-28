@@ -3,11 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "app": "tsx target-app/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "test:integration": "tsx --test test/*.itest.ts",
+    "observe": "tsx scripts/observe.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",
