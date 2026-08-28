@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "outputs": {
+    "savingsBalance": "[REDACTED]",
+    "memberName": "[REDACTED]",
+    "memberId": "[REDACTED]"
+  },
+  "runId": "replay-2026-08-28T04-16-42-856Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "ok",
+      "ms": 451,
+      "target": "textbox inSameRowAs \"Member ID\" in frame \"main\"",
+      "resolvedVia": "anchor"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "ok",
+      "ms": 231,
+      "target": "button named \"Search\" follows \"Search Type\" in frame \"main\"",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 938
+}

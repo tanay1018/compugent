@@ -125,7 +125,7 @@ export interface Surface {
    * subtlest logic in the system, and this signature makes them unit-testable
    * against fixture observations with no browser and no target app running.
    */
-  resolve(observation: Observation, target: TargetDescriptor): ResolveResult;
+  resolve(observation: Observation, target: TargetDescriptor, params?: Record<string, unknown>): ResolveResult;
 
   /** Perform an action against a node from the given observation. */
   act(observation: Observation, node: UINode, action: Action): Promise<void>;

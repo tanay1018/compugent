@@ -98,6 +98,9 @@ export type ResolutionTier = z.infer<typeof ResolutionTier>;
 export const TargetDescriptor = z
   .object({
     role: Role,
+    /** May contain `{{param}}` placeholders, substituted at replay time. That
+     *  is what makes "click the row for member {{memberId}}" expressible —
+     *  a pattern back-office result grids use constantly. */
     name: z.string().optional(),
     nameMatch: NameMatch.default('normalized'),
     anchor: Anchor.optional(),

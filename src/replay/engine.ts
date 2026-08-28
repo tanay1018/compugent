@@ -3,6 +3,7 @@ import { evaluateAssertion, describeTarget, type StateAssertion } from '../schem
 import type { Observation } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
 import { checkAction, type PolicyConfig } from '../policy/allowlist.js';
+import { interpolate } from '../surface/resolve.js';
 import type { RunLog } from '../run/log.js';
 import type { ReplayResult, StepReport, ReplayFailure } from './result.js';
 
@@ -49,9 +50,9 @@ interface Matched {
 }
 
 /** Ask the artifact what this screen means, before calling it a failure. */
-function matchOutcome(a: CapabilityArtifact, o: Observation): Matched | null {
+function matchOutcome(a: CapabilityArtifact, o: Observation, params?: Record<string, unknown>): Matched | null {
   for (const oc of a.outcomes) {
-    const r = evaluateAssertion(o, oc.detect);
+    const r = evaluateAssertion(o, oc.detect, params);
     if (r.held) return { outcome: oc, detail: r.detail };
   }
   return null;
@@ -158,20 +159,20 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       //    step timeout before reporting an answer the app rendered instantly.
       const settled: Observation | null = step.waypoint
         ? await surface.waitUntil(
-            (o) => evaluateAssertion(o, step.waypoint as StateAssertion).held || matchOutcome(a, o) !== null,
+            (o) => evaluateAssertion(o, step.waypoint as StateAssertion, opts.inputs).held || matchOutcome(a, o, opts.inputs) !== null,
             { timeoutMs: stepTimeout },
           )
         : await surface.observe();
 
       const obs: Observation | null =
-        settled && (!step.waypoint || evaluateAssertion(settled, step.waypoint).held) ? settled : null;
+        settled && (!step.waypoint || evaluateAssertion(settled, step.waypoint, opts.inputs).held) ? settled : null;
 
       if (!obs) {
         // Did not arrive. Ask the artifact what this screen means BEFORE
         // calling it a failure -- this is where "no such member" is separated
         // from "the app is broken".
         const current = settled ?? (await surface.observe());
-        const m = matchOutcome(a, current);
+        const m = matchOutcome(a, current, opts.inputs);
         if (m) {
           const handled = await handleOutcome(m, current);
           if (handled === 'retry' && attempts <= 3) continue;
@@ -180,17 +181,17 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         report.status = 'failed';
         report.ms = Date.now() - sT0;
         steps.push(report);
-        const detail = evaluateAssertion(current, step.waypoint as StateAssertion);
+        const detail = evaluateAssertion(current, step.waypoint as StateAssertion, opts.inputs);
         return fail({
           code: 'waypoint_failed', stepIndex: step.index, stepId: step.id,
-          expected: describeAssertion(step.waypoint as StateAssertion),
+          expected: describeAssertion(step.waypoint as StateAssertion, opts.inputs),
           observed: `${detail.detail} (at ${current.location})`,
         });
       }
 
       // An outcome can also be reached WHILE the waypoint holds -- a permission
       // banner rendered on the same screen, for instance.
-      const early = matchOutcome(a, obs);
+      const early = matchOutcome(a, obs, opts.inputs);
       if (early) {
         const handled = await handleOutcome(early, obs);
         if (handled === 'retry' && attempts <= 3) continue;
@@ -200,7 +201,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       if (!step.target) break;
 
       // 2. Resolve.
-      const r = surface.resolve(obs, step.target);
+      const r = surface.resolve(obs, step.target, opts.inputs);
       if (!r.ok) {
         report.status = 'failed';
         report.ms = Date.now() - sT0;
@@ -237,7 +238,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       if (decision.allow === 'needs_approval') {
         // 4. Irreversible: has it already happened? Without this, a run resumed
         //    after a human takeover opens a second account.
-        if (step.idempotencyProbe && evaluateAssertion(obs, step.idempotencyProbe).held) {
+        if (step.idempotencyProbe && evaluateAssertion(obs, step.idempotencyProbe, opts.inputs).held) {
           report.status = 'skipped';
           report.note = 'idempotency probe indicates this step already took effect';
           report.ms = Date.now() - sT0;
@@ -265,10 +266,10 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       });
 
       if (step.produces) {
-        const after = await surface.waitUntil((o) => evaluateAssertion(o, step.produces as StateAssertion).held, { timeoutMs: stepTimeout });
+        const after = await surface.waitUntil((o) => evaluateAssertion(o, step.produces as StateAssertion, opts.inputs).held, { timeoutMs: stepTimeout });
         if (!after) {
           const current = await surface.observe();
-          const m = matchOutcome(a, current);
+          const m = matchOutcome(a, current, opts.inputs);
           if (m) {
             const handled = await handleOutcome(m, current);
             if (handled !== 'retry') return handled;
@@ -294,13 +295,13 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   let lastSeen: Observation | null = null;
   for (let attempt = 1; attempt <= 3 && !arrived; attempt++) {
     const settled = await surface.waitUntil(
-      (o) => evaluateAssertion(o, a.checkpoint).held || matchOutcome(a, o) !== null,
+      (o) => evaluateAssertion(o, a.checkpoint, opts.inputs).held || matchOutcome(a, o, opts.inputs) !== null,
       { timeoutMs: stepTimeout },
     );
     lastSeen = settled ?? (await surface.observe());
-    if (evaluateAssertion(lastSeen, a.checkpoint).held) { arrived = lastSeen; break; }
+    if (evaluateAssertion(lastSeen, a.checkpoint, opts.inputs).held) { arrived = lastSeen; break; }
 
-    const m = matchOutcome(a, lastSeen);
+    const m = matchOutcome(a, lastSeen, opts.inputs);
     if (!m) break;
     const handled = await handleOutcome(m, lastSeen);
     if (handled !== 'retry') return handled;
@@ -309,8 +310,8 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     const current = lastSeen ?? (await surface.observe());
     return fail({
       code: 'checkpoint_failed',
-      expected: describeAssertion(a.checkpoint),
-      observed: `${evaluateAssertion(current, a.checkpoint).detail} (at ${current.location})`,
+      expected: describeAssertion(a.checkpoint, opts.inputs),
+      observed: `${evaluateAssertion(current, a.checkpoint, opts.inputs).detail} (at ${current.location})`,
     });
   }
   log.saveScreenshot(await surface.screenshot(), 'checkpoint');
@@ -318,7 +319,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   // --- Outputs ------------------------------------------------------------
   const outputs: Record<string, unknown> = {};
   for (const spec of a.outputs) {
-    const r = surface.resolve(arrived, spec.from);
+    const r = surface.resolve(arrived, spec.from, opts.inputs);
     if (!r.ok) {
       return fail({
         code: 'output_missing',
@@ -377,12 +378,13 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   }
 }
 
-function describeAssertion(a: StateAssertion): string {
+function describeAssertion(a: StateAssertion, params?: Record<string, unknown>): string {
+  const t = (d: Parameters<typeof describeTarget>[0]) => describeTarget(params ? interpolate(d, params) : d);
   switch (a.kind) {
-    case 'nodeExists': return `${describeTarget(a.target)} present`;
-    case 'nodeAbsent': return `${describeTarget(a.target)} absent`;
+    case 'nodeExists': return `${t(a.target)} present`;
+    case 'nodeAbsent': return `${t(a.target)} absent`;
     case 'textPresent': return `text "${a.text}" present`;
     case 'locationMatches': return `location matching ${a.pattern}`;
-    case 'all': return a.of.map(describeAssertion).join(' AND ');
+    case 'all': return a.of.map((x) => describeAssertion(x, params)).join(' AND ');
   }
 }

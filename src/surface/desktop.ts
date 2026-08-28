@@ -51,7 +51,7 @@ export class DesktopSurface implements Surface {
   }
 
   observe(): Promise<Observation> { this.notImplemented('observe'); }
-  resolve(_o: Observation, _t: TargetDescriptor): ResolveResult { this.notImplemented('resolve'); }
+  resolve(_o: Observation, _t: TargetDescriptor, _p?: Record<string, unknown>): ResolveResult { this.notImplemented('resolve'); }
   act(_o: Observation, _n: UINode, _a: Action): Promise<void> { this.notImplemented('act'); }
   screenshot(): Promise<Buffer> { this.notImplemented('screenshot'); }
   navigate(_url: string): Promise<void> { this.notImplemented('navigate'); }

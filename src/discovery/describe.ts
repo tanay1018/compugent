@@ -59,24 +59,36 @@ export function describeNode(observation: Observation, node: UINode, purpose: Pu
   for (const d of attempts) {
     const r = resolveTarget(observation, d);
     if (r.ok && r.node.ref === node.ref) return { descriptor: d, verified: true };
-  }
 
-  // Nothing resolves uniquely. Fall back to an ordinal among same-role nodes in
-  // the frame — honest but brittle, and flagged so review can catch it.
-  const siblings = observation.nodes.filter((n) => n.role === node.role && n.frame === node.frame);
-  const idx = siblings.findIndex((n) => n.ref === node.ref);
-  const first = attempts[0];
-  if (first && idx >= 0) {
-    const withOrdinal = TargetDescriptor.parse({ ...first, ordinal: idx });
-    const r = resolveTarget(observation, withOrdinal);
-    if (r.ok && r.node.ref === node.ref) {
-      return {
-        descriptor: withOrdinal,
-        verified: true,
-        problem: `not uniquely identifiable; fell back to ordinal ${idx} of ${siblings.length} ${node.role} nodes`,
-      };
+    // Ambiguous is recoverable at RECORD time in a way it never is at replay
+    // time: we can see which of the candidates the model actually meant.
+    //
+    // The ordinal must index the MATCHING CANDIDATES, not all same-role nodes
+    // in the frame — that is the population resolveTarget applies it to. An
+    // earlier version counted siblings, so the ordinal never verified and
+    // descriptors shipped ambiguous. The failure surfaced on a product grid
+    // where every tile carries two identically-named links (thumbnail and
+    // title), which is the norm on real listings and never happened on a
+    // hand-built form.
+    if (!r.ok && r.reason === 'ambiguous') {
+      const idx = r.candidates.findIndex((c) => c.ref === node.ref);
+      if (idx >= 0) {
+        const withOrdinal = TargetDescriptor.parse({ ...d, ordinal: idx });
+        const rr = resolveTarget(observation, withOrdinal);
+        if (rr.ok && rr.node.ref === node.ref) {
+          return {
+            descriptor: withOrdinal,
+            verified: true,
+            // Positional, so it is fragile if the page ever reorders. Flagged
+            // rather than hidden: the step carries this into review.
+            problem: `not unique — disambiguated by ordinal ${idx} of ${r.candidates.length} matching ${node.role} nodes`,
+          };
+        }
+      }
     }
   }
+
+  const first = attempts[0];
 
   return {
     descriptor: first ?? TargetDescriptor.parse({ ...base, name: node.name || '(unnamed)' }),

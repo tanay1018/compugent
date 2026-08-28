@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TargetDescriptor } from './target.js';
 import type { Observation } from '../surface/types.js';
-import { resolveTarget, norm } from '../surface/resolve.js';
+import { resolveTarget, interpolate, norm } from '../surface/resolve.js';
 
 /**
  * A condition on observable state.
@@ -49,28 +49,32 @@ export interface AssertionResult {
  * tested offline against a captured observation is a checkpoint nobody can
  * debug after the fact.
  */
-export function evaluateAssertion(o: Observation, a: StateAssertion): AssertionResult {
+export function evaluateAssertion(
+  o: Observation,
+  a: StateAssertion,
+  params?: Record<string, unknown>,
+): AssertionResult {
   if (a.kind === 'all') {
     for (const sub of a.of) {
-      const r = evaluateAssertion(o, sub);
+      const r = evaluateAssertion(o, sub, params);
       if (!r.held) return r;
     }
     return { held: true, detail: `all ${a.of.length} conditions held` };
   }
   switch (a.kind) {
     case 'nodeExists': {
-      const r = resolveTarget(o, a.target);
+      const r = resolveTarget(o, a.target, params);
       if (r.ok) return { held: true, detail: `found ${a.target.role}` };
       return {
         held: false,
         detail:
           r.reason === 'ambiguous'
             ? `expected one ${a.target.role}, found ${r.candidates.length}`
-            : `no ${a.target.role} matching ${describeTarget(a.target)} (tried: ${r.tried.join(', ') || 'nothing'})`,
+            : `no ${a.target.role} matching ${describeTarget(interpolate(a.target, params ?? {}))} (tried: ${r.tried.join(', ') || 'nothing'})`,
       };
     }
     case 'nodeAbsent': {
-      const r = resolveTarget(o, a.target);
+      const r = resolveTarget(o, a.target, params);
       return r.ok
         ? { held: false, detail: `expected ${describeTarget(a.target)} to be absent, but it is present` }
         : { held: true, detail: 'absent as expected' };

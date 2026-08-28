@@ -17,9 +17,12 @@ const unattended = args.includes('--unattended');
 const inputs: Record<string, string> = {};
 for (const a of args) { const m = /^([A-Za-z0-9_]+)=(.*)$/.exec(a); if (m) inputs[m[1]!] = m[2]!; }
 
+const urlFlag = args.indexOf('--url');
 const port = process.env.TARGET_APP_PORT ?? '8710';
 const tenant = process.env.TENANT ?? 'meridian';
-const baseUrl = `http://localhost:${port}/?tenant=${tenant}`;
+// --url points the SAME artifact at a different host. That is the multi-tenant
+// seam in miniature: the artifact stores a route pattern, never an origin.
+const baseUrl = urlFlag >= 0 ? args[urlFlag + 1]! : `http://localhost:${port}/?tenant=${tenant}`;
 
 const artifact = new ArtifactStore().load(id);
 const runId = `replay-${new Date().toISOString().replace(/[:.]/g, '-')}`;

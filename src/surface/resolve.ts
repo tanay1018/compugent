@@ -50,7 +50,29 @@ function verdict(cands: UINode[], target: TargetDescriptor, via: ResolutionTier,
   return { ok: false, reason: 'ambiguous', candidates: cands };
 }
 
-export function resolveTarget(observation: Observation, target: TargetDescriptor): ResolveResult {
+/**
+ * Interpolate `{{param}}` placeholders into a descriptor.
+ *
+ * Parameterising a step's VALUE is not enough. "Click the row for member
+ * 12345" parameterises the TARGET itself, and that pattern is everywhere in
+ * back-office software — result grids, account lists, transaction rows.
+ * Without this, such a flow could only ever be recorded for one record.
+ */
+export function interpolate(t: TargetDescriptor, params: Record<string, unknown>): TargetDescriptor {
+  const sub = (v: string): string =>
+    v.replace(/\{\{(\w+)\}\}/g, (m, k: string) => (params[k] === undefined ? m : String(params[k])));
+  const out: TargetDescriptor = { ...t };
+  if (t.name !== undefined) out.name = sub(t.name);
+  if (t.anchor) out.anchor = { ...t.anchor, text: sub(t.anchor.text) };
+  return out;
+}
+
+export function resolveTarget(
+  observation: Observation,
+  rawTarget: TargetDescriptor,
+  params?: Record<string, unknown>,
+): ResolveResult {
+  const target = params ? interpolate(rawTarget, params) : rawTarget;
   const tried: ResolutionTier[] = [];
   const pool = observation.nodes.filter((n) => n.role === target.role && inScope(n, target));
 

@@ -113,3 +113,27 @@ test('reports which tiers were tried when nothing matches', () => {
   assert.equal(r.ok, false);
   assert.deepEqual(!r.ok && r.reason === 'not_found' && r.tried, ['name', 'anchor']);
 });
+
+test('descriptors interpolate {{param}} so a TARGET can be parameterised', () => {
+  // "click the row for member 12345" — the pattern every back-office result
+  // grid uses. Without this, such a step is pinned to the recorded record.
+  const o = obs([
+    node({ role: 'link', name: 'Sarah Chen' }),
+    node({ role: 'link', name: 'Marcus Webb' }),
+  ]);
+  const t = target({ role: 'link', name: '{{memberName}}' });
+
+  const hit = resolveTarget(o, t, { memberName: 'Marcus Webb' });
+  assert.equal(hit.ok, true);
+  assert.equal(hit.ok && hit.node.name, 'Marcus Webb');
+
+  // Unbound placeholders must not accidentally match anything.
+  assert.equal(resolveTarget(o, t, {}).ok, false);
+});
+
+test('interpolation reaches anchor text too', () => {
+  const o = obs([node({ role: 'cell', anchorText: 'Savings', anchorRelation: 'inSameRowAs' })]);
+  const r = resolveTarget(o, target({ role: 'cell', anchor: { relation: 'inSameRowAs', text: '{{accountType}}' } }),
+    { accountType: 'Savings' });
+  assert.equal(r.ok, true);
+});

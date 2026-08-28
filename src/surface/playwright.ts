@@ -151,8 +151,11 @@ export class PlaywrightSurface implements Surface {
         const role = normaliseWebRole(raw);
         if (!ACTIONABLE.has(role) && !INFORMATIONAL.has(role)) continue;
 
-        const name = String(ax.name?.value ?? '').replace(/\s+/g, ' ').trim();
-        const value = String(ax.value?.value ?? '').trim();
+        // Long prose (a product description, a terms blob) is never a target
+        // and never an output -- it is pure token cost. One page of untruncated
+        // body copy took a discovery run to 124K input tokens.
+        const name = String(ax.name?.value ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        const value = String(ax.value?.value ?? '').trim().slice(0, 200);
         // Informational nodes with no text carry nothing; actionable ones are
         // kept even when anonymous, because anchoring can still identify them.
         if (!ACTIONABLE.has(role) && name === '') continue;
@@ -221,11 +224,18 @@ export class PlaywrightSurface implements Surface {
   }
 
   /** Pure; delegates to the shared resolver so web and desktop cannot drift. */
-  resolve(observation: Observation, target: TargetDescriptor): ResolveResult {
-    return resolveTarget(observation, target);
+  resolve(observation: Observation, target: TargetDescriptor, params?: Record<string, unknown>): ResolveResult {
+    return resolveTarget(observation, target, params);
   }
 
   private async centreOf(node: UINode): Promise<{ x: number; y: number }> {
+    // Scroll first. getBoxModel reports LAYOUT coordinates, so an element below
+    // the fold yields a point outside the viewport and the dispatched click
+    // lands on nothing -- silently, because the event is still delivered. The
+    // bundled target app never caught this: everything fits on one screen.
+    await this.cdp
+      .send('DOM.scrollIntoViewIfNeeded', { backendNodeId: node.handle as number })
+      .catch(() => {});
     const { model } = await this.cdp.send('DOM.getBoxModel', { backendNodeId: node.handle as number });
     const q = model.content as number[];
     return {

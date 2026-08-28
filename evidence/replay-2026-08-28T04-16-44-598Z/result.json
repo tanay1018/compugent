@@ -1,0 +1,27 @@
+{
+  "status": "business_outcome",
+  "outcome": "member_not_found",
+  "message": "No member matches that identifier.",
+  "runId": "replay-2026-08-28T04-16-44-598Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "ok",
+      "ms": 432,
+      "target": "textbox inSameRowAs \"Member ID\" in frame \"main\"",
+      "resolvedVia": "anchor"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "ok",
+      "ms": 229,
+      "target": "button named \"Search\" follows \"Search Type\" in frame \"main\"",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 862
+}

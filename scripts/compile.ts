@@ -26,8 +26,8 @@ const trace = JSON.parse(readFileSync(join(runDir, 'trace.json'), 'utf8'));
 const { artifact, warnings } = await compileTrace({
   trace,
   discoveryRunId: runDir.split('/').at(-1)!,
-  vendorProduct: 'Corelink MemberDesk 7.2',
-  tenant: new URL(trace.entryUrl).searchParams.get('tenant') ?? 'meridian',
+  vendorProduct: process.env.VENDOR_PRODUCT ?? 'Corelink MemberDesk 7.2',
+  tenant: new URL(trace.entryUrl).searchParams.get('tenant') ?? new URL(trace.entryUrl).hostname,
 });
 
 const path = new ArtifactStore().save(artifact);

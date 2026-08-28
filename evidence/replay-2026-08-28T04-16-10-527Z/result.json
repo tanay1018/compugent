@@ -1,0 +1,32 @@
+{
+  "status": "failed",
+  "failure": {
+    "code": "waypoint_failed",
+    "stepIndex": 2,
+    "stepId": "s2",
+    "expected": "link named \"No Such Book\" in frame \"root\" #0 present",
+    "observed": "no link matching link named \"No Such Book\" in frame \"root\" #0 (tried: name) (at https://books.toscrape.com/catalogue/category/books/poetry_23/index.html)",
+    "screenshot": "screenshots/003-failure.png"
+  },
+  "runId": "replay-2026-08-28T04-16-10-527Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "click",
+      "status": "ok",
+      "ms": 509,
+      "target": "link named \"{{categoryName}}\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "failed",
+      "ms": 15367,
+      "target": "link named \"{{bookTitle}}\" in frame \"root\" #0"
+    }
+  ],
+  "ms": 16887
+}

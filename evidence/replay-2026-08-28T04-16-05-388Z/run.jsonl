@@ -1,0 +1,6 @@
+{"seq":1,"ts":"2026-08-28T04:16:05.496Z","actor":"system","kind":"replay.start","detail":{"capability":"catalogue.readBookPriceAndStock v1","approval":"draft","inputs":{"categoryName":"Poetry","bookTitle":"The Black Maria"}}}
+{"seq":2,"ts":"2026-08-28T04:16:06.454Z","actor":"agent","kind":"navigate","detail":{"url":"https://books.toscrape.com/"}}
+{"seq":3,"ts":"2026-08-28T04:16:07.033Z","actor":"agent","kind":"step.click","detail":{"step":1,"target":"link named \"{{categoryName}}\" in frame \"root\"","via":"name"}}
+{"seq":4,"ts":"2026-08-28T04:16:07.507Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"link named \"{{bookTitle}}\" in frame \"root\" #0","via":"name"}}
+{"seq":5,"ts":"2026-08-28T04:16:07.580Z","actor":"agent","kind":"outputs","detail":{"outputs":{"priceInclTax":52.15,"availability":"In stock (19 available)"}}}
+{"seq":6,"ts":"2026-08-28T04:16:07.580Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"priceInclTax":52.15,"availability":"In stock (19 available)"},"runId":"replay-2026-08-28T04-16-05-388Z","ms":2084}}

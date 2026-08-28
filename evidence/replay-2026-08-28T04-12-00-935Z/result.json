@@ -1,0 +1,32 @@
+{
+  "status": "failed",
+  "failure": {
+    "code": "waypoint_failed",
+    "stepIndex": 2,
+    "stepId": "s2",
+    "expected": "link named \"The Grand Design\" in frame \"root\" present",
+    "observed": "expected one link, found 2 (at https://books.toscrape.com/catalogue/category/books/science_22/index.html)",
+    "screenshot": "screenshots/003-failure.png"
+  },
+  "runId": "replay-2026-08-28T04-12-00-935Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "click",
+      "status": "ok",
+      "ms": 555,
+      "target": "link named \"{{categoryName}}\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "failed",
+      "ms": 15192,
+      "target": "link named \"{{bookTitle}}\" in frame \"root\""
+    }
+  ],
+  "ms": 16696
+}

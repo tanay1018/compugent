@@ -2,6 +2,7 @@ import { generateObject } from 'ai';
 import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
 import { CapabilityArtifact, ParamSpec, OutputSpec, type Step } from '../schema/artifact.js';
+import type { TargetDescriptor } from '../schema/target.js';
 import type { StateAssertion } from '../schema/assertion.js';
 import { canonicaliseLocation } from '../schema/canonical.js';
 import type { DiscoveryTrace, TraceStep } from '../discovery/agent.js';
@@ -125,23 +126,33 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
   const inputs: ParamSpec[] = [];
   for (const p of proposal.parameters) {
     const step = trace.steps.find((s) => s.index === p.stepIndex);
-    if (!step || step.literal === undefined) {
-      warnings.push(`dropped proposed parameter "${p.name}": step ${p.stepIndex} has no literal value`);
+    if (!step) {
+      warnings.push(`dropped proposed parameter "${p.name}": no step ${p.stepIndex}`);
       continue;
     }
-    if (step.literal !== p.literalValue) {
+
+    // A parameter may generalise either a typed VALUE ("12345" into a field) or
+    // the step's TARGET ("click the row for Sarah Chen"). Both are real; a
+    // validator that only knew about values rejected genuine target parameters
+    // and pinned the capability to whatever record was recorded.
+    const fromValue = step.literal !== undefined && step.literal === p.literalValue;
+    const fromTarget =
+      step.target.name === p.literalValue || step.target.anchor?.text === p.literalValue;
+
+    if (!fromValue && !fromTarget) {
       warnings.push(
-        `dropped proposed parameter "${p.name}": claimed literal ${JSON.stringify(p.literalValue)} ` +
-        `but step ${p.stepIndex} actually used ${JSON.stringify(step.literal)}`,
+        `dropped proposed parameter "${p.name}": ${JSON.stringify(p.literalValue)} does not appear ` +
+        `at step ${p.stepIndex} as a typed value or as its target`,
       );
       continue;
     }
+
     const spec = ParamSpec.parse({
       name: p.name, type: p.type, required: true, description: p.description,
       example: p.literalValue, sensitive: p.sensitive,
     });
     inputs.push(spec);
-    paramByStep.set(p.stepIndex, spec);
+    if (fromValue) paramByStep.set(p.stepIndex, spec);
   }
 
   // --- Pass 2: mechanical -------------------------------------------------
@@ -163,6 +174,21 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     );
   }
 
+  /**
+   * A parameter can appear in a step's TARGET as well as its value — "click
+   * the row for member 12345". Substituting it back into the descriptor is
+   * what stops such a step being pinned to the record it was recorded on.
+   */
+  const parameteriseTarget = (t: TargetDescriptor): TargetDescriptor => {
+    let out = t;
+    for (const p of inputs) {
+      if (!p.example) continue;
+      if (out.name === p.example) out = { ...out, name: `{{${p.name}}}` };
+      if (out.anchor?.text === p.example) out = { ...out, anchor: { ...out.anchor, text: `{{${p.name}}}` } };
+    }
+    return out;
+  };
+
   const steps: Step[] = [];
   let index = 0;
   for (const s of trace.steps) {
@@ -181,9 +207,11 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       id: `s${index}`,
       index,
       kind: s.kind,
-      target: s.target,
+      target: parameteriseTarget(s.target),
       ...(value ? { value } : {}),
-      ...(waypointFor(s, locationBefore) ? { waypoint: waypointFor(s, locationBefore)! } : {}),
+      // Built from the PARAMETERISED target: a waypoint carrying the recorded
+      // literal would only ever hold for the run that recorded it.
+      ...(s.target ? { waypoint: { kind: 'nodeExists' as const, target: parameteriseTarget(s.target) } } : {}),
       effect: s.effect,
       ...(s.rationale ? { rationale: s.rationale } : {}),
       ...(s.targetVerified ? {} : { fragile: s.targetProblem ?? 'descriptor could not be verified at record time' }),

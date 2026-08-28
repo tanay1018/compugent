@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "id": "catalogue.readBookPriceAndStock",
+  "version": 1,
+  "name": "Read book price (incl. tax) and stock availability",
+  "description": "Navigates the online book catalogue to a given category, opens a specific book's product detail page, and reads the authoritative Product Information rows: the tax-inclusive price and the availability line that includes the number of copies in stock. Reach for this when an agent needs precise pricing or inventory figures for a named title rather than the abbreviated summary shown on listing pages.",
+  "app": {
+    "vendorProduct": "Books to Scrape (public demo)",
+    "recordedTenant": "books.toscrape.com",
+    "surfaceKind": "web",
+    "entryPathPattern": "^/(\\?|$)",
+    "entryPath": "/"
+  },
+  "inputs": [
+    {
+      "name": "categoryName",
+      "type": "string",
+      "required": true,
+      "description": "Sidebar catalogue category to filter to before locating the title, e.g. 'Science'.",
+      "example": "Science",
+      "sensitive": false
+    },
+    {
+      "name": "bookTitle",
+      "type": "string",
+      "required": true,
+      "description": "Exact title of the book whose product detail page should be opened within the chosen category listing.",
+      "example": "The Grand Design",
+      "sensitive": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "priceInclTax",
+      "type": "number",
+      "description": "Tax-inclusive price of the book taken from the 'Price (incl. tax)' row of the Product Information table.",
+      "from": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Price (incl. tax)"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:13:51.143Z"
+        }
+      },
+      "transform": "currency",
+      "sensitive": false
+    },
+    {
+      "name": "availability",
+      "type": "string",
+      "description": "Availability text from the Product Information table, including the number of copies in stock, e.g. 'In stock (5 available)'.",
+      "from": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Availability"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:13:51.145Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": false
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "s1",
+      "index": 1,
+      "kind": "click",
+      "target": {
+        "role": "link",
+        "name": "{{categoryName}}",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:13:41.439Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "link",
+          "name": "{{categoryName}}",
+          "nameMatch": "normalized",
+          "scope": {
+            "frame": "root"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-28T04:13:41.439Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "The goal specifies the book is in the Science category; the sidebar category link filters the catalogue to Science titles."
+    },
+    {
+      "id": "s2",
+      "index": 2,
+      "kind": "click",
+      "target": {
+        "role": "link",
+        "name": "{{bookTitle}}",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:13:45.598Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "link",
+          "name": "{{bookTitle}}",
+          "nameMatch": "normalized",
+          "scope": {
+            "frame": "root"
+          },
+          "ordinal": 0,
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-28T04:13:45.598Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Title link for 'The Grand Design' within the Science listing — opens the product detail page which carries the tax-inclusive price and stock count."
+    }
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "heading",
+      "name": "Product Information",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "root"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-08-28T04:13:56.157Z"
+      }
+    },
+    "description": "Navigated Home → Science category → 'The Grand Design' product page and read its Product Information table. Price (incl. tax) is £13.76 (tax £0.00, so equal to the excl. tax price) and availability is 'In stock (5 available)'. Both values were recorded via row-label anchors ('Price (incl. tax)' and 'Availability'), so replay can relocate them even if the amounts or counts change. Checkpoint is the stable 'Product Information' heading on the detail page."
+  },
+  "approval": "draft",
+  "provenance": {
+    "recordedAt": "2026-08-28T04:14:02.610Z",
+    "discoveryRunId": "discovery-2026-08-28T04-13-36-311Z",
+    "model": "anthropic/claude-opus-5",
+    "goal": "Open the book 'The Grand Design' from the Science category and read its price including tax and how many copies are in stock",
+    "warnings": [
+      "step 2 (click): not unique — disambiguated by ordinal 0 of 2 matching link nodes"
+    ]
+  }
+}

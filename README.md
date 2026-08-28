@@ -6,8 +6,8 @@ successful run is compiled into a typed, versioned **capability artifact**;
 that artifact then replays deterministically with **no model in the decision
 loop**, which is the path an AI agent invokes in production.
 
-> Status: **Phase 6 — human-in-the-loop handoff.** See `../ROADMAP.md` for the
-> plan and `REPORT.md` (pending) for the design write-up.
+> Status: **Phase 8 — verified on a live public site.** See `../ROADMAP.md` for
+> the plan and `REPORT.md` (pending) for the design write-up.
 
 ## Setup
 
@@ -279,6 +279,58 @@ The operator's actions are captured *semantically*, not as pixels — an auditor
 needs "typed into the Member ID field", not a video. Attribution is decided by
 **who holds the token**, not by the event, since the agent's own input fires the
 same DOM listeners.
+
+## A second surface, one we did not write
+
+The bundled app proves the technique; a site we do not control proves the
+*driver* does not depend on it. Same code, no schema changes:
+
+```bash
+npm run discover -- "Open the book 'The Grand Design' from the Science category \
+  and read its price including tax and how many copies are in stock" \
+  --url "https://books.toscrape.com/"
+npm run compile
+npm run replay -- catalogue.readBookPriceAndStock \
+  categoryName=Poetry "bookTitle=The Black Maria" --url "https://books.toscrape.com/"
+```
+
+`books.toscrape.com` is published expressly for automation practice, is
+read-only, and has no side effects. Its product page puts data in a
+label/value table — so the *same* `inSameRowAs` anchors that carry MemberDesk
+carry it too:
+
+```
+extract cell inSameRowAs "Price (incl. tax)"   -> priceInclTax
+extract cell inSameRowAs "Availability"        -> availability
+```
+
+### Recorded once, replayed with different inputs
+
+The parameters here generalise the step's **target**, not a typed value —
+"click the row for member 12345" is the pattern every back-office result grid
+uses, so descriptors support `{{param}}` placeholders:
+
+| inputs | result |
+|---|---|
+| `Science` / `The Grand Design` *(as recorded)* | `success` — £13.76, 5 available |
+| `Poetry` / `The Black Maria` | `success` — £52.15, 19 available |
+| `Travel` / `Neither Here nor There` | `success` — £38.95, 3 available |
+| `Poetry` / `No Such Book` | `failed` — `waypoint_failed`, with the interpolated target in the message |
+
+Three bugs only a real site could have surfaced, all fixed:
+
+- **We never scrolled.** `DOM.getBoxModel` reports layout coordinates, so any
+  element below the fold produced a click that landed on nothing — silently,
+  because the event was still delivered. Every control in the bundled app fits
+  on one screen, so it could never have caught this.
+- **Ordinals counted the wrong population.** Every product tile carries two
+  identically-named links (thumbnail and title). The record-time
+  disambiguation indexed same-role siblings instead of the *matching
+  candidates* that resolution actually applies an ordinal to, so descriptors
+  shipped ambiguous.
+- **Untruncated body copy.** One product description took a discovery run to
+  124K input tokens. Node text is now capped at 200 chars: prose is never a
+  target and never an output.
 
 ## Demo path
 
