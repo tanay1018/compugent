@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "test:integration": "tsx --test test/*.itest.ts",
-    "observe": "tsx scripts/observe.ts"
+    "observe": "tsx scripts/observe.ts",
+    "discover": "tsx scripts/discover.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",

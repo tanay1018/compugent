@@ -6,8 +6,8 @@ successful run is compiled into a typed, versioned **capability artifact**;
 that artifact then replays deterministically with **no model in the decision
 loop**, which is the path an AI agent invokes in production.
 
-> Status: **Phase 2 — perception & acting.** See `../ROADMAP.md` for the plan
-> and `REPORT.md` (pending) for the design write-up.
+> Status: **Phase 3 — discovery.** See `../ROADMAP.md` for the plan and
+> `REPORT.md` (pending) for the design write-up.
 
 ## Setup
 
@@ -104,6 +104,33 @@ Target resolution is a pure function of `(Observation, TargetDescriptor)`, so
 the most safety-critical logic in the system — anchor matching and ambiguity
 detection — is tested without launching anything.
 
+## Discovery (the LLM path)
+
+```bash
+npm run app                                                        # terminal 1
+npm run discover -- "look up member 12345 and read their savings balance"
+```
+
+Needs `AI_GATEWAY_API_KEY`. A run costs roughly $0.12 against
+`anthropic/claude-opus-5` and writes to `evidence/discovery-<timestamp>/`:
+`trace.json`, an actor-tagged `run.jsonl`, and per-step screenshots.
+
+The model never sees HTML — only the normalised graph that `npm run observe`
+prints. Its action vocabulary is exactly what a recorded step can express, so
+compiling a trace into an artifact is mechanical rather than an exercise in
+parsing intent back out of a transcript.
+
+Two gates run during discovery, both of which fail at *record* time rather
+than in production:
+
+- **Descriptor verification.** Every synthesised descriptor is immediately
+  resolved back against the observation it came from. If it does not find
+  exactly the node the model meant, the step is flagged.
+- **Extraction targets are anchor-only.** For an output, the node's text is the
+  payload, not its identity — recording `"$4,182.55"` as the locator would pin
+  the artifact to one member. If a value has no anchor, the run refuses to
+  record it and says so.
+
 ## Demo path
 
-_Pending — Phase 3 onward._
+_Replay pending — Phase 5._

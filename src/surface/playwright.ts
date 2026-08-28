@@ -33,10 +33,15 @@ import { resolveTarget } from './resolve.js';
  * geometrically.
  */
 const NEARBY_FN = `function () {
-  const el = this;
   const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
   const out = { nearby: '', rel: '' };
-  if (!el.getAttribute) return out;
+
+  // A StaticText accessibility node resolves to a DOM TEXT NODE, not an
+  // element -- and text nodes have no closest()/previousElementSibling. Values
+  // we need to EXTRACT (a balance in a table cell) are exactly these nodes, so
+  // climbing to the parent element first is what makes outputs addressable.
+  const el = this.nodeType === 3 ? this.parentElement : this;
+  if (!el || !el.getAttribute) return out;
 
   const aria = el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder');
   if (aria) return { nearby: clean(aria), rel: 'labelledBy' };
@@ -56,7 +61,11 @@ const NEARBY_FN = `function () {
     }
     const row = td.closest('tr');
     if (row && row.previousElementSibling) {
-      const t = clean(row.previousElementSibling.textContent);
+      // First cell only: the whole row's textContent concatenates label AND
+      // value ("Savings$4,182.55"), which would bake this run's data into the
+      // anchor and pin the artifact to one member.
+      const firstCell = row.previousElementSibling.querySelector('td');
+      const t = clean(firstCell ? firstCell.textContent : '');
       if (t) return { nearby: t, rel: 'follows' };
     }
   }
@@ -175,7 +184,12 @@ export class PlaywrightSurface implements Surface {
         // Cost is two CDP round trips per control. Bounded in practice
         // (actionable controls are a small fraction of a screen) but it is the
         // obvious place to batch if a wide results grid ever makes it hurt.
-        if (ACTIONABLE.has(role) && ax.backendDOMNodeId !== undefined && nodes.length < 250) {
+        // Text and cells are anchored too, because OUTPUTS live in them. To
+        // extract a savings balance from a table layout you need "the cell in
+        // the row whose label says Savings" -- the value itself is the payload,
+        // never the identity.
+        const anchorable = ACTIONABLE.has(role) || role === 'text' || role === 'cell';
+        if (anchorable && ax.backendDOMNodeId !== undefined && nodes.length < 250) {
           const enriched = await this.nearbyText(ax.backendDOMNodeId);
           if (enriched) { node.anchorText = enriched.nearby; node.anchorRelation = enriched.rel; }
         }
