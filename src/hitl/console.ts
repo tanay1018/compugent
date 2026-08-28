@@ -93,9 +93,10 @@ export class OperatorConsole {
         const { action } = JSON.parse(body || '{}') as { action: string };
         if (action === 'take') {
           if (this.session.control.state === 'agent') this.session.control.requestPause();
-          // Nothing is executing while we sit at an escalation, so the boundary
-          // is immediate. Mid-run this waits for the executor to yield.
-          if (this.session.control.pauseRequested) this.session.yield();
+          // Only hand over here when nothing is executing. With a loop running,
+          // the loop yields at its own step boundary — the console must not do
+          // it on the loop's behalf, or control moves mid-action.
+          if (this.session.control.pauseRequested && !this.session.agentActive) this.session.yield();
         } else if (action === 'handback') {
           this.session.control.requestResume();
         }

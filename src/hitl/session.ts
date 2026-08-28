@@ -30,6 +30,16 @@ export class HandoffSession {
   private context: EscalationContext | null = null;
   private frameListeners: Array<(f: string) => void> = [];
   private captureInstalled = false;
+  /**
+   * Is an automation loop currently executing?
+   *
+   * Decides WHO yields. With a loop running, only the loop may hand over —
+   * at a step boundary, once its in-flight action has completed. With nothing
+   * running (sitting at an escalation) there is no boundary to wait for, so
+   * the console hands over immediately. Getting this wrong transfers control
+   * mid-action and puts an event in the log with no clear actor.
+   */
+  agentActive = false;
 
   constructor(
     private readonly surface: PlaywrightSurface,
@@ -101,6 +111,34 @@ export class HandoffSession {
       return 'pause_requested';
     }
     return 'ignored';
+  }
+
+  /**
+   * Block until the agent may act again.
+   *
+   * Used at STEP BOUNDARIES only. An action already in flight runs to
+   * completion — you cannot take a click back halfway, and pretending
+   * otherwise would put an event in the log with no clear actor.
+   */
+  async awaitAgentControl(): Promise<void> {
+    if (this.control.canAgentAct) return;
+    await new Promise<void>((resolve) => {
+      this.control.onChange((e) => { if (e.to === 'agent') resolve(); });
+    });
+  }
+
+  /**
+   * Hand control back mid-DISCOVERY.
+   *
+   * Simpler than the replay case, and instructively so: there is no artifact
+   * to re-localise against yet, so there is nothing to be lost about. The
+   * model just observes wherever the human left things and carries on. Plans
+   * are what create the resumption problem.
+   */
+  resumeDiscovery(): void {
+    if (this.control.state !== 'resume_requested') return;
+    this.control.beginRelocalize();
+    this.control.returnToAgent('discovery continues from wherever the operator left the session');
   }
 
   async stop(): Promise<void> {

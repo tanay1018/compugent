@@ -1,0 +1,144 @@
+{
+  "goal": "look up member 67890 and read their savings balance",
+  "entryUrl": "http://localhost:8710/?tenant=meridian",
+  "model": "anthropic/claude-opus-5",
+  "startedAt": "2026-08-28T04:27:20.395Z",
+  "finishedAt": "2026-08-28T04:27:49.226Z",
+  "outcome": "success",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "type",
+      "rationale": "The Member ID textbox is the input for the member number we want to look up; it is identified by the adjacent \"Member ID\" label.",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:27:23.510Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "67890",
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/lookup?tenant=meridian"
+    },
+    {
+      "index": 2,
+      "kind": "click",
+      "rationale": "Submit the inquiry with Search Type left at \"Member Number\", which matches looking up by member ID.",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:27:27.400Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=67890&q2=M"
+    },
+    {
+      "index": 3,
+      "kind": "extract",
+      "rationale": "This is the Balance-column value on the row labelled \"Savings\" in the Account/Balance table, i.e. the member's savings balance. Anchoring to the \"Savings\" row label keeps it findable when amounts change.",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Savings"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:27:33.223Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "savingsBalance",
+      "observedValue": "$812.30",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=67890&q2=M"
+    },
+    {
+      "index": 4,
+      "kind": "extract",
+      "rationale": "Records the account holder's name beside the \"Name\" label, confirming the balance belongs to the intended member.",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Name"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-28T04:27:33.224Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "memberName",
+      "observedValue": "Marcus Webb",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=67890&q2=M"
+    }
+  ],
+  "warnings": [],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "Savings",
+      "nameMatch": "normalized",
+      "anchor": {
+        "relation": "follows",
+        "text": "Account"
+      },
+      "scope": {
+        "frame": "main"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-08-28T04:27:37.260Z"
+      }
+    },
+    "description": "Searched Member Inquiry for member ID 67890 with Search Type \"Member Number\", landing on the Member Detail screen for Marcus Webb (Status: Active). Savings balance is $812.30 (Checking is $95.00). Checkpoint is the stable \"Savings\" row label in the Account/Balance table."
+  },
+  "summary": "Searched Member Inquiry for member ID 67890 with Search Type \"Member Number\", landing on the Member Detail screen for Marcus Webb (Status: Active). Savings balance is $812.30 (Checking is $95.00). Checkpoint is the stable \"Savings\" row label in the Account/Balance table.",
+  "usage": {
+    "inputTokens": 16161,
+    "inputTokenDetails": {
+      "noCacheTokens": 16161,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 998,
+    "outputTokenDetails": {
+      "textTokens": 934,
+      "reasoningTokens": 64
+    },
+    "totalTokens": 17159
+  }
+}

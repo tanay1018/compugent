@@ -67,6 +67,18 @@ export interface DiscoveryOptions {
    * the same decision routes to a human instead.
    */
   onApprovalRequired?: (ctx: { action: string; target: string }) => Promise<boolean>;
+  /**
+   * When present, the run is watchable and interruptible: an operator can
+   * barge in from the console at any step boundary, drive the session
+   * themselves, and hand back.
+   */
+  session?: {
+    control: { pauseRequested: boolean; state: string; canAgentAct: boolean };
+    agentActive: boolean;
+    yield(): void;
+    awaitAgentControl(): Promise<void>;
+    resumeDiscovery(): void;
+  };
 }
 
 const SYSTEM = `You operate a legacy bank back-office application through its accessibility tree.
@@ -119,6 +131,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   }
 
   log.append('system', 'discovery.start', { goal: opts.goal, entryUrl: opts.entryUrl, model: modelId, maxSteps });
+  if (opts.session) opts.session.agentActive = true;
   await surface.navigate(opts.entryUrl);
   await surface.waitForStable();
   let obs: Observation = await surface.observe();
@@ -132,10 +145,39 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   };
 
   /** Shared path for every acting tool: describe -> gate -> act -> re-observe. */
+  /**
+   * Checked between steps, never mid-action.
+   *
+   * When a pause lands, the action the model just asked for is NOT performed —
+   * the world may have changed underneath it while the human was driving, so
+   * re-planning against what is actually on screen is the only safe move. The
+   * message says so explicitly: leaving the model to infer whether its call
+   * took effect is how a run starts flailing.
+   */
+  const honourBargeIn = async (kind: string): Promise<string | null> => {
+    const sess = opts.session;
+    if (!sess) return null;
+    if (!sess.control.pauseRequested && sess.control.canAgentAct) return null;
+
+    if (sess.control.pauseRequested) {
+      sess.yield();
+      log.append('system', 'discovery.paused', { note: 'operator took control at a step boundary' });
+    }
+    await sess.awaitAgentControl();
+    obs = await surface.observe();
+    log.append('system', 'discovery.resumed', { location: obs.location });
+    return `INTERRUPTED. A human operator took control of this session and has now handed it back.\n\n` +
+           `Your requested "${kind}" was NOT performed — the operator may have changed the screen, ` +
+           `so nothing was assumed on your behalf. Re-read the state below and decide what to do next. ` +
+           `The work the operator did may have already advanced the goal.\n\n${renderObservation(obs)}`;
+  };
+
   const perform = async (
     kind: 'click' | 'type' | 'select',
     ref: number, why: string, text?: string,
   ): Promise<string> => {
+    const interrupted = await honourBargeIn(kind);
+    if (interrupted) return interrupted;
     const node = nodeByRef(ref);
     const described = describeNode(obs, node, 'action');
     const effect = classifyEffect(policy, { kind, ...(text !== undefined ? { text } : {}) }, node);
@@ -279,8 +321,10 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       ...(usage ? { usage } : {}),
     };
     log.append('system', 'discovery.end', { outcome, steps: steps.length, warnings: warnings.length });
+    if (opts.session) opts.session.agentActive = false;
     return trace;
   } catch (err) {
+    if (opts.session) opts.session.agentActive = false;
     log.append('system', 'discovery.error', { message: String(err) });
     return {
       goal: opts.goal, entryUrl: opts.entryUrl, model: modelId, startedAt,

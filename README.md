@@ -104,6 +104,47 @@ Target resolution is a pure function of `(Observation, TargetDescriptor)`, so
 the most safety-critical logic in the system — anchor matching and ambiguity
 detection — is tested without launching anything.
 
+## Give it any goal and watch it work
+
+```bash
+npm run app                                             # terminal 1
+npm run watch -- "look up member 55501 and report their account status and checking balance"
+npm run watch -- "<any goal>" --url "https://books.toscrape.com/" --keep-open
+```
+
+Opens the operator console at `http://localhost:8790/` **first**, then runs
+discovery against the live surface, so you see every step as it happens.
+
+The console is a **web** client, not a desktop app — deliberately. Production
+replay runs headless in a container with the operator attaching remotely, so
+an embedded browser would only ever work when the operator sits on the same
+machine as the automation. Frames go out over CDP screencast; input comes back
+gated on the control token.
+
+### Barge-in
+
+Click **Take control** at any point during a run. The agent finishes its
+in-flight action, yields at the step boundary, and blocks:
+
+```
+agent     act.type              in-flight action completes first
+operator  control.transition    agent -> pause_requested
+agent     control.transition    pause_requested -> operator     the AGENT yields
+system    discovery.paused
+```
+
+Handing back resumes the same run. Note there is no re-localisation here, and
+that is not an oversight: during discovery there is no artifact to be lost
+against, so the model simply observes wherever you left the session. *Plans are
+what create the resumption problem.*
+
+**Limitation, measured:** the action the model had requested when you
+interrupted is deliberately **not** performed — the screen may have changed
+under it — and it is told so explicitly. Even so, interrupting during an
+in-flight navigation on a slow page can leave the model unable to re-orient; in
+that case it gives up cleanly rather than thrashing. Interrupting between steps
+on a settled page recovers reliably.
+
 ## Discovery (the LLM path)
 
 ```bash

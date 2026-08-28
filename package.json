@@ -16,7 +16,8 @@
     "compile": "tsx scripts/compile.ts",
     "learn-outcomes": "tsx scripts/learn-outcomes.ts",
     "replay": "tsx scripts/replay.ts",
-    "handoff": "tsx scripts/handoff.ts"
+    "handoff": "tsx scripts/handoff.ts",
+    "watch": "tsx scripts/watch.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",
