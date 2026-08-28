@@ -1,0 +1,63 @@
+/**
+ * Learn this capability's outcome signatures from runs that actually produce
+ * them, and publish the result as a new artifact version.
+ *
+ *   npm run learn-outcomes -- member.readSavingsBalance
+ *
+ * The classifications below are AUTHORED — deciding that "not authorized" is a
+ * legitimate answer while "error 0x5F" is a fault is a product judgement. Only
+ * the wording is discovered.
+ */
+import { PlaywrightSurface } from '../src/surface/playwright.js';
+import { ArtifactStore } from '../src/store/artifacts.js';
+import { learnOutcomes, type OutcomeProbe } from '../src/replay/learn.js';
+import { CapabilityArtifact } from '../src/schema/artifact.js';
+
+const id = process.argv[2] ?? 'member.readSavingsBalance';
+const port = process.env.TARGET_APP_PORT ?? '8710';
+const baseUrl = process.argv[3] ?? `http://localhost:${port}/?tenant=meridian`;
+
+const PROBES: OutcomeProbe[] = [
+  { name: 'member_not_found', classification: 'business_outcome', inputs: { memberId: '99999' },
+    message: 'No member matches that identifier.' },
+  { name: 'permission_denied', classification: 'business_outcome', inputs: { memberId: '40003' },
+    message: 'The operator is not authorised to view this member record.' },
+  { name: 'maintenance_notice', classification: 'recoverable', inputs: { memberId: '40002' },
+    message: 'A scheduled-maintenance interstitial was dismissed.', recoverBy: 'dismissNewControl' },
+  { name: 'application_error', classification: 'hard_failure', inputs: { memberId: '40004' },
+    message: 'The application returned an internal error.' },
+  { name: 'session_expired', classification: 'escalate', inputs: { memberId: '40005' },
+    message: 'The session expired. Automation cannot re-authenticate; a human must sign in.' },
+];
+
+const store = new ArtifactStore();
+const current = store.load(id);
+const surface = await PlaywrightSurface.launch();
+
+try {
+  console.log(`learning outcomes for ${current.id} v${current.version}\n`);
+  const outcomes = await learnOutcomes(current, PROBES, surface, baseUrl, { memberId: '12345' },
+    (m) => console.log(m));
+
+  const next = CapabilityArtifact.parse({
+    ...current,
+    version: current.version + 1,
+    outcomes,
+    provenance: {
+      ...current.provenance,
+      warnings: [...current.provenance.warnings,
+        `v${current.version + 1}: ${outcomes.length} outcome signatures learned from probe runs`],
+    },
+  });
+  const path = store.save(next);
+  console.log(`\n${outcomes.length} outcomes learned -> ${path}`);
+  console.log(`\n  ${'OUTCOME'.padEnd(20)} ${'CLASS'.padEnd(17)} DETECTED BY`);
+  for (const o of next.outcomes) {
+    const t = o.detect.kind === 'textPresent' ? `"${o.detect.text}"` : o.detect.kind;
+    console.log(`  ${o.name.padEnd(20)} ${o.classification.padEnd(17)} ${t}`);
+    if (o.recovery) console.log(`  ${''.padEnd(38)} recovery: ${o.recovery.kind}`);
+  }
+  console.log('');
+} finally {
+  await surface.close();
+}

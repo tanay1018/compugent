@@ -1,0 +1,31 @@
+{
+  "status": "failed",
+  "failure": {
+    "code": "app_error",
+    "expected": "the application to respond normally",
+    "observed": "The application returned an internal error.",
+    "screenshot": "screenshots/005-failure.png"
+  },
+  "runId": "replay-2026-08-28T03-18-05-972Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "ok",
+      "ms": 445,
+      "target": "textbox inSameRowAs \"Member ID\" in frame \"main\"",
+      "resolvedVia": "anchor"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "ok",
+      "ms": 238,
+      "target": "button named \"Search\" follows \"Search Type\" in frame \"main\"",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 898
+}

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "member.readSavingsBalance",
-  "version": 1,
+  "version": 2,
   "name": "Read member savings balance",
   "description": "Looks up a member by their Member ID in the Member Inquiry screen and returns the current balance of their Savings account, along with the member name and Member ID shown on the loaded record for verification. Use this when an agent needs a member's savings balance or needs to confirm a member record exists before acting on it.",
   "app": {
@@ -89,7 +89,83 @@
       "sensitive": true
     }
   ],
-  "outcomes": [],
+  "outcomes": [
+    {
+      "name": "member_not_found",
+      "classification": "business_outcome",
+      "detect": {
+        "kind": "textPresent",
+        "text": "No member found matching that ID.",
+        "description": "observed for inputs {\"memberId\":\"99999\"}"
+      },
+      "message": "No member matches that identifier.",
+      "verified": true
+    },
+    {
+      "name": "permission_denied",
+      "classification": "business_outcome",
+      "detect": {
+        "kind": "textPresent",
+        "text": "You are not authorized to view this member record.",
+        "description": "observed for inputs {\"memberId\":\"40003\"}"
+      },
+      "message": "The operator is not authorised to view this member record.",
+      "verified": true
+    },
+    {
+      "name": "maintenance_notice",
+      "classification": "recoverable",
+      "detect": {
+        "kind": "textPresent",
+        "text": "Scheduled maintenance begins at 23:00 ET.",
+        "description": "observed for inputs {\"memberId\":\"40002\"}"
+      },
+      "message": "A scheduled-maintenance interstitial was dismissed.",
+      "recovery": {
+        "kind": "dismiss",
+        "target": {
+          "role": "link",
+          "name": "Continue",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Scheduled maintenance begins at 23:00 ET."
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-28T03:15:05.074Z"
+          }
+        },
+        "maxAttempts": 1
+      },
+      "verified": true
+    },
+    {
+      "name": "application_error",
+      "classification": "hard_failure",
+      "detect": {
+        "kind": "textPresent",
+        "text": "MemberDesk error 0x5F: unable to complete request.",
+        "description": "observed for inputs {\"memberId\":\"40004\"}"
+      },
+      "message": "The application returned an internal error.",
+      "verified": true
+    },
+    {
+      "name": "session_expired",
+      "classification": "escalate",
+      "detect": {
+        "kind": "textPresent",
+        "text": "Your session has expired. Please sign in again.",
+        "description": "observed for inputs {\"memberId\":\"40005\"}"
+      },
+      "message": "The session expired. Automation cannot re-authenticate; a human must sign in.",
+      "verified": true
+    }
+  ],
   "steps": [
     {
       "id": "s1",
@@ -218,6 +294,8 @@
     "discoveryRunId": "discovery-2026-08-28T03-14-28-947Z",
     "model": "anthropic/claude-opus-5",
     "goal": "look up member 12345 and read their current savings balance",
-    "warnings": []
+    "warnings": [
+      "v2: 5 outcome signatures learned from probe runs"
+    ]
   }
 }

@@ -1,0 +1,2 @@
+{"seq":1,"ts":"2026-08-28T03:18:31.084Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v2","approval":"draft","inputs":{"memberId":"[REDACTED]"}}}
+{"seq":2,"ts":"2026-08-28T03:18:31.120Z","actor":"system","kind":"replay.failed","detail":{"status":"failed","failure":{"code":"not_approved","expected":"an approved artifact for unattended replay","observed":"member.readSavingsBalance v2 is still a draft","screenshot":"screenshots/001-failure.png"},"runId":"replay-2026-08-28T03-18-30-700Z","ms":36}}

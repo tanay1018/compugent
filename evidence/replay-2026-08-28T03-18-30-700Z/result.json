@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "failure": {
+    "code": "not_approved",
+    "expected": "an approved artifact for unattended replay",
+    "observed": "member.readSavingsBalance v2 is still a draft",
+    "screenshot": "screenshots/001-failure.png"
+  },
+  "runId": "replay-2026-08-28T03-18-30-700Z",
+  "steps": [],
+  "ms": 36
+}

@@ -88,9 +88,14 @@ export function evaluateAssertion(o: Observation, a: StateAssertion): AssertionR
     case 'locationMatches': {
       let re: RegExp;
       try { re = new RegExp(a.pattern); } catch { return { held: false, detail: `invalid pattern ${a.pattern}` }; }
-      return re.test(o.location)
+      // A frameset's TOP url never changes -- only the content frame navigates.
+      // Testing page.url() alone would make every location assertion vacuously
+      // true on exactly the legacy apps this system exists for.
+      const candidates = [o.location, ...o.frames.map((f) => f.url).filter((u): u is string => !!u)];
+      const paths = candidates.map((u) => { try { return new URL(u).pathname + new URL(u).search; } catch { return u; } });
+      return paths.some((p) => re.test(p))
         ? { held: true, detail: `location matches ${a.pattern}` }
-        : { held: false, detail: `location "${o.location}" does not match ${a.pattern}` };
+        : { held: false, detail: `no frame location matches ${a.pattern} (saw ${paths.join(', ')})` };
     }
   }
 }

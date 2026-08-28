@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { TargetDescriptor } from '../schema/target.js';
 import type { StateAssertion } from '../schema/assertion.js';
 import { describeTarget } from '../schema/assertion.js';
-import type { Observation, UINode } from '../surface/types.js';
+import { contentLocation, type Observation, type UINode } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
 import { classifyEffect, checkAction, checkNavigation, type Effect, type PolicyConfig } from '../policy/allowlist.js';
 import type { RunLog } from '../run/log.js';
@@ -171,7 +171,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       target: described.descriptor, targetVerified: described.verified,
       ...(described.problem ? { targetProblem: described.problem } : {}),
       ...(text !== undefined ? { literal: text } : {}),
-      effect, locationAfter: obs.location,
+      effect, locationAfter: contentLocation(obs),
     };
     steps.push(step);
     log.append('agent', `act.${kind}`, {
@@ -231,7 +231,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
             steps.push({
               index: steps.length + 1, kind: 'extract', rationale: why,
               target: described.descriptor, targetVerified: true,
-              outputName: as, observedValue: value, effect: 'read', locationAfter: obs.location,
+              outputName: as, observedValue: value, effect: 'read', locationAfter: contentLocation(obs),
             });
             log.append('agent', 'act.extract', { as, target: describeTarget(described.descriptor), why });
             return `Recorded output "${as}" = ${JSON.stringify(value)}, located by ${describeTarget(described.descriptor)}.`;

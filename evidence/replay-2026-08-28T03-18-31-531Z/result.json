@@ -1,0 +1,27 @@
+{
+  "status": "business_outcome",
+  "outcome": "permission_denied",
+  "message": "The operator is not authorised to view this member record.",
+  "runId": "replay-2026-08-28T03-18-31-531Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "ok",
+      "ms": 459,
+      "target": "textbox inSameRowAs \"Member ID\" in frame \"main\"",
+      "resolvedVia": "anchor"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "ok",
+      "ms": 237,
+      "target": "button named \"Search\" follows \"Search Type\" in frame \"main\"",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 924
+}

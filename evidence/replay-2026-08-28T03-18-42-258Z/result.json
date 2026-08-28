@@ -1,0 +1,30 @@
+{
+  "status": "escalated",
+  "reason": "The session expired. Automation cannot re-authenticate; a human must sign in.",
+  "context": {
+    "location": "http://localhost:8710/?tenant=meridian",
+    "screenshot": "screenshots/005-escalate.png"
+  },
+  "runId": "replay-2026-08-28T03-18-42-258Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "ok",
+      "ms": 443,
+      "target": "textbox inSameRowAs \"Member ID\" in frame \"main\"",
+      "resolvedVia": "anchor"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "ok",
+      "ms": 237,
+      "target": "button named \"Search\" follows \"Search Type\" in frame \"main\"",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 942
+}

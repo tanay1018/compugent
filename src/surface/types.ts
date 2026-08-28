@@ -44,6 +44,26 @@ export interface FrameInfo {
   url?: string;
 }
 
+/**
+ * The URL that actually identifies the screen.
+ *
+ * On a frameset the top document never navigates, so page.url() is a constant
+ * and useless as a location. The content frame -- the one carrying the most
+ * perceivable nodes -- is what a human would call "the page you are on".
+ */
+export function contentLocation(o: Observation): string {
+  if (o.frames.length <= 1) return o.location;
+  const counts = new Map<string, number>();
+  for (const n of o.nodes) counts.set(n.frame, (counts.get(n.frame) ?? 0) + 1);
+  let best: string | undefined;
+  let bestN = -1;
+  for (const f of o.frames) {
+    const n = counts.get(f.name) ?? 0;
+    if (f.url && n > bestN) { bestN = n; best = f.url; }
+  }
+  return best ?? o.location;
+}
+
 export interface Observation {
   surfaceKind: SurfaceKind;
   capturedAt: string;

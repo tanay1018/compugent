@@ -299,12 +299,23 @@ export class PlaywrightSurface implements Surface {
    * (lookup -> interstitial -> detail); returning after the first one would
    * observe a page that is about to be replaced.
    */
-  async waitForStable({ timeoutMs = 15000, quietMs = 120 } = {}): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
+  async waitForStable({ timeoutMs = 15000, quietMs = 150, graceMs = 400 } = {}): Promise<void> {
+    // A click dispatched over CDP returns before the browser has even started
+    // navigating. Without a grace window, this returns instantly against the
+    // page that is about to be replaced -- and the caller observes stale state.
+    const startedAt = Date.now();
+    const navAtEntry = this.lastNavAt;
+    const deadline = startedAt + timeoutMs;
+
     while (Date.now() < deadline) {
-      const ready = await this.page
-        .evaluate(() => document.readyState === 'complete')
-        .catch(() => false);
+      const navigated = this.lastNavAt !== navAtEntry;
+      // Still inside the grace window and nothing has moved yet: keep waiting,
+      // a navigation may be in flight.
+      if (!navigated && Date.now() - startedAt < graceMs) {
+        await new Promise((r) => setTimeout(r, 40));
+        continue;
+      }
+      const ready = await this.page.evaluate(() => document.readyState === 'complete').catch(() => false);
       if (ready && Date.now() - this.lastNavAt > quietMs) return;
       await new Promise((r) => setTimeout(r, 40));
     }

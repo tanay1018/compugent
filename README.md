@@ -6,8 +6,8 @@ successful run is compiled into a typed, versioned **capability artifact**;
 that artifact then replays deterministically with **no model in the decision
 loop**, which is the path an AI agent invokes in production.
 
-> Status: **Phase 4 — compilation.** See `../ROADMAP.md` for the plan and
-> `REPORT.md` (pending) for the design write-up.
+> Status: **Phase 5 — deterministic replay.** See `../ROADMAP.md` for the plan
+> and `REPORT.md` (pending) for the design write-up.
 
 ## Setup
 
@@ -170,6 +170,68 @@ an agent-callable tool:
 Artifacts compile as `draft`. Unattended replay has to be opted into, because
 a fresh artifact has been executed exactly once, by a model, on one tenant.
 
+## Deterministic replay (the production path)
+
+```bash
+npm run replay -- member.readSavingsBalance memberId=12345
+```
+
+**No model is invoked.** That is asserted structurally, not just documented —
+`test/replay-purity.test.ts` fails the build if anything reachable from the
+replay engine imports an LLM SDK.
+
+```
+STATUS   SUCCESS   (969ms, no model invoked)
+OUTPUTS  { "savingsBalance": 4182.55, "memberName": "Sarah Chen", "memberId": "12345" }
+STEPS
+  ✓ 1. type    textbox inSameRowAs "Member ID"    456ms  via:anchor
+  ✓ 2. click   button  named "Search"             240ms  via:name
+```
+
+### The error taxonomy
+
+Outcome signatures are **learned from runs that actually produce them**, never
+guessed from a happy path:
+
+```bash
+npm run learn-outcomes          # publishes v2 with 5 verified outcomes
+```
+
+The wording is discovered by diffing observations; the *classification* is
+authored, because no amount of diffing tells you that "not authorized" is a
+legitimate answer while "error 0x5F" is a fault.
+
+| input | what happens | result |
+|---|---|---|
+| `12345` | happy path | `success` — outputs returned |
+| `99999` | no such member | `business_outcome` — **an answer, not a crash** |
+| `40003` | operator lacks rights | `business_outcome` |
+| `40001` | app stalls 8s | `success` — *waiting is the recovery* |
+| `40002` | surprise interstitial | `success` — dismissed, checkpoint re-verified |
+| `40004` | app returns 500 | `failed` — step, expected, observed |
+| `40005` | session expires | `escalated` — a human must sign in |
+
+Add `--unattended` to any of these and a draft artifact is refused outright: an
+artifact executed exactly once, by a model, against one tenant has not earned
+unattended production use.
+
 ## Demo path
 
-_Replay pending — Phase 5._
+The full thread, end to end:
+
+```bash
+npm install && npx playwright install chromium
+cp .env.example .env                        # add AI_GATEWAY_API_KEY
+npm run app                                 # terminal 1
+
+npm run discover -- "look up member 12345 and read their current savings balance"
+npm run compile                             # trace -> artifacts/<id>/v1.json
+npm run learn-outcomes                      # -> v2, with verified outcomes
+npm run replay -- member.readSavingsBalance memberId=12345    # success
+npm run replay -- member.readSavingsBalance memberId=99999    # business outcome
+npm run replay -- member.readSavingsBalance memberId=40004    # hard failure
+```
+
+Only the first two commands need a key. Everything from `replay` onward runs
+offline against the saved artifact — see `evidence/README.md` for recorded runs
+of every branch.
