@@ -1,0 +1,3 @@
+{"seq":1,"ts":"2026-08-29T23:31:29.471Z","actor":"system","kind":"replay.start","detail":{"capability":"bank.signIn v1","approval":"draft","inputs":{}}}
+{"seq":2,"ts":"2026-08-29T23:31:29.687Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/login?tenant=meridian"}}
+{"seq":3,"ts":"2026-08-29T23:31:29.727Z","actor":"system","kind":"replay.escalated","detail":{"status":"escalated","reason":"step 1 needs a human: Enter the servicing operator ID","atStep":1,"context":{"location":"http://localhost:8710/login?tenant=meridian","screenshot":"screenshots/002-credential.png","expected":"textbox inSameRowAs \"Operator ID\""},"runId":"replay-2026-08-29T23-31-29-001Z","ms":256}}

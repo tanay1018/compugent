@@ -155,9 +155,8 @@ answer there is the visual/OCR tier — designed, not built.
 
 Four other real limits:
 
-- **Login walls.** The system will not handle credentials, by policy. It
-  escalates to a human instead — which is exactly the demo in
-  `npm run handoff`, and why ParaBank's post-login screens are out of reach.
+- **Login walls.** See below — automation is *refused* credential fields, and
+  the flow escalates to a human instead.
 - **Bot protection.** Cloudflare-style interstitials return a challenge page
   rather than the app. Nothing here tries to defeat them, and it should not.
   Amazon, for instance, serves a nine-node "Continue shopping" wall. The run
@@ -453,6 +452,53 @@ STEPS
   ✓ 1. type    textbox inSameRowAs "Member ID"    456ms  via:anchor
   ✓ 2. click   button  named "Search"             240ms  via:name
 ```
+
+### Login pages and credentials
+
+Automation is **refused** a credential field. Not redacted afterwards —
+refused. Redacting the log is a consolation prize: by then the value has been
+typed into a live system by something that cannot be held accountable for it.
+
+```
+BLOCKED: "Password" looks like a credential or regulated field. Automation
+does not enter these — a human must. Escalate, or record the step as
+operator-supplied.
+```
+
+The refusal happens before anything is done *or written down*, so a credential
+never reaches the trace — and therefore can never reach an artifact, which is a
+file that gets committed, diffed and shared. A stored literal that looks like a
+credential also fails schema validation outright.
+
+That leaves the question of how a flow behind a login is expressible at all.
+A step's value can come from three places:
+
+| `value.from` | meaning |
+|---|---|
+| `param` | supplied by the calling agent per invocation |
+| `literal` | fixed configuration, baked in |
+| `operator` | **supplied by a human at run time, never stored** |
+
+The third is the answer. The artifact records that a credential is needed
+*here* and what to ask for, while holding nothing. Replay escalates when it
+reaches one:
+
+```
+STATUS   ESCALATED   (256ms, no model invoked)
+REASON   step 1 needs a human: Enter the servicing operator ID
+AT       step 1 · http://localhost:8710/login?tenant=meridian
+```
+
+and refuses outright if the caller asked for unattended execution:
+
+```
+CODE     not_approved
+OBSERVED step 1 requires an operator-supplied value: Enter the servicing
+         operator ID. This capability cannot run unattended.
+```
+
+Replay re-checks the field label too, rather than trusting the artifact — an
+artifact is a file, and a file can be edited.
 
 ### How success is verified
 

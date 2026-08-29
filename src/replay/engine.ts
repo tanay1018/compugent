@@ -2,7 +2,7 @@ import type { CapabilityArtifact, OutcomeSpec, Step } from '../schema/artifact.j
 import { evaluateAssertion, describeTarget, type StateAssertion } from '../schema/assertion.js';
 import type { Observation } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
-import { checkAction, type PolicyConfig } from '../policy/allowlist.js';
+import { checkAction, checkCredentialField, type PolicyConfig } from '../policy/allowlist.js';
 import { interpolate, norm } from '../surface/resolve.js';
 import type { RunLog } from '../run/log.js';
 import type { ReplayResult, StepReport, ReplayFailure } from './result.js';
@@ -60,7 +60,9 @@ function matchOutcome(a: CapabilityArtifact, o: Observation, params?: Record<str
 
 function bindValue(step: Step, inputs: Record<string, unknown>): string | undefined {
   if (!step.value) return undefined;
-  return step.value.from === 'literal' ? step.value.value : String(inputs[step.value.param] ?? '');
+  if (step.value.from === 'literal') return step.value.value;
+  if (step.value.from === 'operator') return undefined; // handled before we act
+  return String(inputs[step.value.param] ?? '');
 }
 
 function applyTransform(raw: string, transform: 'text' | 'number' | 'currency'): unknown {
@@ -129,6 +131,17 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         `${a.id} v${a.version} is incomplete` +
         (a.incompleteReason ? `: ${a.incompleteReason}` : '') +
         '. Finish the recording before invoking it.',
+    });
+  }
+  const needsHuman = a.steps.find((s) => s.value?.from === 'operator');
+  if (opts.unattended && needsHuman) {
+    return fail({
+      code: 'not_approved',
+      expected: 'a capability that can run without a person',
+      observed:
+        `step ${needsHuman.index} requires an operator-supplied value` +
+        (needsHuman.value?.from === 'operator' ? `: ${needsHuman.value.prompt}` : '') +
+        '. This capability cannot run unattended.',
     });
   }
   if (opts.unattended && a.approval !== 'approved') {
@@ -235,9 +248,36 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       }
       report.resolvedVia = r.via;
 
-      // 3. Policy. The artifact declares the effect; policy only enforces it.
+      // 3a. A value the artifact deliberately does not hold. Nothing here can
+      //     supply it, and guessing is not an option -- hand over to a human.
+      if (step.value?.from === 'operator') {
+        report.status = 'failed';
+        report.ms = Date.now() - sT0;
+        steps.push(report);
+        const shot = log.saveScreenshot(await surface.screenshot(), 'credential');
+        return done({
+          status: 'escalated',
+          reason: `step ${step.index} needs a human: ${step.value.prompt}`,
+          atStep: step.index,
+          context: { location: obs.location, screenshot: shot, expected: describeTarget(step.target) },
+        } as never);
+      }
+
+      // 3b. Policy. The artifact declares the effect; policy only enforces it.
       const value = bindValue(step, opts.inputs);
       const action = { kind: step.kind as never, ...(value !== undefined ? { text: value } : {}) };
+      // Defence in depth: an artifact is a file, and a file can be edited.
+      const cred = checkCredentialField(policy, action, step.target.anchor?.text ?? step.target.name);
+      if (cred.allow === false) {
+        report.status = 'failed';
+        steps.push(report);
+        return fail({
+          code: 'policy_blocked', stepIndex: step.index, stepId: step.id,
+          expected: 'a step that does not enter a credential',
+          observed: cred.reason,
+        });
+      }
+
       const decision = checkAction(policy, action, step.effect);
       if (decision.allow === false) {
         report.status = 'failed';

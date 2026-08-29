@@ -6,7 +6,10 @@ import type { StateAssertion } from '../schema/assertion.js';
 import { describeTarget } from '../schema/assertion.js';
 import { contentLocation, type Observation, type UINode } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
-import { classifyEffect, checkAction, checkNavigation, type Effect, type PolicyConfig } from '../policy/allowlist.js';
+import {
+  classifyEffect, checkAction, checkCredentialField, checkNavigation, isSensitiveField,
+  type Effect, type PolicyConfig,
+} from '../policy/allowlist.js';
 import type { RunLog } from '../run/log.js';
 import { describeNode } from './describe.js';
 import { renderObservation } from './render.js';
@@ -233,6 +236,17 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     if (interrupted) return interrupted;
     const node = nodeByRef(ref);
     const described = describeNode(obs, node, 'action');
+
+    // Checked before anything is done or written down. A credential that
+    // reaches the log has already been typed into a live system.
+    const label = node.anchorText ?? node.name;
+    const cred = checkCredentialField(policy, { kind, ...(text !== undefined ? { text } : {}) }, label);
+    if (cred.allow === false) {
+      log.append('system', 'policy.blocked', { kind, target: describeTarget(described.descriptor), reason: cred.reason });
+      warnings.push(`refused to type into "${label}": credential field`);
+      return `BLOCKED: ${cred.reason}\n\nIf the goal cannot continue without it, call giveUp so a human can take over.`;
+    }
+
     const effect = classifyEffect(policy, { kind, ...(text !== undefined ? { text } : {}) }, node);
 
     const decision = checkAction(policy, { kind, ...(text !== undefined ? { text } : {}) }, effect);
@@ -265,13 +279,18 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       index: steps.length + 1, kind, rationale: why,
       target: described.descriptor, targetVerified: described.verified,
       ...(described.problem ? { targetProblem: described.problem } : {}),
-      ...(text !== undefined ? { literal: text } : {}),
+      // A refused credential never reaches the trace, so it can never reach an
+      // artifact -- which is a file that gets committed, diffed and shared.
+      ...(text !== undefined && !isSensitiveField(policy, label) ? { literal: text } : {}),
       effect, locationAfter: contentLocation(obs),
     };
     steps.push(step);
     log.append('agent', `act.${kind}`, {
       target: describeTarget(described.descriptor), why, effect,
-      ...(text !== undefined ? { text } : {}), location: obs.location,
+      // Belt and braces: the field was already refused above if it read as a
+      // credential, but the log never takes a value on trust.
+      ...(text !== undefined ? { text: isSensitiveField(policy, label) ? '[REDACTED]' : text } : {}),
+      location: obs.location,
     }, log.saveScreenshot(await surface.screenshot(), kind));
 
     return `OK.\n\n${renderObservation(obs)}`;

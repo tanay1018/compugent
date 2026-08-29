@@ -27,6 +27,16 @@ import { Effect } from '../policy/allowlist.js';
 export const ValueSource = z.discriminatedUnion('from', [
   z.object({ from: z.literal('param'), param: z.string() }),
   z.object({ from: z.literal('literal'), value: z.string() }),
+  /**
+   * Supplied by a human at run time and never stored.
+   *
+   * This is how a flow behind a login is expressible at all. The artifact
+   * records that a credential is needed HERE, and what to ask for — but the
+   * value is not a parameter (a caller would have to hold it), not a literal
+   * (a file would hold it), and not something automation may type. Replay
+   * escalates when it reaches one.
+   */
+  z.object({ from: z.literal('operator'), prompt: z.string() }),
 ]);
 export type ValueSource = z.infer<typeof ValueSource>;
 
@@ -229,6 +239,11 @@ export const CapabilityArtifact = z
     }
     const params = new Set(a.inputs.map((p) => p.name));
     for (const s of a.steps) {
+      if (s.value?.from === 'literal' && /^(pw|pass|pin|secret|token)/i.test(s.value.value)) {
+        // Not a real secret detector -- just a floor. A value that looks like a
+        // credential has no business being a stored literal.
+        ctx.addIssue({ code: 'custom', message: `step ${s.index} stores a literal that looks like a credential` });
+      }
       if (s.value?.from === 'param' && !params.has(s.value.param)) {
         ctx.addIssue({ code: 'custom', message: `step ${s.index} references undeclared parameter "${s.value.param}"` });
       }

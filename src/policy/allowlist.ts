@@ -48,7 +48,7 @@ export type PolicyConfig = z.infer<typeof PolicyConfig>;
 
 export type Decision =
   | { allow: true }
-  | { allow: false; reason: string; code: 'origin' | 'path' | 'action' | 'irreversible' }
+  | { allow: false; reason: string; code: 'origin' | 'path' | 'action' | 'irreversible' | 'credential' }
   | { allow: 'needs_approval'; reason: string };
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -84,6 +84,31 @@ export function checkNavigation(policy: PolicyConfig, url: string): Decision {
  * ENFORCE — run time. `declaredEffect` comes from the artifact, where it was
  * classified and reviewed; it is not re-derived here.
  */
+/**
+ * May automation type into this control?
+ *
+ * Redacting a credential from the log is a consolation prize, not a control:
+ * by then the value has been entered into a live system by something that
+ * cannot be held accountable for it. So a field whose label reads like a
+ * secret is REFUSED, and the run escalates to a human who can type it
+ * themselves.
+ *
+ * This is also what stops a credential reaching an artifact. A step whose
+ * value was never captured cannot bake one in, and an artifact is a file that
+ * gets committed, diffed and shared.
+ */
+export function checkCredentialField(policy: PolicyConfig, action: Action, targetLabel: string | undefined): Decision {
+  if (action.kind !== 'type' && action.kind !== 'select') return { allow: true };
+  if (!isSensitiveField(policy, targetLabel)) return { allow: true };
+  return {
+    allow: false,
+    code: 'credential',
+    reason:
+      `"${targetLabel}" looks like a credential or regulated field. Automation does not enter these — ` +
+      `a human must. Escalate, or record the step as operator-supplied.`,
+  };
+}
+
 export function checkAction(policy: PolicyConfig, action: Action, declaredEffect: Effect): Decision {
   if (!policy.allowedActions.includes(action.kind)) {
     return { allow: false, code: 'action', reason: `action "${action.kind}" is not permitted by policy` };
