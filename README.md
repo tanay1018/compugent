@@ -268,18 +268,47 @@ contract looks like — is baked into every future invocation, so it is worth
 keeping capable even when discovery runs on something cheap. One call at
 premium rates is rounding error.
 
-Model choice is the smaller lever. The loop resends the whole conversation on
-every step, and each step appends a full screen rendering, so input grows
-**quadratically** — which is why a five-step run reached 18K input tokens.
-Older observations are now replaced with a one-line note of where the run was:
+Model choice is the smaller lever. Three things drive the bill, in order:
+
+**1. History growth.** The loop resends the whole conversation every step, and
+each step appends a full screen rendering, so input grows *quadratically*.
+Stale observations are now replaced with a one-line note of where the run was —
+only the current screen is decidable-on:
 
 ```
-19429 -> 3704 chars (81% smaller across 10 steps)
+what the model receives: 14550 -> 3770 chars (74% smaller)
 ```
 
-Only the current screen is decidable-on. That saving applies to whichever model
-you point at it, and it compounds with the gateway's prompt caching rather than
-competing with it.
+That figure is measured at the model boundary with a mock model
+(`test/loop-cost.test.ts`), not inferred — the reduction has to survive the SDK
+actually honouring a `prepareStep` override, which is a separate question from
+whether the compaction function works.
+
+**2. Reasoning tokens.** Opus-class models think adaptively by default, and
+every reasoning token is billed on output *and* resent as history on the next
+step. Choosing which of a dozen labelled controls to click does not reward
+extended thinking. `REASONING_EFFORT` (default `low`) turns it down.
+
+**3. Screen size.** A content-heavy page can expose hundreds of nodes —
+books.toscrape.com renders 402, Wikipedia 1393 — resent on every step.
+`MAX_OBSERVATION_NODES` (default 140) caps it; controls are never dropped, long
+runs of text are, and the model is told when it has been cut.
+
+Every run now prints where its tokens went:
+
+```
+TOKENS PER MODEL CALL
+  #    input   cached  reasoning  output
+  1     1840        0        124     210
+  ...
+```
+
+**On prompt caching:** the provider dashboard will show `cached = 0`, and that
+is expected rather than a missed optimisation. Caching needs a byte-stable
+prefix, compaction rewrites history every step, and what is left — a ~450-token
+system prompt — sits under Anthropic's 1024-token minimum cacheable prefix.
+Compaction and caching are in tension here, and for runs of more than two or
+three steps compaction wins.
 
 The model never sees HTML — only the normalised graph that `npm run observe`
 prints. Its action vocabulary is exactly what a recorded step can express, so

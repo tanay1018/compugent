@@ -49,19 +49,43 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+/**
+ * Kill the whole process GROUP, not the pid we happen to hold.
+ *
+ * We spawn through `npx`, which execs node as a grandchild. Signalling the npx
+ * pid kills the wrapper and orphans everything underneath it: the runner keeps
+ * running, its console keeps holding a port, and its browser keeps running.
+ * The visible symptom is a "New run" that appears to hang on the previous
+ * run's page, because the previous run never actually stopped.
+ *
+ * `detached: true` makes each child a group leader so a negative pid reaches
+ * the entire tree.
+ */
+function killTree(proc) {
+  if (!proc) return;
+  try { process.kill(-proc.pid, 'SIGKILL'); }
+  catch { try { proc.kill('SIGKILL'); } catch {} }
+}
+
 function stopRun() {
-  if (child) { try { child.kill('SIGKILL'); } catch {} child = null; }
+  if (child) { killTree(child); child = null; }
+}
+
+/** Give the OS a moment to release the listener before we probe for a port. */
+function settle(ms = 350) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /** The bundled target app, started on demand so a local goal just works. */
 async function ensureTargetApp() {
   if (await portUp(8710)) return;
-  targetApp = spawn('npx', ['tsx', 'target-app/server.ts'], { cwd: ROOT, stdio: 'ignore' });
+  targetApp = spawn('npx', ['tsx', 'target-app/server.ts'], { cwd: ROOT, stdio: 'ignore', detached: true });
   await waitFor(8710, 15000);
 }
 
 ipcMain.handle('run:start', async (_e, { url, task }) => {
   stopRun();
+  await settle();
   if (/localhost:8710|127\.0\.0\.1:8710/.test(url)) {
     send('run:log', '· starting the bundled MemberDesk target app\n');
     await ensureTargetApp();
@@ -71,6 +95,8 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
   const args = ['tsx', 'scripts/watch.ts', task, '--url', url, '--keep-open'];
   child = spawn('npx', args, {
     cwd: ROOT,
+    // Own process group, so stopRun() can reach the whole tree.
+    detached: true,
     // RUNNER_PARENT_PID lets the run notice if this app dies abnormally and
     // shut itself down, instead of orphaning a browser and holding a port.
     env: { ...process.env, CONSOLE_PORT: String(port), RUNNER_PARENT_PID: String(process.pid) },
@@ -107,7 +133,8 @@ ipcMain.handle('caps:list', () => {
       const a = JSON.parse(fs.readFileSync(path.join(dir, `v${v}.json`), 'utf8'));
       out.push({
         id: a.id, version: a.version, versions, name: a.name, description: a.description,
-        approval: a.approval, inputs: a.inputs, outputs: a.outputs,
+        approval: a.approval, incompleteReason: a.incompleteReason,
+        inputs: a.inputs, outputs: a.outputs,
         outcomes: (a.outcomes || []).map((o) => ({ name: o.name, classification: o.classification })),
         steps: a.steps.length, app: a.app,
       });
@@ -124,7 +151,7 @@ ipcMain.handle('caps:run', async (_e, { id, inputs, url }) => {
   if (url) args.push('--url', url);
 
   return new Promise((resolve) => {
-    const p = spawn('npx', args, { cwd: ROOT, env: { ...process.env } });
+    const p = spawn('npx', args, { cwd: ROOT, env: { ...process.env }, detached: true });
     let out = '', err = '';
     p.stdout.on('data', (d) => { out += d.toString(); send('run:log', d.toString()); });
     p.stderr.on('data', (d) => { err += d.toString(); send('run:log', d.toString()); });
@@ -138,15 +165,25 @@ ipcMain.handle('caps:run', async (_e, { id, inputs, url }) => {
 });
 
 /** Turn the most recent successful discovery run into a capability. */
-ipcMain.handle('caps:compile', async () => {
+ipcMain.handle('caps:compile', async (_e, opts) => {
+  // `--partial` saves a run that never finished as an `incomplete` artifact:
+  // the steps that did work are kept, but it is not invocable.
+  const compileArgs = ['tsx', 'scripts/compile.ts'];
+  if (opts && opts.partial) compileArgs.push('--partial');
   return new Promise((resolve) => {
-    const p = spawn('npx', ['tsx', 'scripts/compile.ts'], { cwd: ROOT, env: { ...process.env } });
+    const p = spawn('npx', compileArgs, { cwd: ROOT, env: { ...process.env }, detached: true });
     let out = '';
     p.stdout.on('data', (d) => { out += d.toString(); send('run:log', d.toString()); });
     p.stderr.on('data', (d) => { out += d.toString(); send('run:log', d.toString()); });
     p.on('exit', (code) => {
       const saved = /saved: (\S+)/.exec(out);
-      resolve(code === 0 && saved ? { ok: true, path: saved[1] } : { ok: false, error: out.trim().slice(-400) });
+      if (code === 0 && saved) {
+        return resolve({ ok: true, path: saved[1], incomplete: /\[incomplete\]/.test(out) });
+      }
+      // Distinguish "this run did not finish" from a genuine failure, so the
+      // UI can offer to keep it rather than just reporting an error.
+      const partialAvailable = /allowPartial|--partial/.test(out);
+      resolve({ ok: false, error: out.trim().slice(-400), partialAvailable });
     });
   });
 });
@@ -168,5 +205,5 @@ app.whenReady().then(() => {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 });
 
-app.on('window-all-closed', () => { stopRun(); if (targetApp) targetApp.kill('SIGKILL'); app.quit(); });
-app.on('before-quit', () => { stopRun(); if (targetApp) targetApp.kill('SIGKILL'); });
+app.on('window-all-closed', () => { stopRun(); killTree(targetApp); app.quit(); });
+app.on('before-quit', () => { stopRun(); killTree(targetApp); });

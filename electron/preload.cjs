@@ -7,5 +7,5 @@ contextBridge.exposeInMainWorld('runner', {
   onExit: (fn) => ipcRenderer.on('run:exit', (_e, info) => fn(info)),
   listCapabilities: () => ipcRenderer.invoke('caps:list'),
   runCapability: (opts) => ipcRenderer.invoke('caps:run', opts),
-  compileLatest: () => ipcRenderer.invoke('caps:compile'),
+  compileLatest: (opts) => ipcRenderer.invoke('caps:compile', opts || {}),
 });

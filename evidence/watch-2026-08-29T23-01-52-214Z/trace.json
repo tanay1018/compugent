@@ -1,0 +1,11 @@
+{
+  "goal": "look up member 12345 and read their savings balance",
+  "entryUrl": "http://localhost:8710/?tenant=meridian",
+  "model": "anthropic/claude-opus-5",
+  "startedAt": "2026-08-29T23:01:52.342Z",
+  "finishedAt": "2026-08-29T23:01:52.780Z",
+  "outcome": "error",
+  "blockedReason": "GatewayInternalServerError: API key budget exceeded. Current spend: $20.17, limit: $20.00. Please contact your administrator to increase the budget.",
+  "steps": [],
+  "warnings": []
+}

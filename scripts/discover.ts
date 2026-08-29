@@ -74,6 +74,18 @@ try {
     const c = trace.checkpoint;
     console.log(`\n  checkpoint: ${c.kind === 'nodeExists' ? c.description ?? '' : ''}`);
   }
+  if (trace.stepUsage?.length) {
+    console.log(`\n  TOKENS PER MODEL CALL`);
+    console.log(`    ${'#'.padStart(3)}${'input'.padStart(9)}${'cached'.padStart(9)}${'reasoning'.padStart(11)}${'output'.padStart(8)}`);
+    let ti = 0, tc = 0, tr = 0, to = 0;
+    for (const [i, u] of trace.stepUsage.entries()) {
+      ti += u.in; tc += u.cached; tr += u.reasoning; to += u.out;
+      console.log(`    ${String(i + 1).padStart(3)}${String(u.in).padStart(9)}${String(u.cached).padStart(9)}${String(u.reasoning).padStart(11)}${String(u.out).padStart(8)}`);
+    }
+    console.log(`    ${'tot'.padStart(3)}${String(ti).padStart(9)}${String(tc).padStart(9)}${String(tr).padStart(11)}${String(to).padStart(8)}`);
+    if (tc === 0) console.log(`    cached=0 across every call — the provider is not reusing the prompt prefix`);
+    if (tr > to) console.log(`    reasoning exceeds output — lower REASONING_EFFORT or pick a non-reasoning model`);
+  }
   if (trace.warnings.length) {
     console.log(`\n  warnings:`);
     for (const w of trace.warnings) console.log(`    - ${w}`);

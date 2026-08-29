@@ -51,6 +51,8 @@ export interface DiscoveryTrace {
   summary?: string;
   blockedReason?: string;
   usage?: { inputTokens?: number; outputTokens?: number };
+  /** Per model call, so a climbing input count can be attributed. */
+  stepUsage?: Array<{ in: number; out: number; reasoning: number; cached: number }>;
   warnings: string[];
 }
 
@@ -118,10 +120,12 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   const modelId = opts.model ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-opus-5';
   const maxSteps = opts.maxSteps ?? 20;
   const timeoutMs = opts.timeoutMs ?? 240_000;
+  const reasoningEffort = process.env.REASONING_EFFORT ?? 'low';
   const startedAt = new Date().toISOString();
 
   const steps: TraceStep[] = [];
   const warnings: string[] = [];
+  const stepUsage: Array<{ in: number; out: number; reasoning: number; cached: number }> = [];
   let outcome: DiscoveryOutcome = 'max_steps';
   let checkpoint: StateAssertion | undefined;
   let summary: string | undefined;
@@ -268,6 +272,21 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   try {
     const result = await generateText({
       model: gateway(modelId),
+      /**
+       * Reasoning depth. Choosing which of a dozen labelled controls to click
+       * is not a task that rewards extended thinking, and every thinking token
+       * is billed on output AND resent as history on the next step. Opus-class
+       * models think adaptively by default, which is how a five-step run ends
+       * up spending more on deliberation than on decisions.
+       *
+       * Provider options are advisory: an unrecognised key is ignored rather
+       * than fatal, so this is safe across the gateway's model catalogue.
+       */
+      providerOptions: {
+        anthropic: { thinking: { type: 'adaptive' }, effort: reasoningEffort },
+        gateway: { reasoning: { effort: reasoningEffort } },
+        openai: { reasoningEffort },
+      },
       system: SYSTEM,
       prompt: `GOAL: ${opts.goal}\n\nCurrent observation:\n${renderObservation(obs)}`,
       stopWhen: stepCountIs(maxSteps),
@@ -275,6 +294,21 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       // Only the current screen is decidable-on; older ones are dead weight
       // that the loop would otherwise pay to resend on every step.
       prepareStep: ({ messages }) => ({ messages: compactObservations(messages) }),
+      /**
+       * Per-step token accounting. Without this, a run reports one aggregate
+       * number and there is no way to tell a big page from a long history from
+       * a chatty model -- which is exactly the confusion a climbing input count
+       * in the provider's dashboard produces.
+       */
+      onStepFinish: ({ usage }) => {
+        const u = usage as { inputTokens?: number; outputTokens?: number; reasoningTokens?: number;
+                             cachedInputTokens?: number } | undefined;
+        stepUsage.push({
+          in: u?.inputTokens ?? 0, out: u?.outputTokens ?? 0,
+          reasoning: u?.reasoningTokens ?? 0, cached: u?.cachedInputTokens ?? 0,
+        });
+        log.append('system', 'model.step', stepUsage[stepUsage.length - 1] as unknown as Record<string, unknown>);
+      },
       tools: {
         click: tool({
           description: 'Click a control.',
@@ -361,6 +395,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       ...(summary ? { summary } : {}),
       ...(blockedReason ? { blockedReason } : {}),
       ...(usage ? { usage } : {}),
+      ...(stepUsage.length ? { stepUsage } : {}),
     };
     log.append('system', 'discovery.end', { outcome, steps: steps.length, warnings: warnings.length });
     if (opts.session) opts.session.agentActive = false;

@@ -46,7 +46,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--navy)}
 .cap-id{font-size:13px;color:var(--ink);font-weight:600}
 .cap-v{font-size:11px;color:var(--dim)}
 .badge{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:3px 6px;border-radius:2px;border:1px solid currentColor}
-.b-draft{color:var(--amber)} .b-approved{color:var(--moss)}
+.b-draft{color:var(--amber)} .b-approved{color:var(--moss)} .b-incomplete{color:var(--rust)}
 .cap-d{padding:10px 14px;color:var(--dim);font-size:11.5px;line-height:1.6;border-bottom:1px solid var(--line)}
 .cap-b{padding:12px 14px;display:grid;gap:10px}
 .io{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center}
@@ -67,6 +67,11 @@ input:focus,textarea:focus{outline:none;border-color:var(--navy)}
   padding:9px 11px;overflow-x:auto;font-size:11px;color:#b8c0cc;white-space:pre-wrap}
 .empty{color:var(--dim);font-size:12px;line-height:1.7;border:1px dashed var(--line);
   border-radius:5px;padding:20px;text-align:center}
+.why{border:1px solid var(--rust);border-radius:4px;padding:10px 12px;margin-bottom:12px;
+  font-size:11.5px;line-height:1.6;color:#e8b9a6;background:#241a16}
+.why b{color:var(--rust);display:block;margin-bottom:4px}
+.why button{margin-top:9px}
+.blocked{font-size:11px;color:var(--rust);line-height:1.6}
 
 /* ---- running ---- */
 #run{flex:1;display:none;flex-direction:column;min-height:0}
@@ -245,12 +250,16 @@ async function loadCaps(){
         `<div class="io"><label>target</label><input class="url" value="${defaultUrlFor(c)}" spellcheck="false"></div>` +
         `<div class="meta"><b>returns</b> ${outs || '&mdash;'}` +
           (ocs ? `<br><b>or</b> ${ocs}` : '') + `</div>` +
-        `<div class="runrow"><button class="runbtn">Run</button>` +
-          `<span class="meta" style="opacity:.75">no model — deterministic replay</span></div>` +
+        (c.approval === 'incomplete'
+          ? `<div class="blocked">Not invocable — ${c.incompleteReason || 'the run never finished'}.` +
+            `<br>There is no checkpoint, so nothing could verify success. Finish the recording first.</div>`
+          : `<div class="runrow"><button class="runbtn">Run</button>` +
+            `<span class="meta" style="opacity:.75">no model — deterministic replay</span></div>`) +
       `</div><div class="res"></div>`;
 
     const res = el.querySelector('.res');
-    el.querySelector('.runbtn').onclick = async (ev) => {
+    const runBtn = el.querySelector('.runbtn');
+    if (runBtn) runBtn.onclick = async (ev) => {
       const btn = ev.currentTarget;
       btn.disabled = true; btn.textContent = 'Running…';
       res.className = 'res on'; res.innerHTML = '<span class="meta">replaying…</span>';
@@ -279,13 +288,36 @@ async function loadCaps(){
 }
 
 $('refresh').onclick = loadCaps;
-$('compile').onclick = async (ev) => {
-  const b = ev.currentTarget; b.disabled = true; b.textContent = 'Compiling…';
-  const r = await window.runner.compileLatest();
+async function compile(partial){
+  const b = $('compile');
+  b.disabled = true; b.textContent = partial ? 'Saving…' : 'Compiling…';
+  const r = await window.runner.compileLatest({ partial });
   b.disabled = false; b.textContent = 'Compile latest run → capability';
-  if (!r.ok) { $('caplist').insertAdjacentHTML('afterbegin', `<div class="empty" style="color:var(--rust)">${r.error}</div>`); return; }
-  loadCaps();
-};
+
+  const list = $('caplist');
+  if (r.ok) { await loadCaps(); return; }
+
+  const box = document.createElement('div');
+  box.className = 'why';
+  if (r.partialAvailable) {
+    // The run did not finish. Its steps are still worth keeping — but saving
+    // them has to be a deliberate act, not a silent fallback, or an
+    // un-invocable artifact ends up in the catalog looking usable.
+    box.innerHTML = '<b>That run did not finish</b>' +
+      'There is no checkpoint, so nothing could verify success. The steps it did ' +
+      'complete can still be kept as an <b style="display:inline">incomplete</b> capability — ' +
+      'a record of what was learned, and a starting point for finishing the job. ' +
+      'It will not be invocable.<br>' +
+      '<button class="btn" id="savepartial">Save anyway as incomplete</button>';
+  } else {
+    box.innerHTML = '<b>Could not compile</b>' + r.error;
+  }
+  list.prepend(box);
+  const sp = document.getElementById('savepartial');
+  if (sp) sp.onclick = () => { box.remove(); compile(true); };
+}
+
+$('compile').onclick = () => compile(false);
 
 $('stop').onclick = async () => { await window.runner.stop(); log('\n· stopped\n'); };
 $('newrun').onclick = async () => {
