@@ -1,0 +1,11 @@
+{
+  "goal": "look up member 55501 and read their savings balance and account status",
+  "entryUrl": "http://localhost:8710/?tenant=meridian",
+  "model": "anthropic/claude-sonnet-5",
+  "startedAt": "2026-08-29T22:21:23.449Z",
+  "finishedAt": "2026-08-29T22:21:24.053Z",
+  "outcome": "error",
+  "blockedReason": "GatewayInternalServerError: A positive credit balance is required for all requests, including BYOK, so fallback providers remain available. Add credits at https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dtop-up to continue.",
+  "steps": [],
+  "warnings": []
+}

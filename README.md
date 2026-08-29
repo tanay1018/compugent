@@ -215,9 +215,38 @@ npm run app                                                        # terminal 1
 npm run discover -- "look up member 12345 and read their savings balance"
 ```
 
-Needs `AI_GATEWAY_API_KEY`. A run costs roughly $0.12 against
-`anthropic/claude-opus-5` and writes to `evidence/discovery-<timestamp>/`:
+Needs `AI_GATEWAY_API_KEY`. Writes to `evidence/discovery-<timestamp>/`:
 `trace.json`, an actor-tagged `run.jsonl`, and per-step screenshots.
+
+### Stopping conditions
+
+A run ends on whichever comes first: the goal is met (`finish`), the model
+calls `giveUp` because it cannot safely proceed, **max steps** (20, or 25 in
+the desktop app), or a **wall-clock timeout** (4 minutes). Step count alone
+does not bound a run — one step can sit on a slow page for a long time.
+
+### Cost
+
+Set `DISCOVERY_MODEL` in `.env` to pick a model. Per run of ~20K in / 1.2K out:
+
+| model | $/M in | $/M out | per run |
+|---|---|---|---|
+| `anthropic/claude-haiku-4.5` | 1.00 | 5.00 | ~$0.026 |
+| `anthropic/claude-sonnet-5` | 2.00 | 10.00 | ~$0.052 |
+| `anthropic/claude-opus-5` *(default)* | 5.00 | 25.00 | ~$0.130 |
+
+Model choice is the smaller lever. The loop resends the whole conversation on
+every step, and each step appends a full screen rendering, so input grows
+**quadratically** — which is why a five-step run reached 18K input tokens.
+Older observations are now replaced with a one-line note of where the run was:
+
+```
+19429 -> 3704 chars (81% smaller across 10 steps)
+```
+
+Only the current screen is decidable-on. That saving applies to whichever model
+you point at it, and it compounds with the gateway's prompt caching rather than
+competing with it.
 
 The model never sees HTML — only the normalised graph that `npm run observe`
 prints. Its action vocabulary is exactly what a recorded step can express, so
@@ -260,6 +289,27 @@ the step it claims, or it is dropped and recorded as a warning.
 
 The model runs here exactly once, offline, on a run a human is about to
 review. Replay never calls it.
+
+### Backtracking is compiled out
+
+A discovery trace is a **walk**, not a route: the model tries a screen, finds a
+dead end, goes back and takes a different turn. Recording that verbatim makes
+replay re-enact the exploration — slower on every call, with more chances to
+fail, for work whose result was thrown away.
+
+So cycles are excised. When the walk leaves a screen and later returns to it,
+everything from that screen's first visit is dropped:
+
+```
+lookup(1,2) -> detail(3,4) -> back to lookup(5,6)   compiles to   [5, 6]
+```
+
+Consecutive steps on one screen are *not* a cycle — typing into a field and
+clicking the button beside it is ordinary sequential work. The assumption worth
+stating: re-entering a screen gets it fresh. True for server-rendered apps,
+which is the target here; it can fail on a SPA that preserves form state. So
+anything dropped is listed in the artifact's warnings, and artifacts stay
+`draft`.
 
 Compiled artifacts land in `artifacts/<id>/v<n>.json` and project directly to
 an agent-callable tool:

@@ -10,6 +10,7 @@ import { classifyEffect, checkAction, checkNavigation, type Effect, type PolicyC
 import type { RunLog } from '../run/log.js';
 import { describeNode } from './describe.js';
 import { renderObservation } from './render.js';
+import { compactObservations } from './compact.js';
 
 /**
  * Discovery: an LLM drives the live surface until the goal is met.
@@ -21,7 +22,7 @@ import { renderObservation } from './render.js';
  * here, replay can do without it.
  */
 
-export type DiscoveryOutcome = 'success' | 'gave_up' | 'max_steps' | 'blocked' | 'error';
+export type DiscoveryOutcome = 'success' | 'gave_up' | 'max_steps' | 'timeout' | 'blocked' | 'error';
 
 export interface TraceStep {
   index: number;
@@ -60,6 +61,12 @@ export interface DiscoveryOptions {
   policy: PolicyConfig;
   log: RunLog;
   maxSteps?: number;
+  /**
+   * Wall-clock ceiling. Step count alone does not bound a run: a single step
+   * can sit on a slow page for a long time, and an eight-second stall repeated
+   * across twenty steps is minutes of paid-for waiting with nothing to show.
+   */
+  timeoutMs?: number;
   model?: string;
   /**
    * Seam for Phase 6. Discovery is a supervised activity, so the default
@@ -110,6 +117,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   const { surface, policy, log } = opts;
   const modelId = opts.model ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-opus-5';
   const maxSteps = opts.maxSteps ?? 20;
+  const timeoutMs = opts.timeoutMs ?? 240_000;
   const startedAt = new Date().toISOString();
 
   const steps: TraceStep[] = [];
@@ -233,6 +241,10 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       system: SYSTEM,
       prompt: `GOAL: ${opts.goal}\n\nCurrent observation:\n${renderObservation(obs)}`,
       stopWhen: stepCountIs(maxSteps),
+      abortSignal: AbortSignal.timeout(timeoutMs),
+      // Only the current screen is decidable-on; older ones are dead weight
+      // that the loop would otherwise pay to resend on every step.
+      prepareStep: ({ messages }) => ({ messages: compactObservations(messages) }),
       tools: {
         click: tool({
           description: 'Click a control.',
@@ -325,11 +337,17 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     return trace;
   } catch (err) {
     if (opts.session) opts.session.agentActive = false;
-    log.append('system', 'discovery.error', { message: String(err) });
+    // An abort is the timeout firing, not a fault: whatever the run achieved
+    // up to that point is still worth keeping and inspecting.
+    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError' || /abort/i.test(err.message));
+    log.append('system', timedOut ? 'discovery.timeout' : 'discovery.error',
+      { message: String(err), afterMs: Date.now() - Date.parse(startedAt), steps: steps.length });
     return {
       goal: opts.goal, entryUrl: opts.entryUrl, model: modelId, startedAt,
-      finishedAt: new Date().toISOString(), outcome: 'error',
-      blockedReason: String(err), steps, warnings,
+      finishedAt: new Date().toISOString(),
+      outcome: timedOut ? 'timeout' : 'error',
+      blockedReason: timedOut ? `gave up after ${Math.round(timeoutMs / 1000)}s` : String(err),
+      steps, warnings,
     };
   }
 }

@@ -64,6 +64,53 @@ export interface CompileOptions {
   version?: number;
 }
 
+/**
+ * A discovery trace is a WALK, not a route.
+ *
+ * The model explores: it tries a screen, finds it is a dead end, goes back and
+ * takes a different turn. Recording that verbatim makes replay re-enact the
+ * exploration — slower every single call, and with more chances to fail, for
+ * work whose result was thrown away.
+ *
+ * So cycles are excised. Steps are grouped by the state they act on; when the
+ * walk LEAVES a state and later returns to it, everything from that state's
+ * first visit onward is dropped. Consecutive steps on one screen are not a
+ * cycle — typing into a field and clicking the button beside it is ordinary
+ * sequential work.
+ *
+ * The assumption worth stating: re-entering a screen gets it fresh. That holds
+ * for server-rendered apps, which is the target here, and can fail on a SPA
+ * that preserves form state across navigation. Anything dropped is therefore
+ * listed in the artifact's warnings, and artifacts compile as draft.
+ */
+function pruneCycles(steps: TraceStep[], entryUrl: string): { kept: TraceStep[]; dropped: TraceStep[] } {
+  const stateAt = (i: number): string =>
+    canonicaliseLocation(i === 0 ? entryUrl : steps[i - 1]?.locationAfter ?? entryUrl).pattern;
+
+  const kept: TraceStep[] = [];
+  const dropped: TraceStep[] = [];
+  const runs: Array<{ state: string; start: number }> = [];
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i]!;
+    const state = stateAt(i);
+    const current = runs.at(-1);
+
+    if (current && current.state === state) { kept.push(step); continue; }
+
+    const prior = runs.findIndex((r) => r.state === state);
+    if (prior >= 0) {
+      dropped.push(...kept.slice(runs[prior]!.start));
+      kept.length = runs[prior]!.start;
+      runs.length = prior + 1;
+    } else {
+      runs.push({ state, start: kept.length });
+    }
+    kept.push(step);
+  }
+  return { kept, dropped };
+}
+
 export interface CompileResult {
   artifact: CapabilityArtifact;
   warnings: string[];
@@ -203,12 +250,21 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     return out;
   };
 
+  // Extraction is described by `outputs`, not replayed as an action.
+  const actionSteps = trace.steps.filter((s) => s.kind !== 'extract');
+  const { kept, dropped } = pruneCycles(actionSteps, trace.entryUrl);
+  if (dropped.length) {
+    warnings.push(
+      `pruned ${dropped.length} step(s) the run backtracked out of: ` +
+      dropped.map((d) => `${d.index}.${d.kind}`).join(', ') +
+      ` — replay takes the direct route`,
+    );
+  }
+
   const steps: Step[] = [];
   let index = 0;
-  for (const s of trace.steps) {
-    if (s.kind === 'extract') continue; // extraction is described by outputs, not replayed as an action
+  for (const s of kept) {
     index += 1;
-    const locationBefore = index === 1 ? trace.entryUrl : trace.steps[trace.steps.indexOf(s) - 1]?.locationAfter ?? trace.entryUrl;
     const param = paramByStep.get(s.index);
 
     const value = s.literal === undefined
@@ -266,3 +322,6 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
 
   return { artifact, warnings };
 }
+
+/** Exposed for tests: cycle elimination is pure and worth pinning down. */
+export const __testing = { pruneCycles };
