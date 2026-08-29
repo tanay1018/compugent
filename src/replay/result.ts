@@ -24,6 +24,7 @@ export type FailureCode =
   | 'target_ambiguous'     // the descriptor matches several controls
   | 'checkpoint_failed'    // steps ran but we did not arrive
   | 'output_missing'       // arrived, but a declared output is not readable
+  | 'output_mismatch'      // arrived and read, but the record is not the one asked for
   | 'policy_blocked'       // the allowlist refused the action
   | 'app_error';           // the application itself failed
 

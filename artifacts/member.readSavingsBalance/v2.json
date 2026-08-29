@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "member.readSavingsBalance",
   "version": 2,
-  "name": "Read member savings balance",
-  "description": "Looks up a member by Member ID in the Member Inquiry screen and returns the current balance of their Savings account, along with the member name and Member ID shown on the loaded record so the caller can confirm the correct member was retrieved. Reach for this when an agent needs a member's savings balance or needs to verify a member record exists for a given ID.",
+  "name": "Read Member Savings Balance",
+  "description": "Looks up a credit union member by member number and reads their current savings account balance, returning the balance along with the member ID and name for verification. Use this when an agent needs a specific member's savings balance.",
   "app": {
     "vendorProduct": "Corelink MemberDesk 7.2",
     "recordedTenant": "meridian",
@@ -16,7 +16,7 @@
       "name": "memberId",
       "type": "string",
       "required": true,
-      "description": "The Member ID to look up in the Member Inquiry form.",
+      "description": "The member number to look up in the Member ID search field.",
       "example": "12345",
       "sensitive": true
     }
@@ -24,8 +24,8 @@
   "outputs": [
     {
       "name": "savingsBalance",
-      "type": "string",
-      "description": "Current balance of the account in the row labelled 'Savings'.",
+      "type": "number",
+      "description": "Current balance of the member's Savings account.",
       "from": {
         "role": "text",
         "nameMatch": "normalized",
@@ -38,38 +38,16 @@
         },
         "fallbacks": [],
         "provenance": {
-          "discoveredAt": "2026-08-28T03:14:42.533Z"
+          "discoveredAt": "2026-08-29T21:41:01.035Z"
         }
       },
       "transform": "currency",
       "sensitive": true
     },
     {
-      "name": "memberName",
-      "type": "string",
-      "description": "Member name shown beside the 'Name' label on the member detail screen, used to confirm the correct record loaded.",
-      "from": {
-        "role": "text",
-        "nameMatch": "normalized",
-        "anchor": {
-          "relation": "inSameRowAs",
-          "text": "Name"
-        },
-        "scope": {
-          "frame": "main"
-        },
-        "fallbacks": [],
-        "provenance": {
-          "discoveredAt": "2026-08-28T03:14:42.534Z"
-        }
-      },
-      "transform": "text",
-      "sensitive": true
-    },
-    {
       "name": "memberId",
       "type": "string",
-      "description": "Member ID displayed on the member detail screen, used to verify it matches the searched input.",
+      "description": "Member ID shown on the detail screen, used to confirm the correct member was loaded.",
       "from": {
         "role": "text",
         "nameMatch": "normalized",
@@ -82,7 +60,30 @@
         },
         "fallbacks": [],
         "provenance": {
-          "discoveredAt": "2026-08-28T03:14:46.332Z"
+          "discoveredAt": "2026-08-29T21:41:01.036Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": true,
+      "mustMatchParam": "memberId"
+    },
+    {
+      "name": "memberName",
+      "type": "string",
+      "description": "Name of the member whose balance was read.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Name"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:41:01.036Z"
         }
       },
       "transform": "text",
@@ -136,7 +137,7 @@
           },
           "fallbacks": [],
           "provenance": {
-            "discoveredAt": "2026-08-28T03:33:11.525Z"
+            "discoveredAt": "2026-08-29T22:05:18.035Z"
           }
         },
         "maxAttempts": 1
@@ -183,7 +184,7 @@
         },
         "fallbacks": [],
         "provenance": {
-          "discoveredAt": "2026-08-28T03:14:32.974Z"
+          "discoveredAt": "2026-08-29T21:40:50.439Z"
         }
       },
       "value": {
@@ -204,12 +205,12 @@
           },
           "fallbacks": [],
           "provenance": {
-            "discoveredAt": "2026-08-28T03:14:32.974Z"
+            "discoveredAt": "2026-08-29T21:40:50.439Z"
           }
         }
       },
       "effect": "reversible",
-      "rationale": "The Member ID textbox is the input for the member lookup; typing the target member number here parameterizes the search for replay."
+      "rationale": "The Member ID field is the search input; entering the member number 12345 to look up the member."
     },
     {
       "id": "s2",
@@ -228,7 +229,7 @@
         },
         "fallbacks": [],
         "provenance": {
-          "discoveredAt": "2026-08-28T03:14:36.745Z"
+          "discoveredAt": "2026-08-29T21:40:54.626Z"
         }
       },
       "waypoint": {
@@ -246,12 +247,12 @@
           },
           "fallbacks": [],
           "provenance": {
-            "discoveredAt": "2026-08-28T03:14:36.745Z"
+            "discoveredAt": "2026-08-29T21:40:54.626Z"
           }
         }
       },
       "effect": "reversible",
-      "rationale": "Submits the Member Inquiry form to retrieve the member record for the entered Member ID."
+      "rationale": "Submit the inquiry with Search Type = \"Member Number\", which matches looking up by member ID."
     }
   ],
   "checkpoint": {
@@ -265,18 +266,19 @@
       },
       "fallbacks": [],
       "provenance": {
-        "discoveredAt": "2026-08-28T03:14:50.018Z"
+        "discoveredAt": "2026-08-29T21:41:05.173Z"
       }
     },
-    "description": "Searched Member ID 12345 with Search Type \"Member Number\" and landed on the Member Detail screen for Sarah Chen (Active). Current savings balance is $4,182.55 (checking, for reference, is $1,204.10). Recorded outputs: savingsBalance, memberName, memberId — each located by its row label so they can be re-found on replay."
+    "description": "Searched Member ID 12345 by Member Number and landed on the Member Detail screen for Sarah Chen (ID 12345, Active). Recorded the savings balance $4,182.55 from the \"Savings\" row of the Account/Balance table, plus member ID and name as verification."
   },
   "approval": "draft",
   "provenance": {
-    "recordedAt": "2026-08-28T03:14:54.485Z",
-    "discoveryRunId": "discovery-2026-08-28T03-14-28-947Z",
+    "recordedAt": "2026-08-29T21:41:08.908Z",
+    "discoveryRunId": "watch-2026-08-29T21-40-47-229Z",
     "model": "anthropic/claude-opus-5",
     "goal": "look up member 12345 and read their current savings balance",
     "warnings": [
+      "output \"memberId\" echoes the \"memberId\" input; replay will now assert they match",
       "v2: 5 outcome signatures learned from probe runs"
     ]
   }

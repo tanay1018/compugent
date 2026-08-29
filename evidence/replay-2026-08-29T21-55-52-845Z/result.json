@@ -1,0 +1,23 @@
+{
+  "status": "failed",
+  "failure": {
+    "code": "waypoint_failed",
+    "stepIndex": 1,
+    "stepId": "s1",
+    "expected": "textbox inSameRowAs \"Member ID\" in frame \"main\" present",
+    "observed": "no textbox matching textbox inSameRowAs \"Member ID\" in frame \"main\" (tried: anchor) (at http://localhost:8710/?tenant=harbor)",
+    "screenshot": "screenshots/002-failure.png"
+  },
+  "runId": "replay-2026-08-29T21-55-52-845Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "failed",
+      "ms": 15079,
+      "target": "textbox inSameRowAs \"Member ID\" in frame \"main\""
+    }
+  ],
+  "ms": 15302
+}

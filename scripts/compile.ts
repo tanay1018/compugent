@@ -20,7 +20,15 @@ for (const f of ['.env', '.env.local', '.env.txt']) {
 }
 
 const arg = process.argv[2];
-const runDir = arg ?? join('evidence', readdirSync('evidence').filter((d) => d.startsWith('discovery-')).sort().at(-1)!);
+// Both prefixes: `watch-` runs come from the desktop app and are exactly the
+// ones a user is most likely to want compiled straight after recording.
+const runs = readdirSync('evidence')
+  .filter((d) => d.startsWith('discovery-') || d.startsWith('watch-'))
+  .sort();
+const latest = runs.at(-1);
+if (!arg && !latest) { console.error('no discovery runs in evidence/'); process.exit(1); }
+const runDir = arg ?? join('evidence', latest!);
+console.log(`compiling ${runDir}`);
 const trace = JSON.parse(readFileSync(join(runDir, 'trace.json'), 'utf8'));
 
 const { artifact, warnings } = await compileTrace({

@@ -49,11 +49,12 @@ Faults are keyed on the input so every evidence run is reproducible:
 |---|---|---|
 | `12345` `67890` `55501` | happy path | success |
 | `99999` | no member found | **business outcome** |
-| `40001` | 8s stall | **recoverable** |
-| `40002` | unexpected interstitial | **recoverable** |
+| `40001` | 8s stall, correct record | **recoverable** — waiting is the recovery |
+| `40002` | unexpected interstitial | **recoverable** — dismissed |
 | `40003` | permission denied | **business outcome** |
 | `40004` | HTTP 500 | **hard failure** |
 | `40005` | session expired (stateful) | **escalate** |
+| `40006` | valid screen, **wrong member** | **hard failure** — `output_mismatch` |
 
 ## Layout
 
@@ -290,6 +291,42 @@ STEPS
   ✓ 1. type    textbox inSameRowAs "Member ID"    456ms  via:anchor
   ✓ 2. click   button  named "Search"             240ms  via:name
 ```
+
+### How success is verified
+
+Nothing here trusts the model's opinion that it succeeded. Five machine checks:
+
+1. **Waypoint**, before each step — is the control I am about to use present?
+2. **Resolution** — exactly one match, or `not_found` / `ambiguous`.
+3. **Checkpoint**, before reading anything — a loop, so a recoverable
+   interstitial is dismissed and the checkpoint re-tested.
+4. **Every declared output must resolve**, else `output_missing`.
+5. **Identity** — an output that echoes an input must still equal it.
+
+The model's prose summary is stored for humans and is never what gets checked;
+the checkpoint is an assertion:
+
+```json
+{ "kind": "nodeExists",
+  "target": { "role": "text", "name": "Member Detail", "scope": { "frame": "main" } } }
+```
+
+Check 5 exists because the first four are not enough. A checkpoint proves you
+reached the right **screen**, not that the screen is about the right
+**record** — a cached page or a stale session renders a perfectly valid detail
+screen for the wrong member, and every other assertion still holds:
+
+```
+input: memberId=40006
+CODE     output_mismatch
+EXPECTED "memberId" to echo the "memberId" input (40006)
+OBSERVED the screen reports "12345" — this is a different record
+```
+
+The compiler derives that link mechanically: if an output came back reading
+exactly what a parameter went in as, it is an echo of the input, and the
+artifact asserts it rather than merely reporting it. In a bank this is the
+difference between "read a balance" and "read the *right person's* balance".
 
 ### The error taxonomy
 

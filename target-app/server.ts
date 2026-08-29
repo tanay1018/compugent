@@ -157,7 +157,9 @@ createServer(async (req, res) => {
       switch (faultFor(id)) {
         case 'slow':
           await sleep(8000);
-          return send(200, detail(t, '12345'));
+          return send(200, detail(t, id));      // the RIGHT member, just late
+        case 'wrong_record':
+          return send(200, detail(t, '12345')); // a valid screen, wrong member
         case 'not_found':
           return send(200, banner(t, '#800000', 'No member found matching that ID.'));
         case 'permission_denied':
@@ -174,7 +176,7 @@ createServer(async (req, res) => {
 <table cellpadding="8" cellspacing="1" bgcolor="#808080"><tr><td bgcolor="${t.theme.face}">
  <table cellpadding="4"><tr><td colspan="2" bgcolor="${t.theme.bar}"><font color="#ffffff"><b>Session Notice</b></font></td></tr>
  <tr><td colspan="2"><font size="2">Scheduled maintenance begins at 23:00 ET.</font></td></tr>
- <tr><td colspan="2" align="right"><a href="/continue?${qs(t)}&q1=12345">Continue</a></td></tr>
+ <tr><td colspan="2" align="right"><a href="/continue?${qs(t)}&q1=${encodeURIComponent(id)}">Continue</a></td></tr>
  </table></td></tr></table>`));
         case 'none':
           return send(200, detail(t, id));

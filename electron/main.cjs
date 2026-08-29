@@ -69,7 +69,12 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
 
   const port = await freePort();
   const args = ['tsx', 'scripts/watch.ts', task, '--url', url, '--keep-open'];
-  child = spawn('npx', args, { cwd: ROOT, env: { ...process.env, CONSOLE_PORT: String(port) } });
+  child = spawn('npx', args, {
+    cwd: ROOT,
+    // RUNNER_PARENT_PID lets the run notice if this app dies abnormally and
+    // shut itself down, instead of orphaning a browser and holding a port.
+    env: { ...process.env, CONSOLE_PORT: String(port), RUNNER_PARENT_PID: String(process.pid) },
+  });
 
   child.stdout.on('data', (d) => send('run:log', d.toString()));
   child.stderr.on('data', (d) => send('run:log', d.toString()));

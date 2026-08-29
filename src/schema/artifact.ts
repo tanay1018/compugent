@@ -56,6 +56,22 @@ export const OutputSpec = z.object({
   /** Light normalisation so a caller gets `4182.55`, not `"$4,182.55"`. */
   transform: z.enum(['text', 'number', 'currency']).default('text'),
   sensitive: z.boolean().default(false),
+
+  /**
+   * This output must equal the named input parameter.
+   *
+   * The checkpoint proves you reached the right SCREEN; it says nothing about
+   * whether the screen is about the right RECORD. A cached page, a stale
+   * session, or an app that silently falls back to a default will render a
+   * perfectly valid detail screen for the wrong member — every assertion
+   * holds, every output extracts, and replay reports success while returning
+   * somebody else's balance.
+   *
+   * Tying an echoed identifier back to the input closes that. In a bank it is
+   * the difference between "read a balance" and "read the RIGHT person's
+   * balance".
+   */
+  mustMatchParam: z.string().optional(),
 });
 export type OutputSpec = z.infer<typeof OutputSpec>;
 

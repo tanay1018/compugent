@@ -53,6 +53,21 @@ const consoleSrv = new OperatorConsole(session, log, Number(process.env.CONSOLE_
 // observes wherever it has been left. Plans are what create that problem.
 session.control.onChange((e) => { if (e.to === 'resume_requested') session.resumeDiscovery(); });
 
+// A run spawned by the desktop app must not outlive it -- an orphan keeps a
+// browser and a console port alive forever, which is exactly how a stale
+// console blocks the next launch.
+//
+// Watching stdin for EOF looks like the obvious way to detect a dead parent
+// and is wrong: under `nohup` (or any `< /dev/null`) stdin reports EOF
+// immediately and the run exits before it starts. Poll the parent pid
+// explicitly instead, and only when the parent asked us to.
+const parentPid = Number(process.env.RUNNER_PARENT_PID ?? 0);
+if (parentPid > 0) {
+  setInterval(() => {
+    try { process.kill(parentPid, 0); } catch { process.exit(0); }
+  }, 2000).unref();
+}
+
 try {
   await session.prepare();               // capture operator actions from the first document
   const url = await consoleSrv.start();
@@ -62,6 +77,9 @@ try {
   console.log(`  goal    ${goal}`);
   console.log(`  target  ${entryUrl}`);
   console.log(`  console \x1b[1m${url}\x1b[0m  ← open this to watch`);
+  if (consoleSrv.port !== Number(process.env.CONSOLE_PORT ?? 8790)) {
+    console.log(`          (port ${process.env.CONSOLE_PORT ?? 8790} was busy)`);
+  }
   console.log(`${bar}\n  Take control at any time; the agent yields at the next step boundary.\n`);
 
   const trace = await runDiscovery({

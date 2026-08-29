@@ -60,6 +60,11 @@ export const MEMBERS: Record<string, MemberRecord> = {
   '12345': { name: 'Sarah Chen',  status: 'Active',     savings: '4,182.55',  checking: '1,204.10' },
   '67890': { name: 'Marcus Webb', status: 'Active',     savings: '812.30',    checking: '95.00' },
   '55501': { name: 'Dana Ortiz',  status: 'Restricted', savings: '15,900.00', checking: '3,410.75' },
+  // Real members that happen to trigger a runtime condition on lookup. Keeping
+  // them real matters: a "slow load" fault that returned somebody else's record
+  // would be testing two different things at once.
+  '40001': { name: 'Ivan Petrov',  status: 'Active',     savings: '229.14',    checking: '18.60' },
+  '40002': { name: 'Priya Raman',  status: 'Active',     savings: '7,020.00',  checking: '640.25' },
 };
 
 /**
@@ -68,7 +73,7 @@ export const MEMBERS: Record<string, MemberRecord> = {
  */
 export type Fault =
   | 'none' | 'not_found' | 'slow' | 'interstitial'
-  | 'permission_denied' | 'server_error' | 'session_expired';
+  | 'permission_denied' | 'server_error' | 'session_expired' | 'wrong_record';
 
 export const FAULTS: Record<string, Fault> = {
   '99999': 'not_found',          // expected BUSINESS OUTCOME — not a crash
@@ -77,6 +82,10 @@ export const FAULTS: Record<string, Fault> = {
   '40003': 'permission_denied',  // expected BUSINESS OUTCOME
   '40004': 'server_error',       // HARD FAILURE — stop, surface, debug
   '40005': 'session_expired',    // ESCALATE — automation cannot re-authenticate
+  // Renders a perfectly valid detail screen for the WRONG member: the case a
+  // checkpoint cannot catch, because arriving at the right SCREEN is not the
+  // same as arriving at the right RECORD.
+  '40006': 'wrong_record',
 };
 
 export const faultFor = (id: string): Fault =>

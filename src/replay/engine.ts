@@ -3,7 +3,7 @@ import { evaluateAssertion, describeTarget, type StateAssertion } from '../schem
 import type { Observation } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
 import { checkAction, type PolicyConfig } from '../policy/allowlist.js';
-import { interpolate } from '../surface/resolve.js';
+import { interpolate, norm } from '../surface/resolve.js';
 import type { RunLog } from '../run/log.js';
 import type { ReplayResult, StepReport, ReplayFailure } from './result.js';
 
@@ -327,7 +327,21 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         observed: r.reason === 'ambiguous' ? `${r.candidates.length} candidates` : 'not present on the checkpoint screen',
       });
     }
-    outputs[spec.name] = applyTransform(r.node.name || r.node.value, spec.transform);
+    const raw = r.node.name || r.node.value;
+    outputs[spec.name] = applyTransform(raw, spec.transform);
+
+    // Identity check. Reaching the right screen is not the same as reaching
+    // the right record — see mustMatchParam in schema/artifact.ts.
+    if (spec.mustMatchParam) {
+      const expected = String(opts.inputs[spec.mustMatchParam] ?? '');
+      if (norm(raw) !== norm(expected)) {
+        return fail({
+          code: 'output_mismatch',
+          expected: `"${spec.name}" to echo the "${spec.mustMatchParam}" input (${expected})`,
+          observed: `the screen reports ${JSON.stringify(raw)} — this is a different record`,
+        });
+      }
+    }
   }
   log.append('agent', 'outputs', { outputs: redactOutputs(outputs) });
 

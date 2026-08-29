@@ -91,3 +91,19 @@ test('locations canonicalise to route patterns, dropping this run data', () => {
   assert.ok(new RegExp(b.pattern).test('/member/67890/accounts'));
   assert.ok(!new RegExp(b.pattern).test('/member/67890/loans'));
 });
+
+test('an output can declare that it must echo an input', () => {
+  // Reaching the right SCREEN is not reaching the right RECORD. A cached page
+  // or a stale session renders a valid detail screen for the wrong member,
+  // and every other assertion still holds.
+  const a = CapabilityArtifact.parse({
+    ...base,
+    outputs: [{
+      name: 'memberId', type: 'string', description: 'the member shown',
+      from: target, transform: 'text', sensitive: false,
+      mustMatchParam: 'memberId',
+    }],
+    steps: [{ id: 's1', index: 1, kind: 'type', target, value: { from: 'param', param: 'memberId' }, effect: 'reversible' }],
+  });
+  assert.equal(a.outputs[0]!.mustMatchParam, 'memberId');
+});

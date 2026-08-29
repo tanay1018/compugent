@@ -1,0 +1,11 @@
+{
+  "status": "escalated",
+  "reason": "The session expired. Automation cannot re-authenticate; a human must sign in.",
+  "context": {
+    "location": "http://localhost:8710/?tenant=meridian",
+    "screenshot": "screenshots/003-escalate.png"
+  },
+  "runId": "replay-2026-08-29T22-04-55-489Z",
+  "steps": [],
+  "ms": 229
+}

@@ -24,11 +24,16 @@ export class OperatorConsole {
   private seen = 0;
   private lastFrameAt = 0;
 
+  /** The port actually bound — may differ from the requested one. */
+  port: number;
+
   constructor(
     private readonly session: HandoffSession,
     private readonly log: RunLog,
-    private readonly port = 8790,
-  ) {}
+    requestedPort = 8790,
+  ) {
+    this.port = requestedPort;
+  }
 
   private broadcast(payload: unknown): void {
     const line = `data: ${JSON.stringify(payload)}\n\n`;
@@ -115,7 +120,24 @@ export class OperatorConsole {
       res.writeHead(404); res.end();
     });
 
-    await new Promise<void>((r) => this.server!.listen(this.port, r));
+    // A leftover console from an earlier run should not take this one down.
+    // Walk forward to the next free port and say which one we got -- crashing
+    // with EADDRINUSE tells the operator nothing they can act on.
+    const first = this.port;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const port = first + attempt;
+      const bound = await new Promise<boolean>((resolve) => {
+        const onError = (e: NodeJS.ErrnoException) => {
+          this.server!.removeListener('error', onError);
+          if (e.code === 'EADDRINUSE') return resolve(false);
+          throw e;
+        };
+        this.server!.once('error', onError);
+        this.server!.listen(port, () => { this.server!.removeListener('error', onError); resolve(true); });
+      });
+      if (bound) { this.port = port; break; }
+      if (attempt === 39) throw new Error(`no free port for the operator console (tried ${first}-${first + 39})`);
+    }
     await this.session.startStreaming();
     return `http://localhost:${this.port}/`;
   }

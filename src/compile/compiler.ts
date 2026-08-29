@@ -162,6 +162,14 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     if (!s.outputName) continue;
     const proposed = proposal.outputs.find((o) => o.name === s.outputName);
     if (!proposed) warnings.push(`output "${s.outputName}" was recorded but not typed by the compiler; defaulting to string/text`);
+    /**
+     * If an output came back reading exactly what a parameter went in as, it
+     * is an echo of the input, and the artifact should assert that rather than
+     * merely report it. Purely mechanical -- the values either matched on the
+     * recorded run or they did not, so there is nothing for a model to judge.
+     */
+    const echoes = inputs.find((p) => p.example !== undefined && p.example === s.observedValue);
+
     outputs.push(
       OutputSpec.parse({
         name: s.outputName,
@@ -170,8 +178,14 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
         from: s.target,
         transform: proposed?.transform ?? 'text',
         sensitive: proposed?.sensitive ?? false,
+        ...(echoes ? { mustMatchParam: echoes.name } : {}),
       }),
     );
+    if (echoes) {
+      warnings.push(
+        `output "${s.outputName}" echoes the "${echoes.name}" input; replay will now assert they match`,
+      );
+    }
   }
 
   /**
