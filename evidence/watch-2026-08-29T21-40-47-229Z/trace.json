@@ -1,0 +1,165 @@
+{
+  "goal": "look up member 12345 and read their current savings balance",
+  "entryUrl": "http://localhost:8710/?tenant=meridian",
+  "model": "anthropic/claude-opus-5",
+  "startedAt": "2026-08-29T21:40:47.364Z",
+  "finishedAt": "2026-08-29T21:41:08.908Z",
+  "outcome": "success",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "type",
+      "rationale": "The Member ID field is the search input; entering the member number 12345 to look up the member.",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:40:50.439Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "12345",
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/lookup?tenant=meridian"
+    },
+    {
+      "index": 2,
+      "kind": "click",
+      "rationale": "Submit the inquiry with Search Type = \"Member Number\", which matches looking up by member ID.",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:40:54.626Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 3,
+      "kind": "extract",
+      "rationale": "The balance cell in the row labelled \"Savings\" of the Account/Balance table — this is the member's current savings balance.",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Savings"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:41:01.035Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "savingsBalance",
+      "observedValue": "$4,182.55",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 4,
+      "kind": "extract",
+      "rationale": "Confirms the detail screen belongs to the requested member ID, so the extracted balance can be trusted on replay.",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:41:01.036Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "memberId",
+      "observedValue": "12345",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 5,
+      "kind": "extract",
+      "rationale": "Member name beside the \"Name\" label, useful context identifying whose balance was read.",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Name"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:41:01.036Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "memberName",
+      "observedValue": "Sarah Chen",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    }
+  ],
+  "warnings": [],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "Member Detail",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "main"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-08-29T21:41:05.173Z"
+      }
+    },
+    "description": "Searched Member ID 12345 by Member Number and landed on the Member Detail screen for Sarah Chen (ID 12345, Active). Recorded the savings balance $4,182.55 from the \"Savings\" row of the Account/Balance table, plus member ID and name as verification."
+  },
+  "summary": "Searched Member ID 12345 by Member Number and landed on the Member Detail screen for Sarah Chen (ID 12345, Active). Recorded the savings balance $4,182.55 from the \"Savings\" row of the Account/Balance table, plus member ID and name as verification.",
+  "usage": {
+    "inputTokens": 16334,
+    "inputTokenDetails": {
+      "noCacheTokens": 16334,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 922,
+    "outputTokenDetails": {
+      "textTokens": 875,
+      "reasoningTokens": 47
+    },
+    "totalTokens": 17256
+  }
+}

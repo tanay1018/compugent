@@ -6,3 +6,5 @@ node_modules/
 .DS_Store
 evidence/**/*.tmp
 dist/
+out/
+*.asar

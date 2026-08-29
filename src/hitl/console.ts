@@ -75,7 +75,9 @@ export class OperatorConsole {
         res.write(`data: ${JSON.stringify({ state: this.state() })}\n\n`);
         if (this.session.escalation) res.write(`data: ${JSON.stringify({ escalation: this.session.escalation })}\n\n`);
         // Backlog: the agent's history is what explains why we stopped here.
-        for (const e of this.log.events) {
+        // Only up to `seen` — anything past it is still queued for the live
+        // stream, and replaying it here would show every event twice.
+        for (const e of this.log.events.slice(0, this.seen)) {
           res.write(`data: ${JSON.stringify({ event: { actor: e.actor, kind: e.kind, detail: e.detail } })}\n\n`);
         }
         this.session.snapshot()

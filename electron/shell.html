@@ -1,0 +1,151 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Computer-Use Runner</title>
+<style>
+:root{
+  --bg:#14161a; --panel:#1b1e25; --line:#2b303a; --ink:#dde1e8; --dim:#8891a0;
+  --navy:#7fa0f0; --moss:#7cc496; --rust:#e59070; --amber:#e5b878;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;flex-direction:column;overflow:hidden}
+
+.titlebar{height:38px;flex:0 0 auto;-webkit-app-region:drag;display:flex;align-items:center;
+  justify-content:center;border-bottom:1px solid var(--line);background:var(--panel);
+  font-size:12px;letter-spacing:.06em;color:var(--dim)}
+
+/* ---- setup ---- */
+#setup{flex:1;display:flex;align-items:center;justify-content:center;padding:28px;overflow:auto}
+.card{width:100%;max-width:620px}
+h1{font-size:19px;margin:0 0 6px;letter-spacing:-.01em;color:var(--ink)}
+.sub{color:var(--dim);margin:0 0 26px;font-size:12.5px;line-height:1.6}
+label{display:block;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
+input,textarea{width:100%;background:#101318;border:1px solid var(--line);color:var(--ink);
+  border-radius:4px;padding:10px 12px;font:13px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
+input:focus,textarea:focus{outline:none;border-color:var(--navy)}
+.field{margin-bottom:16px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.preset{background:none;border:1px solid var(--line);color:var(--dim);border-radius:3px;
+  padding:5px 9px;font:11.5px ui-monospace,Menlo,monospace;cursor:pointer}
+.preset:hover{border-color:var(--navy);color:var(--ink)}
+.go{width:100%;margin-top:8px;background:var(--navy);color:#0d1017;border:none;border-radius:4px;
+  padding:12px;font:600 13px ui-monospace,Menlo,monospace;cursor:pointer;letter-spacing:.02em}
+.go:hover{filter:brightness(1.08)} .go:disabled{opacity:.45;cursor:not-allowed}
+.err{color:var(--rust);margin-top:12px;font-size:12px;min-height:16px}
+
+/* ---- running ---- */
+#run{flex:1;display:none;flex-direction:column;min-height:0}
+.bar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:9px 14px;
+  border-bottom:1px solid var(--line);background:var(--panel)}
+.goal{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.goal b{color:var(--dim);font-weight:400;margin-right:7px}
+.btn{background:none;border:1px solid var(--line);color:var(--ink);border-radius:3px;
+  padding:6px 12px;font:12px ui-monospace,Menlo,monospace;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--navy)}
+.btn.stop{color:var(--rust)}
+.split{flex:1;display:flex;min-height:0}
+webview{flex:1;min-width:0;border:none;background:#fff}
+#term{flex:0 0 var(--termw,260px);border-left:1px solid var(--line);background:#101318;padding:10px 12px;
+  overflow:auto;font-size:11.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:#b8c0cc}
+#term .ok{color:var(--moss)} #term .warn{color:var(--amber)} #term .bad{color:var(--rust)}
+.wait{position:absolute;inset:38px 0 0 0;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);color:var(--dim);font-size:12.5px;z-index:5}
+</style></head><body>
+
+<div class="titlebar">computer-use runner</div>
+
+<section id="setup"><div class="card">
+  <h1>Start a run</h1>
+  <p class="sub">Give it a target and a goal. The browser session opens here — watch every step,
+    and take control whenever you want. The bundled MemberDesk app starts automatically
+    if you point at localhost.</p>
+
+  <div class="field">
+    <label for="url">Target URL</label>
+    <input id="url" value="http://localhost:8710/?tenant=meridian" spellcheck="false">
+    <div class="presets">
+      <button class="preset" data-url="http://localhost:8710/?tenant=meridian">MemberDesk · Meridian</button>
+      <button class="preset" data-url="http://localhost:8710/?tenant=harbor">MemberDesk · Harbor (L2)</button>
+      <button class="preset" data-url="https://books.toscrape.com/">Books to Scrape (live)</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="task">Goal</label>
+    <textarea id="task" rows="3" spellcheck="false">look up member 12345 and read their current savings balance</textarea>
+    <div class="presets">
+      <button class="preset task">look up member 55501 and report their account status and checking balance</button>
+      <button class="preset task">look up member 99999 and read their savings balance</button>
+      <button class="preset task">open the book 'The Grand Design' from the Science category and read its price including tax</button>
+    </div>
+  </div>
+
+  <button class="go" id="go">Start run</button>
+  <div class="err" id="err"></div>
+</div></section>
+
+<section id="run">
+  <div class="bar">
+    <div class="goal"><b>goal</b><span id="rgoal"></span></div>
+    <button class="btn" id="toggleterm">Log</button>
+    <button class="btn" id="newrun">New run</button>
+    <button class="btn stop" id="stop">Stop</button>
+  </div>
+  <div class="split">
+    <webview id="view" src="about:blank"></webview>
+    <div id="term"></div>
+  </div>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const setup = $('setup'), run = $('run'), term = $('term'), view = $('view');
+
+document.querySelectorAll('.preset[data-url]').forEach(b =>
+  b.onclick = () => { $('url').value = b.dataset.url; });
+document.querySelectorAll('.preset.task').forEach(b =>
+  b.onclick = () => { $('task').value = b.textContent.trim(); });
+
+function log(line){
+  const span = document.createElement('span');
+  const clean = line.replace(/\x1b\[[0-9;]*m/g, '');
+  if (/SUCCESS|✓/.test(clean)) span.className = 'ok';
+  else if (/UNVERIFIED|WARN|warning/i.test(clean)) span.className = 'warn';
+  else if (/GAVE_UP|FAILED|Error|✗/.test(clean)) span.className = 'bad';
+  span.textContent = clean;
+  term.appendChild(span);
+  term.scrollTop = term.scrollHeight;
+}
+window.runner.onLog(log);
+window.runner.onExit(({code}) => log(`\n· run process exited (${code})\n`));
+
+$('go').onclick = async () => {
+  const url = $('url').value.trim(), task = $('task').value.trim();
+  if (!url || !task) { $('err').textContent = 'A target URL and a goal are both required.'; return; }
+  $('go').disabled = true; $('go').textContent = 'Starting…'; $('err').textContent = '';
+  term.textContent = '';
+
+  const res = await window.runner.start({ url, task });
+  $('go').disabled = false; $('go').textContent = 'Start run';
+  if (!res.ok) { $('err').textContent = res.error; setup.style.display='flex'; return; }
+
+  $('rgoal').textContent = task;
+  setup.style.display = 'none';
+  run.style.display = 'flex';
+  view.src = res.consoleUrl;
+};
+
+let termOn = true;
+$('toggleterm').onclick = () => {
+  termOn = !termOn;
+  term.style.display = termOn ? 'block' : 'none';
+};
+
+$('stop').onclick = async () => { await window.runner.stop(); log('\n· stopped\n'); };
+$('newrun').onclick = async () => {
+  await window.runner.stop();
+  view.src = 'about:blank';
+  run.style.display = 'none';
+  setup.style.display = 'flex';
+};
+</script></body></html>

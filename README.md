@@ -104,7 +104,26 @@ Target resolution is a pure function of `(Observation, TargetDescriptor)`, so
 the most safety-critical logic in the system — anchor matching and ambiguity
 detection — is tested without launching anything.
 
-## Give it any goal and watch it work
+## The desktop app
+
+```bash
+npm run desktop
+```
+
+Type a URL and a goal, hit **Start run**, and the live browser session opens in
+the window. The bundled MemberDesk target app starts automatically if the URL
+points at localhost. Take control at any point; hand back and the agent picks
+up from wherever you left it.
+
+Three panes: the live session, the actor-tagged event log, and the runner's own
+output (collapsible via **Log**). **New run** returns to the form.
+
+The shell is thin on purpose — it spawns the same `watch` run and embeds the
+same operator console a remote operator would attach to. Production replay runs
+headless in a container, so the console has to work over a channel; the desktop
+window is packaging, not architecture.
+
+## Or from the terminal — any goal, watched
 
 ```bash
 npm run app                                             # terminal 1
@@ -113,13 +132,8 @@ npm run watch -- "<any goal>" --url "https://books.toscrape.com/" --keep-open
 ```
 
 Opens the operator console at `http://localhost:8790/` **first**, then runs
-discovery against the live surface, so you see every step as it happens.
-
-The console is a **web** client, not a desktop app — deliberately. Production
-replay runs headless in a container with the operator attaching remotely, so
-an embedded browser would only ever work when the operator sits on the same
-machine as the automation. Frames go out over CDP screencast; input comes back
-gated on the control token.
+discovery against the live surface, so you see every step as it happens. This
+is what the desktop app drives underneath.
 
 ### Barge-in
 
