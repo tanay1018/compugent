@@ -18,7 +18,8 @@
     "replay": "tsx scripts/replay.ts",
     "handoff": "tsx scripts/handoff.ts",
     "watch": "tsx scripts/watch.ts",
-    "desktop": "electron electron/main.cjs"
+    "desktop": "electron electron/main.cjs",
+    "models": "tsx scripts/models.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",

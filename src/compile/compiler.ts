@@ -146,7 +146,14 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
   }
 
   // --- Pass 1: generalise -------------------------------------------------
-  const modelId = opts.model ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-opus-5';
+  /**
+   * Compilation is a SINGLE call, and the judgement it makes -- which literals
+   * are parameters, what the contract looks like -- is baked into every future
+   * invocation. Discovery is a multi-step loop and is where the money goes. So
+   * they get separate knobs: run discovery on something cheap, keep compilation
+   * on something you trust. One call at premium rates is rounding error.
+   */
+  const modelId = opts.model ?? process.env.COMPILE_MODEL ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-opus-5';
   const traceForModel = trace.steps.map((s) => ({
     index: s.index, kind: s.kind, rationale: s.rationale,
     target: s.target.name ?? s.target.anchor?.text,

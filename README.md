@@ -227,13 +227,35 @@ does not bound a run — one step can sit on a slow page for a long time.
 
 ### Cost
 
-Set `DISCOVERY_MODEL` in `.env` to pick a model. Per run of ~20K in / 1.2K out:
+```bash
+npm run models              # cheapest tool-use models, live prices
+npm run models -- openai    # filter
+```
+
+Set `DISCOVERY_MODEL` in `.env`. Nothing else changes — the gateway is why the
+provider is a one-line decision. Estimates per run of ~20K in / 1.2K out:
 
 | model | $/M in | $/M out | per run |
 |---|---|---|---|
+| `deepseek/deepseek-v4-flash` | 0.13 | 0.26 | **~$0.003** |
+| `google/gemini-2.5-flash-lite` | 0.10 | 0.40 | ~$0.003 |
+| `openai/gpt-5-mini` | 0.25 | 2.00 | ~$0.007 |
+| `openai/gpt-4.1-mini` | 0.40 | 1.60 | ~$0.010 |
 | `anthropic/claude-haiku-4.5` | 1.00 | 5.00 | ~$0.026 |
 | `anthropic/claude-sonnet-5` | 2.00 | 10.00 | ~$0.052 |
+| `openai/gpt-5.6-sol` | 2.00 | 10.00 | ~$0.052 |
 | `anthropic/claude-opus-5` *(default)* | 5.00 | 25.00 | ~$0.130 |
+
+**Untested.** These are list prices, not benchmarks — I have not run this
+system on the non-Anthropic models, so treat the cheap end as a starting point
+rather than a recommendation. The requirement is `tool-use`: the discovery loop
+*is* tool calls, and a model without it cannot drive anything.
+
+`COMPILE_MODEL` is separate and falls back to `DISCOVERY_MODEL`. Compilation is
+a **single** call whose judgement — which literals are parameters, what the
+contract looks like — is baked into every future invocation, so it is worth
+keeping capable even when discovery runs on something cheap. One call at
+premium rates is rounding error.
 
 Model choice is the smaller lever. The loop resends the whole conversation on
 every step, and each step appends a full screen rendering, so input grows
