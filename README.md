@@ -453,6 +453,41 @@ STEPS
   ✓ 2. click   button  named "Search"             240ms  via:name
 ```
 
+### Is it actually deterministic?
+
+Determinism is a claim about repetition, so it is measured rather than asserted:
+
+```bash
+npm run replay -- member.readSavingsBalance memberId=12345 --repeat 6
+```
+
+```
+  distinct statuses      1
+  distinct outputs       1
+  distinct resolution    1   (which tier each step matched through)
+  timing                 871–968ms
+
+  STABLE — identical result, outputs and resolution path every run
+```
+
+The third line is the one that matters. A step that sometimes matches by name
+and sometimes by anchor is a descriptor drifting under you, and it will look
+perfectly healthy on status and outputs right up until the day it doesn't.
+Stable across the happy path, the business outcomes, the recovered
+interstitial, the wrong-record failure — and on the live public site, where we
+control nothing.
+
+**What an operator-supplied credential does to this.** Nothing, because replay
+refuses to contain the non-deterministic part. It does not pause and wait for a
+human mid-flight; it **escalates and terminates**. The steps, targets and order
+are fixed; a human supplying a value is an *input*, not a decision, and the run
+that follows the handoff is a separate execution that **re-localises** first
+rather than assuming it can continue at step *k+1*.
+
+That is the whole reason resumption is a localisation problem: a pause is a
+window in which the surface can change. Keeping the human strictly outside the
+replay loop is what lets the loop stay deterministic.
+
 ### Login pages and credentials
 
 Automation is **refused** a credential field. Not redacted afterwards —

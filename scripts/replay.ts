@@ -26,6 +26,50 @@ const baseUrl = urlFlag >= 0 ? args[urlFlag + 1]! : `http://localhost:${port}/?t
 
 const asJson = args.includes('--json');
 const artifact = new ArtifactStore().load(id);
+const repeatFlag = args.indexOf('--repeat');
+const repeat = repeatFlag >= 0 ? Math.max(1, Number(args[repeatFlag + 1] ?? 1)) : 1;
+
+/**
+ * Repeat mode answers "is this actually deterministic?" by measuring rather
+ * than asserting. Determinism is a claim about REPETITION, and the only
+ * evidence for it is repetition.
+ */
+if (repeat > 1) {
+  const runs: Array<{ status: string; outputs: string; tiers: string; ms: number }> = [];
+  for (let i = 0; i < repeat; i++) {
+    const s = await PlaywrightSurface.launch();
+    const l = new RunLog('evidence', `stability-${Date.now()}-${i}`);
+    try {
+      const r = await replay({ artifact, inputs, surface: s, policy: defaultPolicy(new URL(baseUrl).origin),
+                               log: l, baseUrl, unattended });
+      runs.push({
+        status: r.status,
+        outputs: r.status === 'success' ? JSON.stringify(r.outputs) : (r as { outcome?: string }).outcome ?? '',
+        // The tier each step resolved through: a step that sometimes matches by
+        // name and sometimes by anchor is a descriptor drifting under you.
+        tiers: r.steps.map((x) => `${x.index}:${x.resolvedVia ?? x.status}`).join(' '),
+        ms: r.ms,
+      });
+    } finally { await s.close(); }
+  }
+  const distinct = (k: 'status' | 'outputs' | 'tiers') => new Set(runs.map((r) => r[k])).size;
+  const times = runs.map((r) => r.ms);
+  console.log(`\n${'─'.repeat(66)}`);
+  console.log(`${artifact.id} v${artifact.version} × ${repeat}   inputs: ${JSON.stringify(inputs)}`);
+  console.log('─'.repeat(66));
+  for (const [i, r] of runs.entries()) {
+    console.log(`  ${String(i + 1).padStart(2)}. ${r.status.padEnd(18)} ${String(r.ms).padStart(6)}ms  ${r.outputs.slice(0, 60)}`);
+  }
+  const stable = distinct('status') === 1 && distinct('outputs') === 1 && distinct('tiers') === 1;
+  console.log(`\n  distinct statuses      ${distinct('status')}`);
+  console.log(`  distinct outputs       ${distinct('outputs')}`);
+  console.log(`  distinct resolution    ${distinct('tiers')}   (which tier each step matched through)`);
+  console.log(`  timing                 ${Math.min(...times)}–${Math.max(...times)}ms`);
+  console.log(`\n  ${stable ? '\x1b[32mSTABLE\x1b[0m — identical result, outputs and resolution path every run'
+                            : '\x1b[31mFLAKY\x1b[0m — see the differing column above'}\n`);
+  process.exit(stable ? 0 : 1);
+}
+
 const runId = `replay-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const log = new RunLog('evidence', runId);
 const surface = await PlaywrightSurface.launch();
