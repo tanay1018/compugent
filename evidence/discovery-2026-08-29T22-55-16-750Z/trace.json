@@ -1,0 +1,222 @@
+{
+  "goal": "look up member 12345 and then export their full transaction history to a CSV file",
+  "entryUrl": "http://localhost:8710/?tenant=meridian",
+  "model": "anthropic/claude-opus-5",
+  "startedAt": "2026-08-29T22:55:16.963Z",
+  "finishedAt": "2026-08-29T22:56:46.400Z",
+  "outcome": "max_steps",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "type",
+      "rationale": "Member ID field on the Member Inquiry form — the search key for the lookup",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:20.016Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "12345",
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/lookup?tenant=meridian"
+    },
+    {
+      "index": 2,
+      "kind": "click",
+      "rationale": "Submit the member lookup with Search Type = Member Number (already correct for a member ID)",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:23.543Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 3,
+      "kind": "extract",
+      "rationale": "Name field on Member Detail confirms which member the ID resolved to; anchored to the stable \"Name\" label",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Name"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:31.510Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "memberName",
+      "observedValue": "Sarah Chen",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 4,
+      "kind": "extract",
+      "rationale": "Member ID on the detail screen verifies the lookup landed on the requested member",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:31.511Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "memberId",
+      "observedValue": "12345",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 5,
+      "kind": "extract",
+      "rationale": "Account status, anchored to the stable \"Status\" label, gives context for the record",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Status"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:31.512Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "memberStatus",
+      "observedValue": "Active",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 6,
+      "kind": "click",
+      "rationale": "Probing whether the Savings account row drills into a transaction list, which would be the entry point for a CSV export",
+      "target": {
+        "role": "text",
+        "name": "Savings",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Account"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:40.212Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 7,
+      "kind": "extract",
+      "rationale": "Savings balance, located by the stable \"Savings\" row label in the Account/Balance table; the only account-level data this screen exposes",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Savings"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:59.172Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "savingsBalance",
+      "observedValue": "$4,182.55",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 8,
+      "kind": "extract",
+      "rationale": "Checking balance, located by the stable \"Checking\" row label; captured alongside Savings as the available substitute for transaction detail",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Checking"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T22:55:59.174Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "checkingBalance",
+      "observedValue": "$1,204.10",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    }
+  ],
+  "warnings": [],
+  "usage": {
+    "inputTokens": 82264,
+    "inputTokenDetails": {
+      "noCacheTokens": 82264,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 5717,
+    "outputTokenDetails": {
+      "textTokens": 4723,
+      "reasoningTokens": 994
+    },
+    "totalTokens": 87981
+  }
+}

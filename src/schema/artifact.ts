@@ -179,14 +179,33 @@ export const CapabilityArtifact = z
     outcomes: z.array(OutcomeSpec),
 
     steps: z.array(Step).min(1),
-    /** Proof of arrival. Asserted before outputs are read. */
-    checkpoint: StateAssertion,
+    /**
+     * Proof of arrival. Asserted before outputs are read.
+     *
+     * Optional ONLY for an incomplete artifact — a run that was blocked before
+     * it could establish what success looks like has, by definition, nothing
+     * to assert.
+     */
+    checkpoint: StateAssertion.optional(),
 
     /**
-     * Unattended replay is gated on this. A freshly compiled artifact is a
-     * draft: it has been executed exactly once, by a model, on one tenant.
+     * A three-rung ladder, not a boolean.
+     *
+     *   incomplete  the run never finished. There is no checkpoint, so nothing
+     *               can verify success. NOT invocable at all — it exists as a
+     *               record of what was learned before the blocker, and as a
+     *               starting point for finishing the job.
+     *   draft       complete and replayable, but executed exactly once, by a
+     *               model, on one tenant. Attended use only.
+     *   approved    reviewed. Unattended replay permitted.
+     *
+     * The middle rung is the one people skip; the bottom one is the one this
+     * design was missing. Discarding a blocked run throws away every step that
+     * did work, and in a long back-office flow that is most of the run.
      */
-    approval: z.enum(['draft', 'approved']).default('draft'),
+    approval: z.enum(['incomplete', 'draft', 'approved']).default('draft'),
+    /** Why it is incomplete, phrased for whoever picks it up. */
+    incompleteReason: z.string().optional(),
 
     provenance: z.object({
       recordedAt: z.string(),
@@ -198,6 +217,16 @@ export const CapabilityArtifact = z
     }),
   })
   .superRefine((a, ctx) => {
+    // Anything claiming to be usable must be able to prove it arrived.
+    if (a.approval !== 'incomplete' && !a.checkpoint) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'a draft or approved artifact needs a checkpoint; without one replay cannot verify success',
+      });
+    }
+    if (a.approval === 'incomplete' && !a.incompleteReason) {
+      ctx.addIssue({ code: 'custom', message: 'an incomplete artifact must record why it is incomplete' });
+    }
     const params = new Set(a.inputs.map((p) => p.name));
     for (const s of a.steps) {
       if (s.value?.from === 'param' && !params.has(s.value.param)) {

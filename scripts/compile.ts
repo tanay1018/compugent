@@ -31,8 +31,10 @@ const runDir = arg ?? join('evidence', latest!);
 console.log(`compiling ${runDir}`);
 const trace = JSON.parse(readFileSync(join(runDir, 'trace.json'), 'utf8'));
 
+const allowPartial = process.argv.includes('--partial');
 const { artifact, warnings } = await compileTrace({
   trace,
+  allowPartial,
   discoveryRunId: runDir.split('/').at(-1)!,
   vendorProduct: process.env.VENDOR_PRODUCT ?? 'Corelink MemberDesk 7.2',
   tenant: new URL(trace.entryUrl).searchParams.get('tenant') ?? new URL(trace.entryUrl).hostname,
@@ -42,6 +44,11 @@ const path = new ArtifactStore().save(artifact);
 
 console.log(`\n${'='.repeat(66)}`);
 console.log(`${artifact.id} v${artifact.version}  [${artifact.approval}]`);
+if (artifact.approval === 'incomplete') {
+  console.log(`\n  \x1b[33mINCOMPLETE\x1b[0m — ${artifact.incompleteReason}`);
+  console.log(`  The steps below are kept, but this cannot be invoked until the`);
+  console.log(`  flow is finished and a checkpoint exists.`);
+}
 console.log(`${'='.repeat(66)}`);
 console.log(`${artifact.description}\n`);
 console.log(`INPUTS`);
@@ -62,7 +69,13 @@ for (const s of artifact.steps) {
   console.log(`     effect: ${s.effect}${s.fragile ? `   [FRAGILE: ${s.fragile}]` : ''}`);
 }
 console.log(`\nCHECKPOINT`);
-console.log(`  ${artifact.checkpoint.kind === 'nodeExists' ? describeTarget(artifact.checkpoint.target) : artifact.checkpoint.kind}`);
+if (!artifact.checkpoint) {
+  console.log(`  none — the run never established what success looks like`);
+} else if (artifact.checkpoint.kind === 'nodeExists') {
+  console.log(`  ${describeTarget(artifact.checkpoint.target)}`);
+} else {
+  console.log(`  ${artifact.checkpoint.kind}`);
+}
 console.log(`\nOUTCOMES  ${artifact.outcomes.length === 0 ? '(none yet — learned in Phase 5 from runs that produce them)' : ''}`);
 if (warnings.length) { console.log(`\nWARNINGS`); for (const w of warnings) console.log(`  - ${w}`); }
 console.log(`\nsaved: ${path}`);

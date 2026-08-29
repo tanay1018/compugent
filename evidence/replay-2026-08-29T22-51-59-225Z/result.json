@@ -1,0 +1,29 @@
+{
+  "status": "success",
+  "outputs": {
+    "priceInclTax": 13.76,
+    "availability": "In stock (5 available)"
+  },
+  "runId": "replay-2026-08-29T22-51-59-225Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "click",
+      "status": "ok",
+      "ms": 506,
+      "target": "link named \"{{categoryName}}\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "ok",
+      "ms": 525,
+      "target": "link named \"{{bookTitle}}\" in frame \"root\" #0",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 2099
+}

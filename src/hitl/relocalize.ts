@@ -27,8 +27,13 @@ export type Localization =
 export function localize(a: CapabilityArtifact, o: Observation): Localization {
   // Checked FIRST: a human who simply finished the task is the happiest
   // outcome, and resuming into a completed flow would redo work.
-  const done = evaluateAssertion(o, a.checkpoint);
-  if (done.held) return { kind: 'completed', detail: `checkpoint holds (${done.detail})` };
+  //
+  // An incomplete artifact has no checkpoint, so "did the human finish it?"
+  // is unanswerable — fall through to waypoints, which still localise.
+  if (a.checkpoint) {
+    const done = evaluateAssertion(o, a.checkpoint);
+    if (done.held) return { kind: 'completed', detail: `checkpoint holds (${done.detail})` };
+  }
 
   const matches = a.steps.filter((s) => s.waypoint && evaluateAssertion(o, s.waypoint).held).map((s) => s.index);
 

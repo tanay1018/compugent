@@ -107,3 +107,35 @@ test('an output can declare that it must echo an input', () => {
   });
   assert.equal(a.outputs[0]!.mustMatchParam, 'memberId');
 });
+
+test('a draft artifact without a checkpoint is rejected', () => {
+  // Nothing claiming to be usable may lack the one assertion that proves it
+  // arrived — otherwise replay reports success by simply not failing.
+  const { checkpoint, ...noCheckpoint } = base;
+  assert.throws(
+    () => CapabilityArtifact.parse({
+      ...noCheckpoint,
+      steps: [{ id: 's1', index: 1, kind: 'type', target, value: { from: 'param', param: 'memberId' }, effect: 'reversible' }],
+    }),
+    /needs a checkpoint/,
+  );
+});
+
+test('an INCOMPLETE artifact may omit the checkpoint, but must say why', () => {
+  const { checkpoint, ...noCheckpoint } = base;
+  const steps = [{ id: 's1', index: 1, kind: 'type', target, value: { from: 'param', param: 'memberId' }, effect: 'reversible' }];
+
+  // A blocked run still learned something; discarding it wastes every step
+  // that did work. But it has to declare that it is unfinished.
+  assert.throws(
+    () => CapabilityArtifact.parse({ ...noCheckpoint, approval: 'incomplete', steps }),
+    /must record why it is incomplete/,
+  );
+
+  const a = CapabilityArtifact.parse({
+    ...noCheckpoint, approval: 'incomplete', steps,
+    incompleteReason: 'discovery ended as "gave_up": blocked on a login wall',
+  });
+  assert.equal(a.approval, 'incomplete');
+  assert.equal(a.checkpoint, undefined);
+});

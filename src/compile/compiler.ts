@@ -62,6 +62,11 @@ export interface CompileOptions {
   tenant: string;
   model?: string;
   version?: number;
+  /**
+   * Save a run that never finished. Off by default: quietly turning a blocked
+   * run into a capability is how an un-invocable artifact ends up in a catalog.
+   */
+  allowPartial?: boolean;
 }
 
 /**
@@ -138,12 +143,30 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
   const { trace } = opts;
   const warnings = [...trace.warnings];
 
-  if (trace.outcome !== 'success') {
-    throw new Error(`refusing to compile a trace whose outcome was "${trace.outcome}"`);
+  const complete = trace.outcome === 'success' && trace.checkpoint !== undefined;
+  if (!complete && !opts.allowPartial) {
+    throw new Error(
+      `refusing to compile a trace whose outcome was "${trace.outcome}"` +
+      (trace.checkpoint ? '' : ' with no checkpoint') +
+      `. Pass allowPartial to save it as an incomplete artifact instead — the steps that did ` +
+      `work are kept, but it will not be invocable.`,
+    );
   }
-  if (!trace.checkpoint) {
-    throw new Error('refusing to compile a trace with no checkpoint: replay could not verify arrival');
+  // A run that gave up before acting has nothing to preserve. Saying so beats
+  // letting the schema's min(1) surface as a raw validation error.
+  if (trace.steps.filter((s) => s.kind !== 'extract').length === 0) {
+    throw new Error(
+      `nothing to compile: the run recorded no actions` +
+      (trace.blockedReason ? ` (${trace.blockedReason.slice(0, 160)})` : '') +
+      `. An artifact needs at least one step to be worth keeping.`,
+    );
   }
+
+  const incompleteReason = complete
+    ? undefined
+    : `discovery ended as "${trace.outcome}"` +
+      (trace.blockedReason ? `: ${trace.blockedReason}` : '') +
+      (trace.checkpoint ? '' : '; no checkpoint was established, so success cannot be verified');
 
   // --- Pass 1: generalise -------------------------------------------------
   /**
@@ -316,8 +339,9 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     // produce the state, never guessed from a happy path.
     outcomes: [],
     steps,
-    checkpoint: trace.checkpoint,
-    approval: 'draft',
+    ...(trace.checkpoint ? { checkpoint: trace.checkpoint } : {}),
+    approval: complete ? 'draft' : 'incomplete',
+    ...(incompleteReason ? { incompleteReason } : {}),
     provenance: {
       recordedAt: trace.finishedAt,
       discoveryRunId: opts.discoveryRunId,

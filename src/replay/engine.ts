@@ -119,6 +119,18 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       return fail({ code: 'input_invalid', expected: `"${p.name}" to be a number`, observed: JSON.stringify(v) });
     }
   }
+  if (a.approval === 'incomplete' || !a.checkpoint) {
+    // Not a permission gate like the draft check below -- there is genuinely
+    // nothing here that could tell success from failure.
+    return fail({
+      code: 'not_approved',
+      expected: 'a completed capability with a checkpoint',
+      observed:
+        `${a.id} v${a.version} is incomplete` +
+        (a.incompleteReason ? `: ${a.incompleteReason}` : '') +
+        '. Finish the recording before invoking it.',
+    });
+  }
   if (opts.unattended && a.approval !== 'approved') {
     return fail({
       code: 'not_approved',
@@ -295,11 +307,11 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   let lastSeen: Observation | null = null;
   for (let attempt = 1; attempt <= 3 && !arrived; attempt++) {
     const settled = await surface.waitUntil(
-      (o) => evaluateAssertion(o, a.checkpoint, opts.inputs).held || matchOutcome(a, o, opts.inputs) !== null,
+      (o) => evaluateAssertion(o, a.checkpoint!, opts.inputs).held || matchOutcome(a, o, opts.inputs) !== null,
       { timeoutMs: stepTimeout },
     );
     lastSeen = settled ?? (await surface.observe());
-    if (evaluateAssertion(lastSeen, a.checkpoint, opts.inputs).held) { arrived = lastSeen; break; }
+    if (evaluateAssertion(lastSeen, a.checkpoint!, opts.inputs).held) { arrived = lastSeen; break; }
 
     const m = matchOutcome(a, lastSeen, opts.inputs);
     if (!m) break;
@@ -310,8 +322,8 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     const current = lastSeen ?? (await surface.observe());
     return fail({
       code: 'checkpoint_failed',
-      expected: describeAssertion(a.checkpoint, opts.inputs),
-      observed: `${evaluateAssertion(current, a.checkpoint, opts.inputs).detail} (at ${current.location})`,
+      expected: describeAssertion(a.checkpoint!, opts.inputs),
+      observed: `${evaluateAssertion(current, a.checkpoint!, opts.inputs).detail} (at ${current.location})`,
     });
   }
   log.saveScreenshot(await surface.screenshot(), 'checkpoint');

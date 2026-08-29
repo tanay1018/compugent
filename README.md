@@ -344,8 +344,52 @@ which is the target here; it can fail on a SPA that preserves form state. So
 anything dropped is listed in the artifact's warnings, and artifacts stay
 `draft`.
 
-Compiled artifacts land in `artifacts/<id>/v<n>.json` and project directly to
-an agent-callable tool:
+### Saving
+
+Artifacts are plain JSON, one file per version, directory named by id:
+
+```
+artifacts/member.readSavingsBalance/v1.json
+artifacts/member.readSavingsBalance/v2.json     ← + learned outcomes
+```
+
+`save()` refuses to overwrite an existing version — you bump, you never clobber
+a reviewed artifact — and `load()` parses through the schema rather than
+casting, because a stored artifact is untrusted input like any other. Not a
+database on purpose: a v1→v2 diff is exactly what a reviewer wants to look at,
+and git already does that well.
+
+### Saving a run that did not finish
+
+```bash
+npm run compile -- evidence/<run> --partial
+```
+
+By default a blocked run is refused. But discarding it throws away every step
+that *did* work, and in a long back-office flow that is most of the run — so
+`--partial` saves it at a third approval rung:
+
+| approval | meaning | invocable |
+|---|---|---|
+| `incomplete` | no checkpoint — the run never established what success looks like | **no** |
+| `draft` | complete, but run once, by a model, on one tenant | attended only |
+| `approved` | reviewed | unattended |
+
+`incomplete` is not a weaker `draft`; it is a different kind of thing. There is
+genuinely nothing in it that could tell success from failure, so replay refuses
+it outright rather than gating it:
+
+```
+CODE     not_approved
+EXPECTED a completed capability with a checkpoint
+OBSERVED member.lookupProfileAndBalances v1 is incomplete: discovery ended as
+         "max_steps"; no checkpoint was established. Finish the recording first.
+```
+
+The schema enforces the pairing: a `draft` or `approved` artifact without a
+checkpoint fails to parse, and an `incomplete` one must record *why*.
+
+Compiled artifacts project directly to an agent-callable tool:
 
 ```json
 { "name": "member_readSavingsBalance",
