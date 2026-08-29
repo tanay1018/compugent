@@ -7,6 +7,7 @@
 // is why this shell can stay thin.
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 
@@ -80,6 +81,70 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
 });
 
 ipcMain.handle('run:stop', () => { stopRun(); return { ok: true }; });
+
+/**
+ * The capability catalog: what has been recorded and can now be invoked
+ * without a model. Read straight off disk — artifacts are files, one per
+ * version, and the newest version of each id is what a caller gets.
+ */
+ipcMain.handle('caps:list', () => {
+  const root = path.join(ROOT, 'artifacts');
+  if (!fs.existsSync(root)) return [];
+  const out = [];
+  for (const id of fs.readdirSync(root)) {
+    const dir = path.join(root, id);
+    if (!fs.statSync(dir).isDirectory()) continue;
+    const versions = fs.readdirSync(dir)
+      .map((f) => /^v(\d+)\.json$/.exec(f)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b);
+    const v = versions.at(-1);
+    if (v === undefined) continue;
+    try {
+      const a = JSON.parse(fs.readFileSync(path.join(dir, `v${v}.json`), 'utf8'));
+      out.push({
+        id: a.id, version: a.version, versions, name: a.name, description: a.description,
+        approval: a.approval, inputs: a.inputs, outputs: a.outputs,
+        outcomes: (a.outcomes || []).map((o) => ({ name: o.name, classification: o.classification })),
+        steps: a.steps.length, app: a.app,
+      });
+    } catch { /* a malformed artifact is not a reason to hide the rest */ }
+  }
+  return out;
+});
+
+/** Replay a capability. No model is involved — this is the production path. */
+ipcMain.handle('caps:run', async (_e, { id, inputs, url }) => {
+  if (/localhost:8710|127\.0\.0\.1:8710/.test(url || '')) await ensureTargetApp();
+  const args = ['tsx', 'scripts/replay.ts', id, '--json'];
+  for (const [k, v] of Object.entries(inputs || {})) if (String(v).length) args.push(`${k}=${v}`);
+  if (url) args.push('--url', url);
+
+  return new Promise((resolve) => {
+    const p = spawn('npx', args, { cwd: ROOT, env: { ...process.env } });
+    let out = '', err = '';
+    p.stdout.on('data', (d) => { out += d.toString(); send('run:log', d.toString()); });
+    p.stderr.on('data', (d) => { err += d.toString(); send('run:log', d.toString()); });
+    p.on('exit', () => {
+      const line = out.split('\n').find((l) => l.startsWith('__RESULT__'));
+      if (!line) return resolve({ ok: false, error: (err || out).trim().slice(-400) || 'replay produced no result' });
+      try { resolve({ ok: true, result: JSON.parse(line.slice('__RESULT__'.length)) }); }
+      catch (e) { resolve({ ok: false, error: 'could not parse the replay result' }); }
+    });
+  });
+});
+
+/** Turn the most recent successful discovery run into a capability. */
+ipcMain.handle('caps:compile', async () => {
+  return new Promise((resolve) => {
+    const p = spawn('npx', ['tsx', 'scripts/compile.ts'], { cwd: ROOT, env: { ...process.env } });
+    let out = '';
+    p.stdout.on('data', (d) => { out += d.toString(); send('run:log', d.toString()); });
+    p.stderr.on('data', (d) => { out += d.toString(); send('run:log', d.toString()); });
+    p.on('exit', (code) => {
+      const saved = /saved: (\S+)/.exec(out);
+      resolve(code === 0 && saved ? { ok: true, path: saved[1] } : { ok: false, error: out.trim().slice(-400) });
+    });
+  });
+});
 
 app.whenReady().then(() => {
   win = new BrowserWindow({

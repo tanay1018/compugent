@@ -118,6 +118,54 @@ up from wherever you left it.
 Three panes: the live session, the actor-tagged event log, and the runner's own
 output (collapsible via **Log**). **New run** returns to the form.
 
+The **Capabilities** tab is the other half — the catalog of what has been
+recorded, with typed inputs, declared outputs, and the business outcomes each
+one may return instead of success. **Run** replays a capability with whatever
+parameters you type, **with no model in the loop**:
+
+```
+SUCCESS  959ms                      BUSINESS OUTCOME  919ms
+{ "savingsBalance": 4182.55,        member_not_found
+  "memberName": "Sarah Chen" }      No member matches that identifier.
+                                    (an ANSWER, not a crash)
+```
+
+**Compile latest run → capability** turns the most recent successful discovery
+run into a new artifact without leaving the app.
+
+## Which sites does this actually work on?
+
+Not all of them. Measured, by pointing the perception layer at a spread of real
+sites and counting what it can see:
+
+| Site | Nodes | Controls | Verdict |
+|---|---|---|---|
+| Wikipedia (server-rendered) | 1393 | 396 | works — 96% of controls named |
+| Hacker News (table layout) | 743 | 230 | works — 86% named, anchors carry the rest |
+| ParaBank (JSP, legacy) | 88 | 36 | works — the target shape |
+| react.dev (modern SPA) | 552 | 50 | works — client-rendered is fine |
+| example.com | 5 | 1 | works (trivially) |
+| OpenCart demo | 12 | 2 | **blocked** — bot protection served an interstitial |
+| Google Maps | 11 | 7 | **useless** — the map is a canvas with no a11y tree |
+
+The rule of thumb: **if a screen reader can use it, so can this.** Anything
+rendered to a `<canvas>` or WebGL exposes nothing to perceive, and the design's
+answer there is the visual/OCR tier — designed, not built.
+
+Four other real limits:
+
+- **Login walls.** The system will not handle credentials, by policy. It
+  escalates to a human instead — which is exactly the demo in
+  `npm run handoff`, and why ParaBank's post-login screens are out of reach.
+- **Bot protection.** Cloudflare-style interstitials return a challenge page
+  rather than the app. Nothing here tries to defeat them, and it should not.
+- **Terms of service.** Automating a site can breach its terms. The bundled
+  target app and `books.toscrape.com` are used precisely because they are
+  published for this.
+- **Infinite scroll / lazy lists.** Controls only exist once rendered; a
+  descriptor for a row 300 items down will not resolve until it is scrolled
+  into view, and nothing here drives that scrolling for you yet.
+
 The shell is thin on purpose — it spawns the same `watch` run and embeds the
 same operator console a remote operator would attach to. Production replay runs
 headless in a container, so the console has to work over a channel; the desktop

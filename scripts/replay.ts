@@ -24,6 +24,7 @@ const tenant = process.env.TENANT ?? 'meridian';
 // seam in miniature: the artifact stores a route pattern, never an origin.
 const baseUrl = urlFlag >= 0 ? args[urlFlag + 1]! : `http://localhost:${port}/?tenant=${tenant}`;
 
+const asJson = args.includes('--json');
 const artifact = new ArtifactStore().load(id);
 const runId = `replay-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const log = new RunLog('evidence', runId);
@@ -35,6 +36,11 @@ try {
     log, baseUrl, unattended,
   });
 
+  if (asJson) {
+    // Last line is the whole result, for programmatic callers (the desktop app).
+    console.log('__RESULT__' + JSON.stringify(result));
+    process.exitCode = result.status === 'failed' ? 1 : 0;
+  } else {
   const bar = '─'.repeat(66);
   console.log(`\n${bar}`);
   console.log(`${artifact.id} v${artifact.version}   inputs: ${JSON.stringify(inputs)}`);
@@ -72,6 +78,7 @@ try {
   }
   console.log(`\nevidence: ${log.dir}\n`);
   process.exitCode = result.status === 'failed' ? 1 : 0;
+  }
 } finally {
   await surface.close();
 }
