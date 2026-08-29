@@ -92,6 +92,14 @@ try {
   console.log(`  ${trace.outcome.toUpperCase()}   ${trace.steps.length} steps   ` +
               `in=${trace.usage?.inputTokens ?? '?'} out=${trace.usage?.outputTokens ?? '?'}`);
   console.log(bar);
+  if (trace.outcome !== 'success' && trace.blockedReason) {
+    console.log(`\n  \x1b[31mwhy:\x1b[0m ${trace.blockedReason}`);
+    if (/budget|credit balance|quota/i.test(trace.blockedReason)) {
+      console.log(`       your AI gateway key is out of budget — top up or raise the cap at`);
+      console.log(`       https://vercel.com/[team]/~/ai`);
+    }
+    console.log('');
+  }
   for (const s of trace.steps) {
     const id = s.target.name ? `"${s.target.name}"` : s.target.anchor ? `${s.target.anchor.relation} "${s.target.anchor.text}"` : '?';
     console.log(`  ${String(s.index).padStart(2)}. ${s.kind.padEnd(7)} ${s.target.role.padEnd(8)} ${id}`);

@@ -53,6 +53,14 @@ try {
   console.log(`evidence : ${log.dir}`);
   console.log(`${'='.repeat(64)}\n`);
 
+  if (trace.outcome !== 'success' && trace.blockedReason) {
+    console.log(`\n  \x1b[31mwhy:\x1b[0m ${trace.blockedReason}`);
+    if (/budget|credit balance|quota/i.test(trace.blockedReason)) {
+      console.log(`       your AI gateway key is out of budget — top up or raise the cap at`);
+      console.log(`       https://vercel.com/[team]/~/ai`);
+    }
+    console.log('');
+  }
   for (const s of trace.steps) {
     const t = s.target;
     const id = t.name ? `"${t.name}"` : t.anchor ? `${t.anchor.relation} "${t.anchor.text}"` : '?';

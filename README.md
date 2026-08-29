@@ -160,6 +160,17 @@ Four other real limits:
   `npm run handoff`, and why ParaBank's post-login screens are out of reach.
 - **Bot protection.** Cloudflare-style interstitials return a challenge page
   rather than the app. Nothing here tries to defeat them, and it should not.
+  Amazon, for instance, serves a nine-node "Continue shopping" wall. The run
+  warns before spending a model call on it:
+
+  ```
+  the entry page has no input controls and only 3 clickable element(s) across
+  9 nodes — usually a bot wall, a consent gate, or a canvas-rendered app
+  ```
+
+  The signal is *no way to enter anything and almost nothing to click*, not a
+  low node count — the bundled legacy app's entry screen is a perfectly
+  workable 11 nodes.
 - **Terms of service.** Automating a site can breach its terms. The bundled
   target app and `books.toscrape.com` are used precisely because they are
   published for this.

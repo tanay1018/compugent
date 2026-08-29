@@ -146,6 +146,36 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   log.append('agent', 'observe', { location: obs.location, nodes: obs.nodes.length },
     log.saveScreenshot(await surface.screenshot(), 'entry'));
 
+  /**
+   * Is there anything here to operate?
+   *
+   * Node count alone is a bad signal — the bundled legacy app's entry screen is
+   * a perfectly workable 11 nodes, and flagging it was the first thing this
+   * check got wrong. What actually distinguishes a bot wall, a consent gate or
+   * a canvas app is that there is nowhere to put input and almost nothing to
+   * click. Amazon's interstitial is one button and two footer links; a real
+   * form screen has a field.
+   *
+   * Heuristic, and labelled as one: it warns, it does not block.
+   */
+  {
+    const inputs = obs.nodes.filter((n) => n.role === 'textbox' || n.role === 'combobox');
+    const clickable = obs.nodes.filter((n) => n.role === 'button' || n.role === 'link');
+    if (inputs.length === 0 && clickable.length <= 3 && obs.nodes.length < 15) {
+      const warning =
+        `the entry page has no input controls and only ${clickable.length} clickable element(s) ` +
+        `across ${obs.nodes.length} nodes — usually a bot wall, a consent gate, or a ` +
+        `canvas-rendered app with no accessibility tree`;
+      warnings.push(warning);
+      log.append('system', 'surface.thin', {
+        nodes: obs.nodes.length, inputs: inputs.length, clickable: clickable.length,
+        location: obs.location,
+        sample: obs.nodes.map((n) => n.name).filter(Boolean).slice(0, 6),
+        note: warning,
+      });
+    }
+  }
+
   const nodeByRef = (ref: number): UINode => {
     const n = obs.nodes.find((x) => x.ref === ref);
     if (!n) throw new Error(`ref ${ref} is not in the current observation`);

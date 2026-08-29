@@ -48,3 +48,6 @@
 {"seq":48,"ts":"2026-08-29T22:17:20.836Z","actor":"operator","kind":"manual.click","detail":{"control":"bath towelsdddadazzzzzzzzbath tbath towelsowels"}}
 {"seq":49,"ts":"2026-08-29T22:17:23.691Z","actor":"operator","kind":"manual.click","detail":{"control":"Springtree Home Luxury Bamboo Rayon Bath Towel Set | 6-Piece"}}
 {"seq":50,"ts":"2026-08-29T22:17:24.211Z","actor":"operator","kind":"manual.click","detail":{"control":"var aPageStart = (new Date()).getTime(); var ue_t0=ue_t0||+n"}}
+{"seq":51,"ts":"2026-08-29T22:47:34.667Z","actor":"operator","kind":"control.transition","detail":{"from":"operator","to":"resume_requested","reason":"operator handed control back"}}
+{"seq":52,"ts":"2026-08-29T22:47:34.667Z","actor":"system","kind":"control.transition","detail":{"from":"resume_requested","to":"relocalizing","reason":"establishing where the operator left the session"}}
+{"seq":53,"ts":"2026-08-29T22:47:34.668Z","actor":"system","kind":"control.transition","detail":{"from":"relocalizing","to":"agent","reason":"discovery continues from wherever the operator left the session"}}
