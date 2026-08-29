@@ -117,7 +117,15 @@ Work one step at a time. After each action you receive a fresh observation.`;
 
 export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTrace> {
   const { surface, policy, log } = opts;
-  const modelId = opts.model ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-opus-5';
+  /**
+   * Discovery is the multi-step loop, so this is where the money goes. The
+   * default is deliberately not the most capable model available: the task is
+   * "read a normalised tree, pick a node, call a tool", and a premium
+   * reasoning model spends most of its budget deliberating over a choice
+   * between a dozen labelled controls. `npm run models` lists cheaper options
+   * -- deepseek-v4-flash lands near $0.003 a run against $0.130 for opus.
+   */
+  const modelId = opts.model ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
   const maxSteps = opts.maxSteps ?? 20;
   const timeoutMs = opts.timeoutMs ?? 240_000;
   const reasoningEffort = process.env.REASONING_EFFORT ?? 'low';
@@ -142,7 +150,10 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     };
   }
 
-  log.append('system', 'discovery.start', { goal: opts.goal, entryUrl: opts.entryUrl, model: modelId, maxSteps });
+  log.append('system', 'discovery.start', {
+    goal: opts.goal, entryUrl: opts.entryUrl, model: modelId, maxSteps,
+    reasoningEffort, timeoutMs,
+  });
   if (opts.session) opts.session.agentActive = true;
   await surface.navigate(opts.entryUrl);
   await surface.waitForStable();

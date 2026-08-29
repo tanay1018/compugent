@@ -30,6 +30,9 @@ if (!process.env.AI_GATEWAY_API_KEY) {
   process.exit(1);
 }
 
+const MODEL = process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
+console.log(`\n  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'}` +
+            (/opus|fable|gpt-5\.|gemini-3/.test(MODEL) ? '   \x1b[33m(premium tier — npm run models for cheaper)\x1b[0m' : ''));
 const runId = `discovery-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const log = new RunLog('evidence', runId);
 const surface = await PlaywrightSurface.launch({ headless: true });

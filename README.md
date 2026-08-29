@@ -253,9 +253,15 @@ provider is a one-line decision. Estimates per run of ~20K in / 1.2K out:
 | `openai/gpt-5-mini` | 0.25 | 2.00 | ~$0.007 |
 | `openai/gpt-4.1-mini` | 0.40 | 1.60 | ~$0.010 |
 | `anthropic/claude-haiku-4.5` | 1.00 | 5.00 | ~$0.026 |
-| `anthropic/claude-sonnet-5` | 2.00 | 10.00 | ~$0.052 |
+| `anthropic/claude-sonnet-5` *(default)* | 2.00 | 10.00 | ~$0.052 |
 | `openai/gpt-5.6-sol` | 2.00 | 10.00 | ~$0.052 |
-| `anthropic/claude-opus-5` *(default)* | 5.00 | 25.00 | ~$0.130 |
+| `anthropic/claude-opus-5` | 5.00 | 25.00 | ~$0.130 |
+
+Every run prints the model it is about to use, and flags the premium tier:
+
+```
+model   deepseek/deepseek-v4-flash   effort=low
+```
 
 **Untested.** These are list prices, not benchmarks — I have not run this
 system on the non-Anthropic models, so treat the cheap end as a starting point

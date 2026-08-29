@@ -77,6 +77,10 @@ try {
   console.log(`  goal    ${goal}`);
   console.log(`  target  ${entryUrl}`);
   console.log(`  console \x1b[1m${url}\x1b[0m  ← open this to watch`);
+const MODEL = process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
+console.log(`  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'}` +
+            (/opus|fable|gpt-5\.|gemini-3/.test(MODEL) ? '   \x1b[33m(premium tier — npm run models for cheaper)\x1b[0m' : ''));
+
   if (consoleSrv.port !== Number(process.env.CONSOLE_PORT ?? 8790)) {
     console.log(`          (port ${process.env.CONSOLE_PORT ?? 8790} was busy)`);
   }

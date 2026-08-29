@@ -176,7 +176,7 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
    * they get separate knobs: run discovery on something cheap, keep compilation
    * on something you trust. One call at premium rates is rounding error.
    */
-  const modelId = opts.model ?? process.env.COMPILE_MODEL ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-opus-5';
+  const modelId = opts.model ?? process.env.COMPILE_MODEL ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
   const traceForModel = trace.steps.map((s) => ({
     index: s.index, kind: s.kind, rationale: s.rationale,
     target: s.target.name ?? s.target.anchor?.text,

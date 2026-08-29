@@ -1,0 +1,11 @@
+{
+  "goal": "look up member 67890 and read their savings balance",
+  "entryUrl": "http://localhost:8710/?tenant=meridian",
+  "model": "deepseek/deepseek-v4-flash",
+  "startedAt": "2026-08-29T23:10:40.191Z",
+  "finishedAt": "2026-08-29T23:10:40.667Z",
+  "outcome": "error",
+  "blockedReason": "GatewayInternalServerError: API key budget exceeded. Current spend: $20.17, limit: $20.00. Please contact your administrator to increase the budget.",
+  "steps": [],
+  "warnings": []
+}
