@@ -6,7 +6,7 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { compileTrace } from '../src/compile/compiler.js';
+import { compileTrace, setVersionResolver } from '../src/compile/compiler.js';
 import { ArtifactStore } from '../src/store/artifacts.js';
 import { toToolSchema } from '../src/schema/artifact.js';
 import { describeTarget } from '../src/schema/assertion.js';
@@ -32,15 +32,32 @@ console.log(`compiling ${runDir}`);
 const trace = JSON.parse(readFileSync(join(runDir, 'trace.json'), 'utf8'));
 
 const allowPartial = process.argv.includes('--partial');
-const { artifact, warnings } = await compileTrace({
+const store = new ArtifactStore();
+setVersionResolver((id) => store.nextVersion(id));
+
+let compiled;
+try {
+  compiled = await compileTrace({
   trace,
   allowPartial,
   discoveryRunId: runDir.split('/').at(-1)!,
-  vendorProduct: process.env.VENDOR_PRODUCT ?? 'Corelink MemberDesk 7.2',
-  tenant: new URL(trace.entryUrl).searchParams.get('tenant') ?? new URL(trace.entryUrl).hostname,
-});
+    vendorProduct: process.env.VENDOR_PRODUCT ?? 'Corelink MemberDesk 7.2',
+    tenant: new URL(trace.entryUrl).searchParams.get('tenant') ?? new URL(trace.entryUrl).hostname,
+  });
+} catch (e) {
+  // A stack trace tells the operator nothing they can act on.
+  console.error(`\ncannot compile: ${e instanceof Error ? e.message : String(e)}\n`);
+  process.exit(1);
+}
+const { artifact, warnings } = compiled;
 
-const path = new ArtifactStore().save(artifact);
+let path: string;
+try {
+  path = store.save(artifact);
+} catch (e) {
+  console.error(`\ncannot save: ${e instanceof Error ? e.message : String(e)}\n`);
+  process.exit(1);
+}
 
 console.log(`\n${'='.repeat(66)}`);
 console.log(`${artifact.id} v${artifact.version}  [${artifact.approval}]`);

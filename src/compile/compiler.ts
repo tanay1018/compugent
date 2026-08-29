@@ -116,6 +116,10 @@ function pruneCycles(steps: TraceStep[], entryUrl: string): { kept: TraceStep[];
   return { kept, dropped };
 }
 
+/** Injected so the compiler stays free of storage concerns in tests. */
+let nextVersion: (id: string) => number = () => 1;
+export function setVersionResolver(fn: (id: string) => number): void { nextVersion = fn; }
+
 export interface CompileResult {
   artifact: CapabilityArtifact;
   warnings: string[];
@@ -322,7 +326,9 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
   const artifact = CapabilityArtifact.parse({
     schemaVersion: 1,
     id: proposal.id,
-    version: opts.version ?? 1,
+    // Re-recording an existing capability lands as the next version. The store
+    // still refuses to overwrite; this just stops that being the default path.
+    version: opts.version ?? nextVersion(proposal.id),
     name: proposal.name,
     description: proposal.description,
     app: {

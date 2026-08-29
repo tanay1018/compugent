@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "id": "member.readSavingsBalance",
+  "version": 3,
+  "name": "Read Member Savings Balance",
+  "description": "Looks up a member by their Member ID via the member inquiry search and reads their current savings account balance from the member detail screen. Use this when an agent needs to retrieve the up-to-date savings balance for a specific member.",
+  "app": {
+    "vendorProduct": "Corelink MemberDesk 7.2",
+    "recordedTenant": "meridian",
+    "surfaceKind": "web",
+    "entryPathPattern": "^/(\\?|$)",
+    "entryPath": "/"
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "The Member ID to search for in the member inquiry system",
+      "example": "12345",
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savingsBalance",
+      "type": "string",
+      "description": "The current savings account balance shown for the member",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Savings"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:47:17.107Z"
+        }
+      },
+      "transform": "currency",
+      "sensitive": true
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "s1",
+      "index": 1,
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:47:07.251Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "button",
+          "name": "Search",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Search Type"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-29T23:47:07.251Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Submit the member inquiry search"
+    },
+    {
+      "id": "s2",
+      "index": 2,
+      "kind": "type",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:47:07.237Z"
+        }
+      },
+      "value": {
+        "from": "param",
+        "param": "memberId"
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "textbox",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "inSameRowAs",
+            "text": "Member ID"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-29T23:47:07.237Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Enter the member ID we need to look up in the Member ID field"
+    },
+    {
+      "id": "s3",
+      "index": 3,
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:47:11.713Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "button",
+          "name": "Search",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Search Type"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-29T23:47:11.713Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "The previous Search click did not produce a results screen; retry the search submission"
+    }
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "Member Detail",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "main"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-08-29T23:47:21.514Z"
+      }
+    },
+    "description": "Looked up member 12345 (Sarah Chen, Active). Read their current savings balance: $4,182.55, located as the value in the same row as the \"Savings\" account label on the Member Detail screen."
+  },
+  "approval": "draft",
+  "provenance": {
+    "recordedAt": "2026-08-29T23:47:23.079Z",
+    "discoveryRunId": "watch-2026-08-29T23-47-01-976Z",
+    "model": "deepseek/deepseek-v4-flash",
+    "goal": "look up member 12345 and read their current savings balance",
+    "warnings": []
+  }
+}

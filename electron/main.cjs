@@ -102,7 +102,14 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
     env: { ...process.env, CONSOLE_PORT: String(port), RUNNER_PARENT_PID: String(process.pid) },
   });
 
-  child.stdout.on('data', (d) => send('run:log', d.toString()));
+  child.stdout.on('data', (d) => {
+    const text = d.toString();
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('__RUN_DONE__')) continue;
+      try { send('run:done', JSON.parse(line.slice('__RUN_DONE__'.length))); } catch {}
+    }
+    send('run:log', text.replace(/^__RUN_DONE__.*$/gm, '').replace(/\n{3,}/g, '\n\n'));
+  });
   child.stderr.on('data', (d) => send('run:log', d.toString()));
   child.on('exit', (code) => { send('run:exit', { code }); child = null; });
 
@@ -169,6 +176,8 @@ ipcMain.handle('caps:compile', async (_e, opts) => {
   // `--partial` saves a run that never finished as an `incomplete` artifact:
   // the steps that did work are kept, but it is not invocable.
   const compileArgs = ['tsx', 'scripts/compile.ts'];
+  // Save the run the user actually watched, not whatever happens to be newest.
+  if (opts && opts.runDir) compileArgs.push(opts.runDir);
   if (opts && opts.partial) compileArgs.push('--partial');
   return new Promise((resolve) => {
     const p = spawn('npx', compileArgs, { cwd: ROOT, env: { ...process.env }, detached: true });
@@ -177,13 +186,23 @@ ipcMain.handle('caps:compile', async (_e, opts) => {
     p.stderr.on('data', (d) => { out += d.toString(); send('run:log', d.toString()); });
     p.on('exit', (code) => {
       const saved = /saved: (\S+)/.exec(out);
+      const id = /^(\S+) v\d+  \[/m.exec(out);
       if (code === 0 && saved) {
-        return resolve({ ok: true, path: saved[1], incomplete: /\[incomplete\]/.test(out) });
+        return resolve({
+          ok: true, path: saved[1], id: id ? id[1] : null,
+          incomplete: /\[incomplete\]/.test(out),
+        });
       }
       // Distinguish "this run did not finish" from a genuine failure, so the
       // UI can offer to keep it rather than just reporting an error.
       const partialAvailable = /allowPartial|--partial/.test(out);
-      resolve({ ok: false, error: out.trim().slice(-400), partialAvailable });
+      // Prefer our own one-line reason over whatever Node dumped after it.
+      const clean = /cannot (?:compile|save): (.+)/.exec(out);
+      resolve({
+        ok: false,
+        error: clean ? clean[1] : out.split('\n').filter((l) => l.trim() && !/^\s+at /.test(l)).slice(-3).join(' ').slice(0, 300),
+        partialAvailable,
+      });
     });
   });
 });

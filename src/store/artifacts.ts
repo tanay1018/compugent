@@ -31,6 +31,18 @@ export class ArtifactStore {
     return path;
   }
 
+  /**
+   * The next free version for an id.
+   *
+   * Re-recording an existing capability is the normal case, not an error --
+   * a flow changed, or a run was redone on a different tenant. The store still
+   * refuses to OVERWRITE a reviewed artifact; what it should not do is make
+   * re-recording feel like a failure.
+   */
+  nextVersion(id: string): number {
+    return (this.versions(id).at(-1) ?? 0) + 1;
+  }
+
   versions(id: string): number[] {
     const dir = this.dirFor(id);
     if (!existsSync(dir)) return [];
@@ -41,12 +53,46 @@ export class ArtifactStore {
       .sort((a, b) => a - b);
   }
 
-  load(id: string, version?: number): CapabilityArtifact {
-    const v = version ?? this.versions(id).at(-1);
-    if (v === undefined) throw new Error(`no artifact found for "${id}"`);
+  /** Read one specific version, without any preference logic. */
+  private read(id: string, v: number): CapabilityArtifact {
     const raw = readFileSync(join(this.dirFor(id), `v${v}.json`), 'utf8');
     // Parsed, not cast: a stored artifact is untrusted input like any other.
     return CapabilityArtifact.parse(JSON.parse(raw));
+  }
+
+  /**
+   * Which version a caller gets.
+   *
+   * NOT simply the highest. An approved artifact outranks any later draft,
+   * because re-recording is how a capability gets worse as well as better:
+   * a fresh run on a cheaper model produced a flow that clicked Search before
+   * typing anything, compiled cleanly as the next version, and would have
+   * silently replaced a working capability for every caller.
+   *
+   * Highest approved if one exists; otherwise highest overall, so a
+   * never-reviewed capability still works.
+   */
+  load(id: string, version?: number): CapabilityArtifact {
+    const all = this.versions(id);
+    if (version !== undefined) return this.read(id, version);
+    if (!all.length) throw new Error(`no artifact found for "${id}"`);
+
+    const approved = all.filter((v) => {
+      try { return this.read(id, v).approval === 'approved'; } catch { return false; }
+    });
+    const pick = approved.at(-1) ?? all.at(-1)!;
+    return this.read(id, pick);
+  }
+
+  /** Promote a reviewed version. The only way to reach `approved`. */
+  approve(id: string, version: number): CapabilityArtifact {
+    const a = this.read(id, version);
+    if (a.approval === 'incomplete') {
+      throw new Error(`${id} v${version} is incomplete — it has no checkpoint and cannot be approved`);
+    }
+    const next = CapabilityArtifact.parse({ ...a, approval: 'approved' });
+    writeFileSync(join(this.dirFor(id), `v${version}.json`), JSON.stringify(next, null, 2));
+    return next;
   }
 
   list(): Array<{ id: string; version: number; name: string; approval: string }> {

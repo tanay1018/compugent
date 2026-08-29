@@ -387,11 +387,28 @@ artifacts/member.readSavingsBalance/v1.json
 artifacts/member.readSavingsBalance/v2.json     ← + learned outcomes
 ```
 
-`save()` refuses to overwrite an existing version — you bump, you never clobber
-a reviewed artifact — and `load()` parses through the schema rather than
-casting, because a stored artifact is untrusted input like any other. Not a
-database on purpose: a v1→v2 diff is exactly what a reviewer wants to look at,
-and git already does that well.
+`save()` refuses to overwrite a version — re-recording lands as the *next* one —
+and `load()` parses through the schema rather than casting, because a stored
+artifact is untrusted input like any other. Not a database on purpose: a v1→v2
+diff is exactly what a reviewer wants, and git already does that well.
+
+**`load()` does not return the highest version. It returns the highest
+*approved* one**, falling back to the highest overall when none is approved.
+That rule earned its place: a re-record on a cheaper model produced a flow that
+clicked Search before typing anything, compiled cleanly as v3, and would have
+silently replaced a working capability for every caller.
+
+```bash
+npm run approve                                  # list every version and its state
+npm run approve -- member.readSavingsBalance 2   # promote a reviewed one
+```
+
+```
+member.readSavingsBalance   v1:draft  v2:approved  v3:draft
+```
+
+Approval is the only route to unattended replay, and the only thing that stops
+a later draft shadowing a working capability.
 
 ### Saving a run that did not finish
 

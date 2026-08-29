@@ -271,7 +271,7 @@
     },
     "description": "Searched Member ID 12345 by Member Number and landed on the Member Detail screen for Sarah Chen (ID 12345, Active). Recorded the savings balance $4,182.55 from the \"Savings\" row of the Account/Balance table, plus member ID and name as verification."
   },
-  "approval": "draft",
+  "approval": "approved",
   "provenance": {
     "recordedAt": "2026-08-29T21:41:08.908Z",
     "discoveryRunId": "watch-2026-08-29T21-40-47-229Z",

@@ -126,6 +126,13 @@ console.log(`  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'
   const humanSteps = log.events.filter((e) => e.actor === 'operator' && e.kind.startsWith('manual.')).length;
   if (humanSteps) console.log(`\n  ${humanSteps} operator action(s) recorded in the same log.`);
   console.log(`\n  evidence: ${log.dir}`);
+  // Machine-readable, for the desktop app: it needs to know the run finished
+  // and WHICH run to save, rather than scraping formatted output or guessing
+  // that "latest" is still the one you just watched.
+  console.log('__RUN_DONE__' + JSON.stringify({
+    outcome: trace.outcome, steps: trace.steps.length, runDir: log.dir,
+    hasCheckpoint: Boolean(trace.checkpoint),
+  }));
 
   if (trace.outcome === 'success') {
     console.log(`\n  Next:`);

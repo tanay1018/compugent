@@ -1,0 +1,734 @@
+{
+  "goal": "open a new savings account and transfer balance from the checking account having positive balance to the saving accounts. Both the accounts should have equal balance in the end",
+  "entryUrl": "https://parabank.parasoft.com/parabank/overview.htm",
+  "model": "deepseek/deepseek-v4-flash",
+  "startedAt": "2026-08-29T23:41:11.061Z",
+  "finishedAt": "2026-08-29T23:44:07.341Z",
+  "outcome": "success",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "type",
+      "rationale": "Enter username into the focused username field to log in to the demo bank app.",
+      "target": {
+        "role": "textbox",
+        "name": "(unnamed)",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:41:23.280Z"
+        }
+      },
+      "targetVerified": false,
+      "targetProblem": "no descriptor resolves uniquely back to this node",
+      "literal": "john",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 2,
+      "kind": "type",
+      "rationale": "Enter the demo password for the john account.",
+      "target": {
+        "role": "textbox",
+        "name": "(unnamed)",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:41:23.297Z"
+        }
+      },
+      "targetVerified": false,
+      "targetProblem": "no descriptor resolves uniquely back to this node",
+      "literal": "demo",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 3,
+      "kind": "click",
+      "rationale": "Click Log In to authenticate with the entered demo credentials and reach the account overview.",
+      "target": {
+        "role": "button",
+        "name": "Log In",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:41:27.042Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
+    },
+    {
+      "index": 4,
+      "kind": "type",
+      "rationale": "Re-enter username because the previous attempt apparently didn't register on this page load.",
+      "target": {
+        "role": "textbox",
+        "name": "(unnamed)",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:41:33.202Z"
+        }
+      },
+      "targetVerified": false,
+      "targetProblem": "no descriptor resolves uniquely back to this node",
+      "literal": "john",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
+    },
+    {
+      "index": 5,
+      "kind": "type",
+      "rationale": "Re-enter password for the demo account.",
+      "target": {
+        "role": "textbox",
+        "name": "(unnamed)",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:41:33.204Z"
+        }
+      },
+      "targetVerified": false,
+      "targetProblem": "no descriptor resolves uniquely back to this node",
+      "literal": "demo",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
+    },
+    {
+      "index": 6,
+      "kind": "click",
+      "rationale": "Submit the login form to reach the account overview.",
+      "target": {
+        "role": "button",
+        "name": "Log In",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:41:44.804Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
+    },
+    {
+      "index": 7,
+      "kind": "type",
+      "rationale": "Username field is empty while password is filled; enter the demo username to complete credentials.",
+      "target": {
+        "role": "textbox",
+        "name": "(unnamed)",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:41:44.802Z"
+        }
+      },
+      "targetVerified": false,
+      "targetProblem": "no descriptor resolves uniquely back to this node",
+      "literal": "john",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
+    },
+    {
+      "index": 8,
+      "kind": "click",
+      "rationale": "Both credential fields are populated now; submit the login form cleanly to reach the account overview.",
+      "target": {
+        "role": "button",
+        "name": "Log In",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:08.218Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 9,
+      "kind": "click",
+      "rationale": "Refresh the accounts overview to load the account list (checking/savings rows) which didn't appear in the initial render.",
+      "target": {
+        "role": "link",
+        "name": "Accounts Overview",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:14.480Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 10,
+      "kind": "extract",
+      "rationale": "Current balance of account 13344 (the only/checking account); needed to compute the equal split target.",
+      "target": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "13344"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:20.699Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "checkingBalance",
+      "observedValue": "$5022.93",
+      "effect": "read",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 11,
+      "kind": "click",
+      "rationale": "Open New Account to create a savings account that will receive part of the checking balance.",
+      "target": {
+        "role": "link",
+        "name": "Open New Account",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:20.701Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/openaccount.htm"
+    },
+    {
+      "index": 12,
+      "kind": "select",
+      "rationale": "Goal requires opening a savings account, not a checking account; choose SAVINGS from the account-type dropdown.",
+      "target": {
+        "role": "combobox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "What type of Account would you like to open?"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:26.929Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "SAVINGS",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/openaccount.htm"
+    },
+    {
+      "index": 13,
+      "kind": "click",
+      "rationale": "Submit the Open New Account form to create the new savings account funded from the checking account.",
+      "target": {
+        "role": "button",
+        "name": "Open New Account",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:30.356Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/openaccount.htm"
+    },
+    {
+      "index": 14,
+      "kind": "extract",
+      "rationale": "The newly opened savings account number — the destination for the transfer.",
+      "target": {
+        "role": "link",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "Your new account number:"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:41.009Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "newSavingsAccountId",
+      "observedValue": "28440",
+      "effect": "read",
+      "locationAfter": "https://parabank.parasoft.com/parabank/openaccount.htm"
+    },
+    {
+      "index": 15,
+      "kind": "click",
+      "rationale": "Open Accounts Overview to see the current balances of the checking source and the new savings account so the equal-split transfer can be calculated.",
+      "target": {
+        "role": "link",
+        "name": "Accounts Overview",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:41.010Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 16,
+      "kind": "click",
+      "rationale": "Re-request the accounts overview to force a fresh render of the account rows, as done successfully before.",
+      "target": {
+        "role": "link",
+        "name": "Accounts Overview",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:42:53.783Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 17,
+      "kind": "extract",
+      "rationale": "Current balance of the new savings account (28440); together with the checking balance it determines the equal-split transfer amount.",
+      "target": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "28440"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:29.428Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "savingsBalance",
+      "observedValue": "$90.00",
+      "effect": "read",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 18,
+      "kind": "click",
+      "rationale": "Open the Transfer Funds page to move the computed amount from checking to savings.",
+      "target": {
+        "role": "link",
+        "name": "Transfer Funds",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:29.429Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "irreversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/transfer.htm"
+    },
+    {
+      "index": 19,
+      "kind": "select",
+      "rationale": "Source account is the checking account 13344 that holds the positive balance to draw from.",
+      "target": {
+        "role": "combobox",
+        "name": "(unnamed)",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:40.134Z"
+        }
+      },
+      "targetVerified": false,
+      "targetProblem": "no descriptor resolves uniquely back to this node",
+      "literal": "13344",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/transfer.htm"
+    },
+    {
+      "index": 20,
+      "kind": "select",
+      "rationale": "Destination account is the newly opened savings account 28440.",
+      "target": {
+        "role": "combobox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "1334428440"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:40.135Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "28440",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/transfer.htm"
+    },
+    {
+      "index": 21,
+      "kind": "type",
+      "rationale": "Transfer amount = (checking 4932.93 − savings 90.00) / 2 = 2421.465, rounded up to 2421.47 to leave both accounts equal to within one cent.",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "Amount:"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:40.133Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "2421.47",
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/transfer.htm"
+    },
+    {
+      "index": 22,
+      "kind": "click",
+      "rationale": "Submit the transfer to move $2421.47 from checking to the new savings account, equalizing the two balances.",
+      "target": {
+        "role": "button",
+        "name": "Transfer",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:43.959Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "irreversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/transfer.htm"
+    },
+    {
+      "index": 23,
+      "kind": "click",
+      "rationale": "Verify the final balances of both accounts after the transfer to confirm they are equal (or equal to the cent).",
+      "target": {
+        "role": "link",
+        "name": "Accounts Overview",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:48.245Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 24,
+      "kind": "click",
+      "rationale": "Re-request the overview to force the account rows (with final balances) to render, as done successfully on prior occurrences.",
+      "target": {
+        "role": "link",
+        "name": "Accounts Overview",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:53.062Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 25,
+      "kind": "extract",
+      "rationale": "Final balance of the checking account (13344) after the equalizing transfer — proof the goal is met.",
+      "target": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "13344"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:59.842Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "finalCheckingBalance",
+      "observedValue": "$2511.46",
+      "effect": "read",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    },
+    {
+      "index": 26,
+      "kind": "extract",
+      "rationale": "Final balance of the new savings account (28440) after the equalizing transfer — proof the goal is met.",
+      "target": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "28440"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T23:43:59.843Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "finalSavingsBalance",
+      "observedValue": "$2511.47",
+      "effect": "read",
+      "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
+    }
+  ],
+  "warnings": [
+    "step 1 (type): no descriptor resolves uniquely back to this node",
+    "step 1 (type): no descriptor resolves uniquely back to this node",
+    "step 4 (type): no descriptor resolves uniquely back to this node",
+    "step 4 (type): no descriptor resolves uniquely back to this node",
+    "step 6 (type): no descriptor resolves uniquely back to this node",
+    "step 19 (select): no descriptor resolves uniquely back to this node"
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "heading",
+      "name": "Accounts Overview",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "root"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-08-29T23:44:03.402Z"
+      }
+    },
+    "description": "Opened a new savings account (#28440) funded from the checking account #13344, then transferred $2421.47 from checking to savings to equalize the balances. Final balances: checking $2511.46 and savings $2511.47 (the total of $5022.93 is an odd number of cents, so exact equality is impossible — these are equal to within one cent, the closest attainable). Verified on the Accounts Overview page via the \"Accounts Overview\" heading."
+  },
+  "summary": "Opened a new savings account (#28440) funded from the checking account #13344, then transferred $2421.47 from checking to savings to equalize the balances. Final balances: checking $2511.46 and savings $2511.47 (the total of $5022.93 is an odd number of cents, so exact equality is impossible — these are equal to within one cent, the closest attainable). Verified on the Accounts Overview page via the \"Accounts Overview\" heading.",
+  "usage": {
+    "inputTokens": 90966,
+    "inputTokenDetails": {
+      "noCacheTokens": 33622,
+      "cacheReadTokens": 57344,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 12219,
+    "outputTokenDetails": {
+      "textTokens": 3338,
+      "reasoningTokens": 8881
+    },
+    "totalTokens": 103185
+  },
+  "stepUsage": [
+    {
+      "in": 2171,
+      "out": 934,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 3148,
+      "out": 167,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 2627,
+      "out": 337,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 3630,
+      "out": 876,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 3943,
+      "out": 1747,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 3604,
+      "out": 384,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 3974,
+      "out": 445,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 4121,
+      "out": 313,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 4301,
+      "out": 139,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 4358,
+      "out": 651,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 4684,
+      "out": 902,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 5185,
+      "out": 3082,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 5209,
+      "out": 880,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 7479,
+      "out": 155,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 5907,
+      "out": 247,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 6052,
+      "out": 140,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 6556,
+      "out": 412,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 6904,
+      "out": 192,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 7113,
+      "out": 216,
+      "reasoning": 0,
+      "cached": 0
+    }
+  ]
+}

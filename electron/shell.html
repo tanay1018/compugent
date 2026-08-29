@@ -83,6 +83,15 @@ input:focus,textarea:focus{outline:none;border-color:var(--navy)}
   padding:6px 12px;font:12px ui-monospace,Menlo,monospace;cursor:pointer;white-space:nowrap}
 .btn:hover{border-color:var(--navy)}
 .btn.stop{color:var(--rust)}
+.btn.save{border-color:var(--moss);color:var(--moss);font-weight:600}
+.btn.save:hover{background:#17301f}
+#outcome{white-space:nowrap}
+#saveres{position:absolute;right:14px;top:46px;z-index:20;max-width:440px;background:var(--panel);
+  border:1px solid var(--line);border-radius:5px;padding:12px 14px;font-size:11.5px;line-height:1.6;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
+#saveres b{display:block;margin-bottom:5px}
+#saveres .ok{color:var(--moss)} #saveres .warn{color:var(--amber)} #saveres .bad{color:var(--rust)}
+#saveres button{margin-top:9px}
 .split{flex:1;display:flex;min-height:0}
 webview{flex:1;min-width:0;border:none;background:#fff}
 #term{flex:0 0 var(--termw,260px);border-left:1px solid var(--line);background:#101318;padding:10px 12px;
@@ -145,10 +154,13 @@ webview{flex:1;min-width:0;border:none;background:#fff}
 <section id="run">
   <div class="bar">
     <div class="goal"><b>goal</b><span id="rgoal"></span></div>
+    <span id="outcome" class="badge" style="display:none"></span>
+    <button class="btn save" id="save" style="display:none">Save as capability</button>
     <button class="btn" id="toggleterm">Log</button>
     <button class="btn" id="newrun">New run</button>
     <button class="btn stop" id="stop">Stop</button>
   </div>
+  <div id="saveres"></div>
   <div class="split">
     <webview id="view" src="about:blank"></webview>
     <div id="term"></div>
@@ -177,6 +189,51 @@ function log(line){
 window.runner.onLog(log);
 window.runner.onExit(({code}) => log(`\n· run process exited (${code})\n`));
 
+let lastRun = null;
+
+window.runner.onDone((info) => {
+  lastRun = info;
+  const badge = $('outcome');
+  badge.style.display = '';
+  badge.textContent = info.outcome.replace('_', ' ');
+  badge.className = 'badge ' + (info.outcome === 'success' ? 'b-approved' : 'b-incomplete');
+
+  const save = $('save');
+  save.style.display = '';
+  save.textContent = info.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
+  save.title = info.hasCheckpoint
+    ? 'Compile this run into a replayable capability'
+    : 'This run never established what success looks like. The steps it did complete can still be kept.';
+});
+
+$('save').onclick = async (ev) => {
+  const b = ev.currentTarget;
+  const box = $('saveres');
+  b.disabled = true; b.textContent = 'Saving…';
+  box.style.display = 'block';
+  box.innerHTML = '<span class="meta">compiling…</span>';
+
+  // Save THIS run, not whatever happens to be newest, and fall straight to
+  // --partial when the run has no checkpoint — the button already said so.
+  let r = await window.runner.compileLatest({ runDir: lastRun?.runDir, partial: !lastRun?.hasCheckpoint });
+  if (!r.ok && r.partialAvailable) {
+    r = await window.runner.compileLatest({ runDir: lastRun?.runDir, partial: true });
+  }
+  b.disabled = false;
+  b.textContent = lastRun?.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
+
+  if (!r.ok) { box.innerHTML = '<b class="bad">Could not save</b>' + r.error; return; }
+  box.innerHTML =
+    '<b class="' + (r.incomplete ? 'warn' : 'ok') + '">' +
+    (r.incomplete ? 'Saved as incomplete' : 'Saved') + '</b>' +
+    (r.id ? '<code>' + r.id + '</code><br>' : '') + r.path +
+    (r.incomplete
+      ? '<br><br>No checkpoint, so nothing can verify success — it will not be invocable until the flow is finished.'
+      : '<br><br>Open the <b>Capabilities</b> tab to run it with different inputs.') +
+    '<br><button class="btn" id="dismisssave">Dismiss</button>';
+  document.getElementById('dismisssave').onclick = () => { box.style.display = 'none'; };
+};
+
 $('go').onclick = async () => {
   const url = $('url').value.trim(), task = $('task').value.trim();
   if (!url || !task) { $('err').textContent = 'A target URL and a goal are both required.'; return; }
@@ -188,6 +245,10 @@ $('go').onclick = async () => {
   if (!res.ok) { $('err').textContent = res.error; setup.style.display='flex'; return; }
 
   $('rgoal').textContent = task;
+  lastRun = null;
+  $('outcome').style.display = 'none';
+  $('save').style.display = 'none';
+  $('saveres').style.display = 'none';
   setup.style.display = 'none';
   run.style.display = 'flex';
   view.src = res.consoleUrl;

@@ -19,7 +19,8 @@
     "handoff": "tsx scripts/handoff.ts",
     "watch": "tsx scripts/watch.ts",
     "desktop": "electron electron/main.cjs",
-    "models": "tsx scripts/models.ts"
+    "models": "tsx scripts/models.ts",
+    "approve": "tsx scripts/approve.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",
