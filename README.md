@@ -320,8 +320,22 @@ prints. Its action vocabulary is exactly what a recorded step can express, so
 compiling a trace into an artifact is mechanical rather than an exercise in
 parsing intent back out of a transcript.
 
-Two gates run during discovery, both of which fail at *record* time rather
+Three gates run during discovery, all of which fail at *record* time rather
 than in production:
+
+- **An irreversible action cannot be repeated within a run.** Exploration is
+  fine; redoing something that cannot be undone is not. A ParaBank run that
+  lost track of an account it had just opened went back and opened a second
+  one, then transferred the money twice — every individual step looked
+  reasonable, and nothing was watching the run as a whole. The second attempt
+  is now refused, with the step number of the first:
+
+  ```
+  BLOCKED: you already performed this irreversible action at step 11.
+  Doing it again would duplicate its effect — a second account, a second
+  transfer. VERIFY the result on screen, or call giveUp. Do not redo it.
+  ```
+
 
 - **Descriptor verification.** Every synthesised descriptor is immediately
   resolved back against the observation it came from. If it does not find

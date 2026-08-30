@@ -137,6 +137,15 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   const steps: TraceStep[] = [];
   const warnings: string[] = [];
   const stepUsage: Array<{ in: number; out: number; reasoning: number; cached: number }> = [];
+  /**
+   * Irreversible actions already performed, by target signature.
+   *
+   * Exploration is fine; repeating something that cannot be undone is not. A
+   * run that lost track of an account it had just opened went back and opened
+   * a second one, then transferred the money twice — each individual step
+   * looked reasonable, and nothing was watching the run as a whole.
+   */
+  const committed = new Map<string, number>();
   let outcome: DiscoveryOutcome = 'max_steps';
   let checkpoint: StateAssertion | undefined;
   let summary: string | undefined;
@@ -248,6 +257,27 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     }
 
     const effect = classifyEffect(policy, { kind, ...(text !== undefined ? { text } : {}) }, node);
+
+    // Has this exact irreversible action already been taken in this run?
+    if (effect === 'irreversible') {
+      const signature = `${kind}:${describeTarget(described.descriptor)}`;
+      const previous = committed.get(signature);
+      if (previous !== undefined) {
+        warnings.push(`refused to repeat an irreversible action: ${signature} (already done at step ${previous})`);
+        log.append('system', 'policy.blocked', {
+          kind, target: describeTarget(described.descriptor),
+          reason: 'irreversible action already performed in this run',
+          firstPerformedAtStep: previous,
+        });
+        return (
+          `BLOCKED: you already performed this irreversible action at step ${previous} ` +
+          `(${signature}). Doing it again would duplicate its effect — a second account, a second ` +
+          `transfer. If you cannot tell whether it worked, VERIFY the result on screen or call ` +
+          `giveUp so a human can check. Do not redo it.`
+        );
+      }
+      committed.set(signature, steps.length + 1);
+    }
 
     const decision = checkAction(policy, { kind, ...(text !== undefined ? { text } : {}) }, effect);
     if (decision.allow === false) {

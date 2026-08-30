@@ -34,6 +34,11 @@ export const PolicyConfig = z.object({
   irreversiblePatterns: z.array(z.string()).default([
     'submit', 'confirm', 'post', 'transfer', 'delete', 'remove', 'approve',
     'authorize', 'close account', 'disburse', 'issue', 'send', 'pay',
+    // Creating a thing is as irreversible as destroying one. An earlier list
+    // covered transfers and submits but not account opening, so a run that
+    // lost its place opened a second savings account and classified that as
+    // reversible.
+    'open new', 'open account', 'create', 'register', 'enroll', 'apply',
   ]),
   /** What ENFORCEMENT does when a step declares itself irreversible. */
   onIrreversible: z.enum(['block', 'require_approval', 'flag']).default('require_approval'),
