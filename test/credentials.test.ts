@@ -66,3 +66,19 @@ test('a stored literal that looks like a credential is rejected outright', () =>
     /looks like a credential/,
   );
 });
+
+test('a password field with NO label is still refused', () => {
+  // The case that actually leaked. ParaBank's login inputs carry no accessible
+  // name and no anchor text, so a check that reads only labels permitted them
+  // and the password reached both the trace and the run log.
+  const d = checkCredentialField(policy, { kind: 'type', text: 'secret' }, undefined, 'password');
+  assert.equal(d.allow, false);
+  assert.equal(d.allow === false && d.code, 'credential');
+  assert.match(d.allow === false ? d.reason : '', /with no label/);
+});
+
+test('an unlabelled ordinary text field is still usable', () => {
+  // The refusal must not swallow every anonymous input — legacy screens are
+  // full of them, and anchoring is how the rest of the system finds them.
+  assert.equal(checkCredentialField(policy, { kind: 'type', text: 'x' }, undefined, 'text').allow, true);
+});

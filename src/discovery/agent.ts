@@ -240,7 +240,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     // Checked before anything is done or written down. A credential that
     // reaches the log has already been typed into a live system.
     const label = node.anchorText ?? node.name;
-    const cred = checkCredentialField(policy, { kind, ...(text !== undefined ? { text } : {}) }, label);
+    const cred = checkCredentialField(policy, { kind, ...(text !== undefined ? { text } : {}) }, label, node.inputType);
     if (cred.allow === false) {
       log.append('system', 'policy.blocked', { kind, target: describeTarget(described.descriptor), reason: cred.reason });
       warnings.push(`refused to type into "${label}": credential field`);
@@ -281,7 +281,8 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       ...(described.problem ? { targetProblem: described.problem } : {}),
       // A refused credential never reaches the trace, so it can never reach an
       // artifact -- which is a file that gets committed, diffed and shared.
-      ...(text !== undefined && !isSensitiveField(policy, label) ? { literal: text } : {}),
+      ...(text !== undefined && !isSensitiveField(policy, label) && node.inputType !== 'password'
+        ? { literal: text } : {}),
       effect, locationAfter: contentLocation(obs),
     };
     steps.push(step);
@@ -289,7 +290,9 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       target: describeTarget(described.descriptor), why, effect,
       // Belt and braces: the field was already refused above if it read as a
       // credential, but the log never takes a value on trust.
-      ...(text !== undefined ? { text: isSensitiveField(policy, label) ? '[REDACTED]' : text } : {}),
+      ...(text !== undefined
+        ? { text: isSensitiveField(policy, label) || node.inputType === 'password' ? '[REDACTED]' : text }
+        : {}),
       location: obs.location,
     }, log.saveScreenshot(await surface.screenshot(), kind));
 

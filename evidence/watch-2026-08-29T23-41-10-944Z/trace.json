@@ -24,7 +24,7 @@
       },
       "targetVerified": false,
       "targetProblem": "no descriptor resolves uniquely back to this node",
-      "literal": "john",
+      "literal": "[REDACTED]",
       "effect": "reversible",
       "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
     },
@@ -46,7 +46,7 @@
       },
       "targetVerified": false,
       "targetProblem": "no descriptor resolves uniquely back to this node",
-      "literal": "demo",
+      "literal": "[REDACTED]",
       "effect": "reversible",
       "locationAfter": "https://parabank.parasoft.com/parabank/overview.htm"
     },
@@ -88,7 +88,7 @@
       },
       "targetVerified": false,
       "targetProblem": "no descriptor resolves uniquely back to this node",
-      "literal": "john",
+      "literal": "[REDACTED]",
       "effect": "reversible",
       "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
     },
@@ -110,7 +110,7 @@
       },
       "targetVerified": false,
       "targetProblem": "no descriptor resolves uniquely back to this node",
-      "literal": "demo",
+      "literal": "[REDACTED]",
       "effect": "reversible",
       "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
     },
@@ -152,7 +152,7 @@
       },
       "targetVerified": false,
       "targetProblem": "no descriptor resolves uniquely back to this node",
-      "literal": "john",
+      "literal": "[REDACTED]",
       "effect": "reversible",
       "locationAfter": "https://parabank.parasoft.com/parabank/login.htm;jsessionid=4A4CEF84F7D368DC282E620777A63E30"
     },
@@ -288,7 +288,7 @@
     {
       "index": 14,
       "kind": "extract",
-      "rationale": "The newly opened savings account number — the destination for the transfer.",
+      "rationale": "The newly opened savings account number \u2014 the destination for the transfer.",
       "target": {
         "role": "link",
         "nameMatch": "normalized",
@@ -444,7 +444,7 @@
     {
       "index": 21,
       "kind": "type",
-      "rationale": "Transfer amount = (checking 4932.93 − savings 90.00) / 2 = 2421.465, rounded up to 2421.47 to leave both accounts equal to within one cent.",
+      "rationale": "Transfer amount = (checking 4932.93 \u2212 savings 90.00) / 2 = 2421.465, rounded up to 2421.47 to leave both accounts equal to within one cent.",
       "target": {
         "role": "textbox",
         "nameMatch": "normalized",
@@ -528,7 +528,7 @@
     {
       "index": 25,
       "kind": "extract",
-      "rationale": "Final balance of the checking account (13344) after the equalizing transfer — proof the goal is met.",
+      "rationale": "Final balance of the checking account (13344) after the equalizing transfer \u2014 proof the goal is met.",
       "target": {
         "role": "cell",
         "nameMatch": "normalized",
@@ -553,7 +553,7 @@
     {
       "index": 26,
       "kind": "extract",
-      "rationale": "Final balance of the new savings account (28440) after the equalizing transfer — proof the goal is met.",
+      "rationale": "Final balance of the new savings account (28440) after the equalizing transfer \u2014 proof the goal is met.",
       "target": {
         "role": "cell",
         "nameMatch": "normalized",
@@ -598,9 +598,9 @@
         "discoveredAt": "2026-08-29T23:44:03.402Z"
       }
     },
-    "description": "Opened a new savings account (#28440) funded from the checking account #13344, then transferred $2421.47 from checking to savings to equalize the balances. Final balances: checking $2511.46 and savings $2511.47 (the total of $5022.93 is an odd number of cents, so exact equality is impossible — these are equal to within one cent, the closest attainable). Verified on the Accounts Overview page via the \"Accounts Overview\" heading."
+    "description": "Opened a new savings account (#28440) funded from the checking account #13344, then transferred $2421.47 from checking to savings to equalize the balances. Final balances: checking $2511.46 and savings $2511.47 (the total of $5022.93 is an odd number of cents, so exact equality is impossible \u2014 these are equal to within one cent, the closest attainable). Verified on the Accounts Overview page via the \"Accounts Overview\" heading."
   },
-  "summary": "Opened a new savings account (#28440) funded from the checking account #13344, then transferred $2421.47 from checking to savings to equalize the balances. Final balances: checking $2511.46 and savings $2511.47 (the total of $5022.93 is an odd number of cents, so exact equality is impossible — these are equal to within one cent, the closest attainable). Verified on the Accounts Overview page via the \"Accounts Overview\" heading.",
+  "summary": "Opened a new savings account (#28440) funded from the checking account #13344, then transferred $2421.47 from checking to savings to equalize the balances. Final balances: checking $2511.46 and savings $2511.47 (the total of $5022.93 is an odd number of cents, so exact equality is impossible \u2014 these are equal to within one cent, the closest attainable). Verified on the Accounts Overview page via the \"Accounts Overview\" heading.",
   "usage": {
     "inputTokens": 90966,
     "inputTokenDetails": {

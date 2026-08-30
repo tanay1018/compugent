@@ -34,7 +34,7 @@ import { resolveTarget } from './resolve.js';
  */
 const NEARBY_FN = `function () {
   const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
-  const out = { nearby: '', rel: '' };
+  const out = { nearby: '', rel: '', inputType: '' };
 
   // A StaticText accessibility node resolves to a DOM TEXT NODE, not an
   // element -- and text nodes have no closest()/previousElementSibling. Values
@@ -43,21 +43,26 @@ const NEARBY_FN = `function () {
   const el = this.nodeType === 3 ? this.parentElement : this;
   if (!el || !el.getAttribute) return out;
 
+  // Captured before any label lookup, because a control with NO label is
+  // exactly the case where the type is the only thing that identifies it.
+  out.inputType = el.type ? String(el.type).toLowerCase() : '';
+
+  const withType = (o) => Object.assign({}, o, { inputType: out.inputType });
   const aria = el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder');
-  if (aria) return { nearby: clean(aria), rel: 'labelledBy' };
+  if (aria) return withType({ nearby: clean(aria), rel: 'labelledBy' });
   if (el.id) {
     const lab = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
-    if (lab) return { nearby: clean(lab.textContent), rel: 'labelledBy' };
+    if (lab) return withType({ nearby: clean(lab.textContent), rel: 'labelledBy' });
   }
   const wrap = el.closest && el.closest('label');
-  if (wrap) return { nearby: clean(wrap.textContent), rel: 'labelledBy' };
+  if (wrap) return withType({ nearby: clean(wrap.textContent), rel: 'labelledBy' });
 
   // Legacy table layout: the label is the previous cell in the same row.
   const td = el.closest && el.closest('td');
   if (td) {
     for (let p = td.previousElementSibling; p; p = p.previousElementSibling) {
       const t = clean(p.textContent);
-      if (t) return { nearby: t, rel: 'inSameRowAs' };
+      if (t) return withType({ nearby: t, rel: 'inSameRowAs' });
     }
     const row = td.closest('tr');
     if (row && row.previousElementSibling) {
@@ -66,12 +71,12 @@ const NEARBY_FN = `function () {
       // anchor and pin the artifact to one member.
       const firstCell = row.previousElementSibling.querySelector('td');
       const t = clean(firstCell ? firstCell.textContent : '');
-      if (t) return { nearby: t, rel: 'follows' };
+      if (t) return withType({ nearby: t, rel: 'follows' });
     }
   }
   for (let p = el.previousElementSibling; p; p = p.previousElementSibling) {
     const t = clean(p.textContent);
-    if (t) return { nearby: t, rel: 'precededBy' };
+    if (t) return withType({ nearby: t, rel: 'precededBy' });
   }
   return out;
 }`;
@@ -105,6 +110,16 @@ export class PlaywrightSurface implements Surface {
     // navigation ourselves instead of guessing with a sleep.
     cdp.on('Page.frameNavigated', () => { surface.lastNavAt = Date.now(); });
     cdp.on('Page.loadEventFired', () => { surface.lastNavAt = Date.now(); });
+    // In-flight request tracking. document.readyState says nothing about a
+    // table still being fetched: a modern app finishes loading and THEN asks
+    // the server for its rows. Observing in that gap yields an empty screen,
+    // and a model that sees an empty screen clicks the link again -- which is
+    // what "it kept refreshing the page" actually is.
+    cdp.send('Network.enable').catch(() => {});
+    cdp.on('Network.requestWillBeSent', () => { surface.inFlight += 1; });
+    const settled = () => { surface.inFlight = Math.max(0, surface.inFlight - 1); surface.lastNetAt = Date.now(); };
+    cdp.on('Network.loadingFinished', settled);
+    cdp.on('Network.loadingFailed', settled);
     return surface;
   }
 
@@ -194,7 +209,10 @@ export class PlaywrightSurface implements Surface {
         const anchorable = ACTIONABLE.has(role) || role === 'text' || role === 'cell';
         if (anchorable && ax.backendDOMNodeId !== undefined && nodes.length < 250) {
           const enriched = await this.nearbyText(ax.backendDOMNodeId);
-          if (enriched) { node.anchorText = enriched.nearby; node.anchorRelation = enriched.rel; }
+          if (enriched) {
+            if (enriched.nearby) { node.anchorText = enriched.nearby; node.anchorRelation = enriched.rel; }
+            if (enriched.inputType) node.inputType = enriched.inputType;
+          }
         }
         nodes.push(node);
       }
@@ -208,16 +226,19 @@ export class PlaywrightSurface implements Surface {
     };
   }
 
-  private async nearbyText(backendNodeId: number): Promise<{ nearby: string; rel: string } | null> {
+  private async nearbyText(backendNodeId: number): Promise<{ nearby: string; rel: string; inputType?: string } | null> {
     try {
       const { object } = await this.cdp.send('DOM.resolveNode', { backendNodeId });
       if (!object.objectId) return null;
       const r = await this.cdp.send('Runtime.callFunctionOn', {
         objectId: object.objectId, functionDeclaration: NEARBY_FN, returnByValue: true,
       });
-      const v = r.result?.value as { nearby?: string; rel?: string } | undefined;
-      if (!v?.nearby || !v.rel) return null;
-      return { nearby: v.nearby, rel: v.rel };
+      const v = r.result?.value as { nearby?: string; rel?: string; inputType?: string } | undefined;
+      if (!v) return null;
+      // An unlabelled control still matters: its TYPE may be the only thing
+      // telling us it holds a secret.
+      if (!v.nearby || !v.rel) return v.inputType ? { nearby: '', rel: '', inputType: v.inputType } : null;
+      return { nearby: v.nearby, rel: v.rel, ...(v.inputType ? { inputType: v.inputType } : {}) };
     } catch {
       return null;
     }
@@ -306,6 +327,9 @@ export class PlaywrightSurface implements Surface {
 
   /** @internal — updated from CDP navigation events. */
   lastNavAt = 0;
+  /** @internal — requests still outstanding, and when one last completed. */
+  inFlight = 0;
+  lastNetAt = 0;
 
   /**
    * Settle helper. Waits for the document to be ready AND for navigation
@@ -315,7 +339,7 @@ export class PlaywrightSurface implements Surface {
    * (lookup -> interstitial -> detail); returning after the first one would
    * observe a page that is about to be replaced.
    */
-  async waitForStable({ timeoutMs = 15000, quietMs = 150, graceMs = 400 } = {}): Promise<void> {
+  async waitForStable({ timeoutMs = 15000, quietMs = 150, graceMs = 400, networkQuietMs = 350 } = {}): Promise<void> {
     // A click dispatched over CDP returns before the browser has even started
     // navigating. Without a grace window, this returns instantly against the
     // page that is about to be replaced -- and the caller observes stale state.
@@ -332,7 +356,10 @@ export class PlaywrightSurface implements Surface {
         continue;
       }
       const ready = await this.page.evaluate(() => document.readyState === 'complete').catch(() => false);
-      if (ready && Date.now() - this.lastNavAt > quietMs) return;
+      // Ready AND navigation quiet AND nothing still being fetched. The last
+      // condition is what lets an async-rendered table finish arriving.
+      const netQuiet = this.inFlight === 0 && Date.now() - this.lastNetAt > networkQuietMs;
+      if (ready && Date.now() - this.lastNavAt > quietMs && netQuiet) return;
       await new Promise((r) => setTimeout(r, 40));
     }
   }

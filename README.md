@@ -511,6 +511,11 @@ Automation is **refused** a credential field. Not redacted afterwards —
 refused. Redacting the log is a consolation prize: by then the value has been
 typed into a live system by something that cannot be held accountable for it.
 
+The check reads the control's **input type first, label second**. A label can
+be omitted; ParaBank's login inputs carry no accessible name and no anchor text
+at all, and an earlier label-only version of this check permitted them — the
+password reached both the trace and the run log before that was caught.
+
 ```
 BLOCKED: "Password" looks like a credential or regulated field. Automation
 does not enter these — a human must. Escalate, or record the step as

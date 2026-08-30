@@ -97,8 +97,30 @@ export function checkNavigation(policy: PolicyConfig, url: string): Decision {
  * value was never captured cannot bake one in, and an artifact is a file that
  * gets committed, diffed and shared.
  */
-export function checkCredentialField(policy: PolicyConfig, action: Action, targetLabel: string | undefined): Decision {
+/** Input types that hold a secret regardless of how the field is labelled. */
+const SECRET_INPUT_TYPES = new Set(['password']);
+
+export function checkCredentialField(
+  policy: PolicyConfig,
+  action: Action,
+  targetLabel: string | undefined,
+  inputType?: string,
+): Decision {
   if (action.kind !== 'type' && action.kind !== 'select') return { allow: true };
+
+  // Type first. A label can be omitted -- ParaBank's login inputs carry no
+  // accessible name at all -- and a check that only reads labels quietly
+  // permits exactly the fields that matter most. The type cannot be omitted.
+  if (inputType && SECRET_INPUT_TYPES.has(inputType.toLowerCase())) {
+    return {
+      allow: false,
+      code: 'credential',
+      reason:
+        `this is a password field (input type "${inputType}")${targetLabel ? ` near "${targetLabel}"` : ', with no label'}. ` +
+        `Automation does not enter credentials — a human must. Escalate, or record the step as operator-supplied.`,
+    };
+  }
+
   if (!isSensitiveField(policy, targetLabel)) return { allow: true };
   return {
     allow: false,

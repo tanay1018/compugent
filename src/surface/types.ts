@@ -33,6 +33,13 @@ export interface UINode {
    */
   anchorText?: string;
   anchorRelation?: string;
+  /**
+   * The control's own type where the platform exposes one (`password`,
+   * `email`, `tel`...). Unlike a label this cannot be omitted by a careless
+   * author, which makes it the only trustworthy signal that a field holds a
+   * secret. ParaBank's login inputs carry no accessible name at all.
+   */
+  inputType?: string;
   bounds?: { x: number; y: number; width: number; height: number };
   /** Opaque platform handle (backendNodeId, AXUIElementRef, …). */
   handle: unknown;
