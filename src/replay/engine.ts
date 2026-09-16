@@ -1,5 +1,5 @@
 import type { CapabilityArtifact, OutcomeSpec, Step } from '../schema/artifact.js';
-import { evaluateAssertion, describeTarget, type StateAssertion } from '../schema/assertion.js';
+import { evaluateAssertion, describeTarget as describeTargetRaw, type StateAssertion } from '../schema/assertion.js';
 import type { Observation } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
 import { checkAction, checkCredentialField, type PolicyConfig } from '../policy/allowlist.js';
@@ -171,6 +171,19 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     const report: StepReport = { index: step.index, id: step.id, kind: step.kind, status: 'ok', ms: 0 };
     if (step.target) report.target = describeTarget(step.target);
 
+    /**
+     * Narration. The engine previously said nothing until after it had acted,
+     * which left the most characteristic thing this system does -- walking a
+     * recorded path and verifying each waypoint before touching anything --
+     * entirely invisible. These events cost nothing and make a replay
+     * watchable, as well as making the evidence trail legible after the fact.
+     */
+    log.append('agent', 'step.begin', {
+      step: step.index, of: a.steps.length, kind: step.kind,
+      ...(step.target ? { target: describeTarget(step.target, opts.inputs) } : {}),
+      effect: step.effect,
+    });
+
     let attempts = 0;
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -214,6 +227,13 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         });
       }
 
+      if (step.waypoint) {
+        log.append('agent', 'step.waypoint', {
+          step: step.index, held: true,
+          expected: describeAssertion(step.waypoint, opts.inputs),
+        });
+      }
+
       // An outcome can also be reached WHILE the waypoint holds -- a permission
       // banner rendered on the same screen, for instance.
       const early = matchOutcome(a, obs, opts.inputs);
@@ -247,6 +267,11 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         );
       }
       report.resolvedVia = r.via;
+      // WHICH tier matched is the interesting part: a step that resolves by
+      // anchor is one the accessibility tree could not name on its own.
+      log.append('agent', 'step.resolved', {
+        step: step.index, via: r.via, target: describeTarget(step.target, opts.inputs),
+      });
 
       // 3a. A value the artifact deliberately does not hold. Nothing here can
       //     supply it, and guessing is not an option -- hand over to a human.
@@ -366,6 +391,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       observed: `${evaluateAssertion(current, a.checkpoint!, opts.inputs).detail} (at ${current.location})`,
     });
   }
+  log.append('agent', 'checkpoint.verified', { assertion: describeAssertion(a.checkpoint!, opts.inputs) });
   log.saveScreenshot(await surface.screenshot(), 'checkpoint');
 
   // --- Outputs ------------------------------------------------------------
@@ -381,6 +407,10 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     }
     const raw = r.node.name || r.node.value;
     outputs[spec.name] = applyTransform(raw, spec.transform);
+    log.append('agent', 'output.read', {
+      name: spec.name, via: r.via, from: describeTarget(spec.from, opts.inputs),
+      value: spec.sensitive ? '[REDACTED]' : applyTransform(raw, spec.transform),
+    });
 
     // Identity check. Reaching the right screen is not the same as reaching
     // the right record — see mustMatchParam in schema/artifact.ts.
@@ -444,8 +474,13 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   }
 }
 
+/** Display helper: show the target as it will actually be resolved. */
+function describeTarget(t: Parameters<typeof describeTargetRaw>[0], params?: Record<string, unknown>): string {
+  return describeTargetRaw(params ? interpolate(t, params) : t);
+}
+
 function describeAssertion(a: StateAssertion, params?: Record<string, unknown>): string {
-  const t = (d: Parameters<typeof describeTarget>[0]) => describeTarget(params ? interpolate(d, params) : d);
+  const t = (d: Parameters<typeof describeTargetRaw>[0]) => describeTarget(d, params);
   switch (a.kind) {
     case 'nodeExists': return `${t(a.target)} present`;
     case 'nodeAbsent': return `${t(a.target)} absent`;

@@ -1,0 +1,15 @@
+{"seq":1,"ts":"2026-09-16T06:16:17.572Z","actor":"system","kind":"replay.start","detail":{"capability":"catalogue.readBookPriceAndStock v1","approval":"draft","inputs":{"categoryName":"Science","bookTitle":"The Grand Design"}}}
+{"seq":2,"ts":"2026-09-16T06:16:18.695Z","actor":"agent","kind":"navigate","detail":{"url":"https://books.toscrape.com/"}}
+{"seq":3,"ts":"2026-09-16T06:16:18.696Z","actor":"agent","kind":"step.begin","detail":{"step":1,"of":2,"kind":"click","target":"link named \"Science\" in frame \"root\"","effect":"reversible"}}
+{"seq":4,"ts":"2026-09-16T06:16:18.802Z","actor":"agent","kind":"step.waypoint","detail":{"step":1,"held":true,"expected":"link named \"Science\" in frame \"root\" present"}}
+{"seq":5,"ts":"2026-09-16T06:16:18.802Z","actor":"agent","kind":"step.resolved","detail":{"step":1,"via":"name","target":"link named \"Science\" in frame \"root\""}}
+{"seq":6,"ts":"2026-09-16T06:16:19.459Z","actor":"agent","kind":"step.click","detail":{"step":1,"target":"link named \"{{categoryName}}\" in frame \"root\"","via":"name"}}
+{"seq":7,"ts":"2026-09-16T06:16:19.460Z","actor":"agent","kind":"step.begin","detail":{"step":2,"of":2,"kind":"click","target":"link named \"The Grand Design\" in frame \"root\" #0","effect":"reversible"}}
+{"seq":8,"ts":"2026-09-16T06:16:19.559Z","actor":"agent","kind":"step.waypoint","detail":{"step":2,"held":true,"expected":"link named \"The Grand Design\" in frame \"root\" #0 present"}}
+{"seq":9,"ts":"2026-09-16T06:16:19.559Z","actor":"agent","kind":"step.resolved","detail":{"step":2,"via":"name","target":"link named \"The Grand Design\" in frame \"root\" #0"}}
+{"seq":10,"ts":"2026-09-16T06:16:20.193Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"link named \"{{bookTitle}}\" in frame \"root\" #0","via":"name"}}
+{"seq":11,"ts":"2026-09-16T06:16:20.254Z","actor":"agent","kind":"checkpoint.verified","detail":{"assertion":"heading named \"Product Information\" in frame \"root\" present"}}
+{"seq":12,"ts":"2026-09-16T06:16:20.277Z","actor":"agent","kind":"output.read","detail":{"name":"priceInclTax","via":"anchor","from":"cell inSameRowAs \"Price (incl. tax)\" in frame \"root\"","value":13.76}}
+{"seq":13,"ts":"2026-09-16T06:16:20.278Z","actor":"agent","kind":"output.read","detail":{"name":"availability","via":"anchor","from":"cell inSameRowAs \"Availability\" in frame \"root\"","value":"In stock (5 available)"}}
+{"seq":14,"ts":"2026-09-16T06:16:20.278Z","actor":"agent","kind":"outputs","detail":{"outputs":{"priceInclTax":13.76,"availability":"In stock (5 available)"}}}
+{"seq":15,"ts":"2026-09-16T06:16:20.278Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"priceInclTax":13.76,"availability":"In stock (5 available)"},"runId":"replay-2026-09-16T06-16-17-450Z","ms":2706}}

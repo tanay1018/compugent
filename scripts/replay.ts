@@ -9,7 +9,10 @@ import { PlaywrightSurface } from '../src/surface/playwright.js';
 import { ArtifactStore } from '../src/store/artifacts.js';
 import { defaultPolicy } from '../src/policy/allowlist.js';
 import { RunLog } from '../src/run/log.js';
+import { describeTarget } from '../src/schema/assertion.js';
 import { replay } from '../src/replay/engine.js';
+import { HandoffSession } from '../src/hitl/session.js';
+import { OperatorConsole } from '../src/hitl/console.js';
 
 const args = process.argv.slice(2);
 const id = args.find((a) => !a.includes('=') && !a.startsWith('--')) ?? 'member.readSavingsBalance';
@@ -74,6 +77,36 @@ const runId = `replay-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const log = new RunLog('evidence', runId);
 const surface = await PlaywrightSurface.launch();
 
+/**
+ * `--watch` hosts the same operator channel a discovery run uses, so a replay
+ * can be watched rather than reported. The most characteristic thing this
+ * system does -- retrace a recorded path, checking each waypoint before it
+ * touches anything -- was previously invisible behind a JSON result.
+ */
+const watch = args.includes('--watch');
+let session: HandoffSession | undefined;
+let consoleSrv: OperatorConsole | undefined;
+if (watch) {
+  session = new HandoffSession(surface, log);
+  await session.prepare();
+  consoleSrv = new OperatorConsole(session, log, Number(process.env.CONSOLE_PORT ?? 8790));
+  const url = await consoleSrv.start();
+  console.log(`  watching at ${url}`);
+  // The artifact's plan, up front: the point is that replay follows THIS and
+  // nothing else, so the steps are announced before any of them run.
+  console.log('__PLAN__' + JSON.stringify({
+    id: artifact.id, version: artifact.version, approval: artifact.approval,
+    steps: artifact.steps.map((s) => ({
+      index: s.index, kind: s.kind, effect: s.effect,
+      target: s.target ? describeTarget(s.target) : null,
+      value: s.value?.from === 'param' ? `<${s.value.param}>`
+           : s.value?.from === 'literal' ? s.value.value
+           : s.value?.from === 'operator' ? '<operator>' : null,
+    })),
+    outputs: artifact.outputs.map((o) => ({ name: o.name, type: o.type })),
+  }));
+}
+
 try {
   const result = await replay({
     artifact, inputs, surface, policy: defaultPolicy(new URL(baseUrl).origin),
@@ -123,6 +156,19 @@ try {
   console.log(`\nevidence: ${log.dir}\n`);
   process.exitCode = result.status === 'failed' ? 1 : 0;
   }
+  if (watch) {
+    console.log('__REPLAY_DONE__' + JSON.stringify({
+      status: result.status, ms: result.ms, runDir: log.dir,
+      outputs: result.status === 'success' ? result.outputs : undefined,
+      outcome: (result as { outcome?: string }).outcome,
+      failure: (result as { failure?: unknown }).failure,
+      reason: (result as { reason?: string }).reason,
+    }));
+    // Leave the stage up so the final screen stays on view.
+    await new Promise(() => {});
+  }
 } finally {
+  await consoleSrv?.stop();
+  await session?.stop();
   await surface.close();
 }

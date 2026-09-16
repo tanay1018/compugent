@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('runner', {
   input: (body) => ipcRenderer.invoke('session:input', body),
   listCapabilities: () => ipcRenderer.invoke('caps:list'),
   runCapability: (opts) => ipcRenderer.invoke('caps:run', opts),
+  runCapabilityLive: (opts) => ipcRenderer.invoke('caps:runLive', opts),
+  onReplayPlan: (fn) => ipcRenderer.on('replay:plan', (_e, d) => fn(d)),
+  onReplayDone: (fn) => ipcRenderer.on('replay:done', (_e, d) => fn(d)),
   compileLatest: (opts) => ipcRenderer.invoke('caps:compile', opts || {}),
 });

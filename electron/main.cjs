@@ -104,14 +104,7 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
     env: { ...process.env, CONSOLE_PORT: String(port), RUNNER_PARENT_PID: String(process.pid) },
   });
 
-  child.stdout.on('data', (d) => {
-    const text = d.toString();
-    for (const line of text.split('\n')) {
-      if (!line.startsWith('__RUN_DONE__')) continue;
-      try { send('run:done', JSON.parse(line.slice('__RUN_DONE__'.length))); } catch {}
-    }
-    send('run:log', text.replace(/^__RUN_DONE__.*$/gm, '').replace(/\n{3,}/g, '\n\n'));
-  });
+  child.stdout.on('data', (d) => pipeChildOutput(d.toString()));
   child.stderr.on('data', (d) => send('run:log', d.toString()));
   child.on('exit', (code) => { send('run:exit', { code }); child = null; });
 
@@ -186,6 +179,62 @@ ipcMain.handle('run:stop', () => { stopRun(); detachSession(); return { ok: true
  * without a model. Read straight off disk — artifacts are files, one per
  * version, and the newest version of each id is what a caller gets.
  */
+/**
+ * Markers the runner prints on stdout. Scraping formatted output would break
+ * the moment a heading changed; these are the runner telling us things it
+ * knows and the UI cannot infer -- which run directory this was, what plan a
+ * replay is about to follow.
+ */
+const MARKERS = {
+  __RUN_DONE__: 'run:done',
+  __PLAN__: 'replay:plan',
+  __REPLAY_DONE__: 'replay:done',
+};
+
+function pipeChildOutput(text) {
+  let prose = text;
+  for (const [marker, channel] of Object.entries(MARKERS)) {
+    for (const line of text.split('\n')) {
+      if (!line.startsWith(marker)) continue;
+      try { send(channel, JSON.parse(line.slice(marker.length))); } catch {}
+    }
+    prose = prose.replace(new RegExp('^' + marker + '.*$', 'gm'), '');
+  }
+  send('run:log', prose.replace(/\n{3,}/g, '\n\n'));
+}
+
+/**
+ * Replay a capability ON THE STAGE rather than headlessly.
+ *
+ * Replay is the whole point of the system and it was the one thing you could
+ * not watch: you pressed Run and a JSON result appeared. Hosting the same
+ * operator channel a discovery run uses makes an artifact retracing its
+ * recorded path something you can see happen.
+ */
+ipcMain.handle('caps:runLive', async (_e, { id, inputs, url }) => {
+  stopRun();
+  await settle();
+  if (/localhost:8710|127\.0\.0\.1:8710/.test(url || '')) await ensureTargetApp();
+
+  const port = await freePort();
+  const args = ['tsx', 'scripts/replay.ts', id, '--watch'];
+  for (const [k, v] of Object.entries(inputs || {})) if (String(v).length) args.push(`${k}=${v}`);
+  if (url) args.push('--url', url);
+
+  child = spawn('npx', args, {
+    cwd: ROOT, detached: true,
+    env: { ...process.env, CONSOLE_PORT: String(port), RUNNER_PARENT_PID: String(process.pid) },
+  });
+  child.stdout.on('data', (d) => pipeChildOutput(d.toString()));
+  child.stderr.on('data', (d) => send('run:log', d.toString()));
+  child.on('exit', (code) => { send('run:exit', { code }); child = null; });
+
+  const ok = await waitFor(port);
+  if (!ok) { stopRun(); return { ok: false, error: 'the replay did not start — open the raw log' }; }
+  attachSession(port);
+  return { ok: true };
+});
+
 ipcMain.handle('caps:list', () => {
   const root = path.join(ROOT, 'artifacts');
   if (!fs.existsSync(root)) return [];

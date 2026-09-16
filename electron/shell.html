@@ -1,471 +1,570 @@
-<!doctype html><html><head><meta charset="utf-8">
-<title>Computer-Use Runner</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Operator Console</title>
 <style>
+/* Implements DESIGN.md. Tokens first; components read only from tokens. */
 :root{
-  --bg:#101216; --panel:#171A20; --panel2:#1C2028; --line:#272C36; --line2:#333947;
-  --ink:#E2E6EC; --dim:#8A93A3; --faint:#5C6474;
-  --agent:#7FA3F0; --operator:#F0A868; --ok:#6FC08C; --bad:#E07A62; --warn:#DFC178;
-  --focus:#7FA3F0;
+  color-scheme:dark;
+  --bg:#0E1014; --surface:#161920; --surface-2:#1D2129;
+  --line:#252A34; --line-2:#333945;
+  --ink:#E4E8EE; --ink-2:#98A1B2; --ink-3:#646D7E;
+  --agent:#6E9BF2; --human:#D99A4E;
+  --ok:#5FB88A; --warn:#D99A4E; --bad:#DD6E5A; --info:#6E9BF2;
+  --r-sm:4px; --r:6px;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);overflow:hidden;
-  font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-button{font:inherit;cursor:pointer;border-radius:5px;border:1px solid var(--line2);
-  background:var(--panel2);color:var(--ink);padding:6px 12px}
-button:hover:not(:disabled){border-color:var(--faint);background:#222734}
-button:disabled{opacity:.4;cursor:not-allowed}
-button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
-input,textarea{width:100%;background:#0B0D11;border:1px solid var(--line);color:var(--ink);
-  border-radius:5px;padding:9px 11px;font:13px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
-input:focus,textarea:focus{border-color:var(--focus);outline:none}
+body{background:var(--bg);color:var(--ink);font:400 13px/1.55 var(--ui);
+  overflow:hidden;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.mono,code{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
 
-/* ---------- chrome ---------- */
-.titlebar{height:34px;flex:0 0 auto;-webkit-app-region:drag;display:flex;align-items:center;
-  justify-content:center;background:var(--panel);border-bottom:1px solid var(--line);
-  font-size:11.5px;letter-spacing:.05em;color:var(--faint)}
+/* ---- type scale ---- */
+.t-display{font:600 24px/1.2 var(--ui);letter-spacing:-.015em}
+.t-title{font:600 19px/1.3 var(--ui);letter-spacing:-.01em}
+.t-strong{font:550 15px/1.45 var(--ui)}
+.t-dense{font-size:12px;line-height:1.5}
+.t-label{font:600 11px/1.4 var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 
-/* ---------- start screen ---------- */
-#start{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;overflow:auto}
-.card{width:100%;max-width:640px}
-h1{font-size:21px;margin:0 0 7px;letter-spacing:-.01em;font-weight:600}
-.sub{color:var(--dim);margin:0 0 26px;font-size:13px;line-height:1.65}
-label{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--faint);margin:0 0 6px;font-weight:600}
+/* ---- controls ---- */
+button{font:inherit;cursor:pointer;border-radius:var(--r-sm);border:1px solid var(--line-2);
+  background:var(--surface-2);color:var(--ink);padding:6px 12px;
+  transition:background 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out}
+button:hover:not(:disabled){background:#242936;border-color:#414957}
+button:active:not(:disabled){background:#2A303E}
+button:disabled{opacity:.42;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--agent);outline-offset:1px}
+.btn-primary{background:var(--agent);border-color:var(--agent);color:#0B0D11;font-weight:600}
+.btn-primary:hover:not(:disabled){background:#83AAF5;border-color:#83AAF5}
+.btn-quiet{background:transparent;border-color:transparent;color:var(--ink-2);padding:5px 9px}
+.btn-quiet:hover:not(:disabled){background:var(--surface-2);border-color:transparent;color:var(--ink)}
+.btn-danger{border-color:var(--bad);color:var(--bad);background:transparent}
+.btn-danger:hover:not(:disabled){background:#2A1714;border-color:var(--bad)}
+.spin{display:inline-block;width:10px;height:10px;margin-right:7px;vertical-align:-1px;
+  border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;
+  animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+input,textarea{width:100%;background:#0A0C10;border:1px solid var(--line-2);color:var(--ink);
+  border-radius:var(--r-sm);padding:8px 10px;font:13px/1.5 var(--mono);resize:vertical;
+  transition:border-color 120ms ease-out}
+input:hover,textarea:hover{border-color:#414957}
+input:focus,textarea:focus{border-color:var(--agent);outline:none}
+label{display:block;font:600 11px/1.4 var(--ui);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 6px;cursor:pointer}
+
+/* ---- pills & chips ---- */
+.pill{display:inline-block;font:600 10.5px/1 var(--ui);letter-spacing:.06em;text-transform:uppercase;
+  padding:4px 7px;border-radius:var(--r-sm);border:1px solid currentColor;white-space:nowrap}
+.p-ok{color:var(--ok)} .p-warn{color:var(--warn)} .p-bad{color:var(--bad)} .p-dim{color:var(--ink-3)}
+.chip{display:inline-block;border:1px solid var(--line-2);border-radius:var(--r-sm);
+  padding:2px 6px;margin:0 4px 4px 0;font:11px/1.5 var(--mono);color:var(--ink-2)}
+.c-ok{color:var(--ok);border-color:#27402F} .c-info{color:var(--info);border-color:#26344E}
+.c-bad{color:var(--bad);border-color:#43251F} .c-warn{color:var(--warn);border-color:#413020}
+
+/* ---- chrome ---- */
+.titlebar{height:32px;flex:0 0 auto;-webkit-app-region:drag;display:flex;align-items:center;
+  justify-content:center;background:var(--surface);border-bottom:1px solid var(--line);
+  font:600 11px/1 var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.shell{flex:1;display:flex;min-height:0}
+
+/* ---- rail ---- */
+.rail{flex:0 0 232px;display:flex;flex-direction:column;min-height:0;
+  background:var(--surface);border-right:1px solid var(--line)}
+.railtop{padding:14px 14px 9px;display:flex;align-items:center;justify-content:space-between}
+#caps{flex:1;overflow:auto;padding:0 8px 8px}
+.capitem{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 9px;
+  border:1px solid transparent;background:transparent;border-radius:var(--r-sm);margin-bottom:2px;
+  color:var(--ink-2);font-size:12.5px}
+.capitem:hover{background:var(--surface-2);border-color:transparent;color:var(--ink)}
+.capitem.on{background:var(--surface-2);border-color:var(--line-2);color:var(--ink)}
+.capitem .dot{flex:0 0 6px;height:6px;border-radius:50%;background:currentColor}
+.capitem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--mono);font-size:11.5px}
+.d-ok{color:var(--ok)} .d-warn{color:var(--warn)} .d-bad{color:var(--bad)}
+.railfoot{flex:0 0 auto;padding:10px 12px;border-top:1px solid var(--line)}
+.railfoot button{width:100%}
+
+/* ---- main ---- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.view{flex:1;min-height:0;display:none;flex-direction:column}
+.view.on{display:flex}
+.scroll{flex:1;overflow:auto}
+
+/* start */
+.startwrap{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;overflow:auto}
+.card{width:100%;max-width:620px}
+.sub{color:var(--ink-2);margin:7px 0 26px}
 .field{margin-bottom:18px}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
-.chip{background:none;border:1px solid var(--line);color:var(--dim);padding:5px 10px;
-  font-size:11.5px;border-radius:4px}
-.chip:hover{color:var(--ink);border-color:var(--agent)}
-.primary{width:100%;background:var(--agent);color:#0B0D11;border:none;padding:12px;
-  font-weight:650;font-size:13.5px;letter-spacing:.01em}
-.primary:hover:not(:disabled){filter:brightness(1.08);background:var(--agent)}
-#starterr{color:var(--bad);margin-top:12px;min-height:17px;font-size:12.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:transparent;border-color:var(--line);color:var(--ink-3);
+  padding:5px 9px;font-size:11.5px}
+.chips button:hover{color:var(--ink);border-color:var(--line-2);background:var(--surface-2)}
+#starterr{color:var(--bad);min-height:18px;margin-top:11px;font-size:12.5px}
 
-/* ---------- session ---------- */
-#session{flex:1;display:none;flex-direction:column;min-height:0}
-.sbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:9px 13px;
-  background:var(--panel);border-bottom:1px solid var(--line)}
-.goal{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
-.goal b{color:var(--ink);font-weight:500}
-.who{display:flex;align-items:center;gap:7px;padding:5px 11px;border-radius:99px;
-  font-size:11px;font-weight:700;letter-spacing:.08em;white-space:nowrap}
-.who .dot{width:7px;height:7px;border-radius:99px;background:currentColor}
-.who.agent{color:var(--agent);background:#16233C}
-.who.operator{color:var(--operator);background:#332316}
-.who.nobody{color:var(--faint);background:#20242C}
-.pill{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
-  padding:4px 8px;border-radius:4px;border:1px solid currentColor;white-space:nowrap}
-.p-ok{color:var(--ok)} .p-bad{color:var(--bad)} .p-warn{color:var(--warn)} .p-dim{color:var(--faint)}
-
-.body{flex:1;display:flex;min-height:0}
+/* session */
+.sbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:9px 14px;
+  background:var(--surface);border-bottom:1px solid var(--line)}
+.mode{display:inline-flex;align-items:center;gap:7px;padding:4px 9px;border-radius:var(--r-sm);
+  font:600 10.5px/1 var(--ui);letter-spacing:.07em;text-transform:uppercase;
+  border:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap}
+.mode.discovery{color:var(--agent);border-color:#2A3A58}
+.mode.replay{color:var(--ok);border-color:#27402F}
+.sgoal{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.who{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:99px;
+  font:700 10.5px/1 var(--ui);letter-spacing:.08em;white-space:nowrap}
+.who .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.who.agent{color:var(--agent);background:#141C2C}
+.who.operator{color:var(--human);background:#2A2117}
+.who.nobody{color:var(--ink-3);background:var(--surface-2)}
+.sbody{flex:1;display:flex;min-height:0}
 .stage{flex:1;min-width:0;display:flex;align-items:flex-start;justify-content:center;
-  background:#07080A;padding:12px;overflow:auto;position:relative}
-#screen{max-width:100%;background:#fff;border:1px solid var(--line);border-radius:3px;
-  cursor:not-allowed;display:block}
-#screen.live{cursor:crosshair;border-color:var(--operator);box-shadow:0 0 0 1px var(--operator)}
-#stagehint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
-  background:rgba(12,14,18,.94);border:1px solid var(--line2);border-radius:5px;
-  padding:7px 13px;font-size:11.5px;color:var(--dim);pointer-events:none}
+  background:#07080B;padding:14px;overflow:auto;position:relative}
+#screen{max-width:100%;display:block;border:1px solid var(--line-2);border-radius:3px;background:#fff;
+  cursor:not-allowed;transition:border-color 120ms ease-out}
+#screen.agent{border-color:#2A3A58}
+#screen.operator{border-color:var(--human);cursor:crosshair}
+#stagenote{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+  background:rgba(14,16,20,.95);border:1px solid var(--line-2);border-radius:var(--r-sm);
+  padding:7px 13px;font-size:11.5px;color:var(--ink-2);pointer-events:none;max-width:78%}
+#stagenote.human{border-color:var(--human);color:var(--human)}
 
-/* ---------- right rail ---------- */
-.rail{flex:0 0 340px;display:flex;flex-direction:column;min-height:0;
-  background:var(--panel);border-left:1px solid var(--line)}
-.railhead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
-  padding:9px 13px;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:700;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.railhead button{padding:3px 8px;font-size:10.5px;letter-spacing:.04em}
-#steps{flex:1;overflow:auto;padding:5px 0}
-.step{display:flex;gap:9px;padding:7px 13px;font-size:12.5px;line-height:1.5;
-  border-left:2px solid transparent}
-.step .mark{flex:0 0 14px;text-align:center;color:var(--faint);font-size:11px;padding-top:1px}
-.step .what{flex:1;min-width:0;word-break:break-word}
-.step .what em{font-style:normal;color:var(--faint)}
-.step.agent{border-left-color:#2B3B5C}
-.step.operator{border-left-color:#5C452B;background:#1B1713}
-.step.system{color:var(--dim)}
-.step.ok .mark{color:var(--ok)} .step.bad .mark{color:var(--bad)} .step.warn .mark{color:var(--warn)}
-.step code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--ink);
-  background:#0E1014;padding:1px 4px;border-radius:3px}
-.divider{padding:7px 13px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--faint);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  background:var(--panel2);margin:5px 0}
-#result{flex:0 0 auto;max-height:42%;overflow:auto;border-top:1px solid var(--line);
-  padding:11px 13px;display:none;background:var(--panel2)}
-#result h3{margin:0 0 7px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-#result pre{margin:0;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;
-  white-space:pre-wrap;word-break:break-word;color:var(--ink);line-height:1.6}
+/* right rail */
+.side{flex:0 0 348px;display:flex;flex-direction:column;min-height:0;
+  background:var(--surface);border-left:1px solid var(--line)}
+.sidehead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:10px 13px;border-bottom:1px solid var(--line)}
+#feed,#plan{flex:1;overflow:auto;padding:4px 0}
+.ev{display:flex;gap:9px;padding:6px 13px;border-left:2px solid transparent;font-size:12px;line-height:1.5}
+.ev .mk{flex:0 0 13px;text-align:center;color:var(--ink-3);font-size:11px;padding-top:1px}
+.ev .tx{flex:1;min-width:0;word-break:break-word;color:var(--ink-2)}
+.ev .tx b{color:var(--ink);font-weight:550}
+.ev.agent{border-left-color:#2A3A58}
+.ev.operator{border-left-color:var(--human);background:#1A1712}
+.ev.ok .mk{color:var(--ok)} .ev.bad .mk{color:var(--bad)} .ev.warn .mk{color:var(--warn)}
+.ev code{font-family:var(--mono);font-size:11px;color:var(--ink);background:#0A0C10;
+  padding:1px 4px;border-radius:3px}
+.seam{padding:6px 13px;margin:5px 0;font:600 10.5px/1.4 var(--ui);letter-spacing:.08em;
+  text-transform:uppercase;color:var(--human);background:#1A1712;
+  border-top:1px solid #33291C;border-bottom:1px solid #33291C}
 
-/* ---------- footer ---------- */
-.foot{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:9px 13px;
-  background:var(--panel);border-top:1px solid var(--line)}
-.foot .spacer{flex:1}
-.foot .meta{font-size:11.5px;color:var(--faint);font-family:ui-monospace,Menlo,monospace}
-.save{border-color:var(--ok);color:var(--ok);font-weight:650}
-.save:hover:not(:disabled){background:#14271C;border-color:var(--ok)}
+/* replay plan */
+.pstep{display:flex;gap:10px;padding:8px 13px;font-size:12px;border-left:2px solid transparent;
+  transition:background 120ms ease-out,border-color 120ms ease-out}
+.pstep .n{flex:0 0 16px;color:var(--ink-3);font-family:var(--mono);font-size:11px;
+  font-variant-numeric:tabular-nums}
+.pstep .d{flex:1;min-width:0;color:var(--ink-3);word-break:break-word}
+.pstep .via{font-family:var(--mono);font-size:10.5px;color:var(--ok);white-space:nowrap}
+.pstep.active{border-left-color:var(--info);background:var(--surface-2)}
+.pstep.active .d{color:var(--ink)}
+.pstep.done{border-left-color:var(--ok)}
+.pstep.done .d{color:var(--ink-2)}
+.pstep.failed{border-left-color:var(--bad)}
+.pstep.failed .d{color:var(--bad)}
 
-/* ---------- capabilities drawer ---------- */
-#drawer{position:fixed;inset:34px 0 0 auto;width:min(560px,92vw);background:var(--panel);
-  border-left:1px solid var(--line2);box-shadow:-18px 0 40px rgba(0,0,0,.45);
-  transform:translateX(102%);transition:transform .18s ease;display:flex;flex-direction:column;z-index:40}
-#drawer.open{transform:none}
-.dhead{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:12px 15px;
-  border-bottom:1px solid var(--line)}
-.dhead h2{margin:0;font-size:15px;font-weight:600;flex:1}
-#caplist{flex:1;overflow:auto;padding:13px 15px}
-.cap{border:1px solid var(--line);border-radius:7px;background:var(--panel2);margin-bottom:12px;overflow:hidden}
-.caph{padding:11px 13px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;
-  gap:9px;flex-wrap:wrap}
-.caph .id{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:600}
-.caph .v{font-size:11px;color:var(--faint);font-family:ui-monospace,Menlo,monospace}
-.capd{padding:9px 13px;font-size:11.5px;line-height:1.6;color:var(--dim);border-bottom:1px solid var(--line)}
-.capb{padding:11px 13px;display:grid;gap:9px}
-.io{display:grid;grid-template-columns:auto 1fr;gap:7px 11px;align-items:center}
-.io label{margin:0;font-size:10px}
-.io input{padding:6px 9px;font-size:12px}
-.tag{display:inline-block;border:1px solid var(--line2);border-radius:4px;padding:2px 6px;
-  margin:0 4px 4px 0;font-size:10.5px;font-family:ui-monospace,Menlo,monospace;color:var(--dim)}
-.tag.biz{color:var(--ok);border-color:#2C4436} .tag.rec{color:var(--agent);border-color:#2B3B5C}
-.tag.hard{color:var(--bad);border-color:#4A2B24} .tag.esc{color:var(--warn);border-color:#4A3F24}
-.capres{border-top:1px solid var(--line);padding:10px 13px;font-size:11.5px;display:none}
-.capres pre{margin:6px 0 0;font-family:ui-monospace,Menlo,monospace;font-size:11px;
-  white-space:pre-wrap;color:var(--dim);line-height:1.6}
-.blocked{font-size:11.5px;color:var(--bad);line-height:1.6}
-.empty{color:var(--dim);font-size:12.5px;line-height:1.75;border:1px dashed var(--line2);
-  border-radius:7px;padding:24px;text-align:center}
-#scrim{position:fixed;inset:34px 0 0 0;background:rgba(6,7,9,.6);display:none;z-index:30}
-#scrim.on{display:block}
+#result{flex:0 0 auto;max-height:46%;overflow:auto;border-top:1px solid var(--line);
+  padding:12px 13px;display:none;background:var(--surface-2)}
+#result pre{margin:7px 0 0;font:12px/1.6 var(--mono);white-space:pre-wrap;word-break:break-word;color:var(--ink-2)}
 
-/* ---------- raw log ---------- */
-#raw{position:fixed;left:0;right:340px;bottom:0;height:34%;background:#07080A;
-  border-top:1px solid var(--line2);padding:10px 13px;overflow:auto;display:none;z-index:20;
-  font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.55;
-  white-space:pre-wrap;word-break:break-word;color:#9AA3B2}
+.foot{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:9px 14px;
+  background:var(--surface);border-top:1px solid var(--line)}
+.foot .sp{flex:1}
+.foot .meta{font:11.5px/1 var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* capability detail */
+.detail{padding:24px 28px;max-width:840px}
+.dhead{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:5px}
+.dhead .id{font:600 19px/1.3 var(--mono);letter-spacing:-.01em}
+.sect{margin-top:26px}
+.sect > .t-label{margin-bottom:9px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;align-items:baseline}
+.kv dt{font:11px/1.6 var(--mono);color:var(--ink-3)}
+.kv dd{margin:0;font-size:12.5px}
+.planrow{display:flex;gap:11px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.planrow:last-child{border-bottom:none}
+.planrow .n{flex:0 0 18px;color:var(--ink-3);font-family:var(--mono);font-size:11px}
+.planrow .k{flex:0 0 58px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.planrow .t{flex:1;min-width:0;font-family:var(--mono);font-size:11.5px;color:var(--ink-2);word-break:break-word}
+.vrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.vrow:last-child{border-bottom:none}
+.runbar{display:flex;align-items:flex-end;gap:11px;flex-wrap:wrap;margin-top:14px;
+  padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.runbar .f{flex:1;min-width:150px}
+.empty{color:var(--ink-2);border:1px dashed var(--line-2);border-radius:var(--r);
+  padding:28px;text-align:left;max-width:520px}
+.empty h3{margin:0 0 7px;font:550 15px/1.45 var(--ui);color:var(--ink)}
+.note{color:var(--ink-3);font-size:12px;margin-top:9px}
+
+#raw{position:fixed;left:232px;right:348px;bottom:0;height:36%;background:#07080B;
+  border-top:1px solid var(--line-2);padding:11px 14px;overflow:auto;display:none;z-index:20;
+  font:11px/1.6 var(--mono);white-space:pre-wrap;word-break:break-word;color:#8A93A3}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style></head><body>
 
-<div class="titlebar">computer-use runner</div>
+<div class="titlebar">Operator Console</div>
 
-<!-- ============ START ============ -->
-<section id="start"><div class="card">
-  <h1>Run a goal against a live app</h1>
-  <p class="sub">The browser session opens here. Watch every step, take over whenever you want,
-    and save what worked as a replayable capability. The bundled MemberDesk app starts itself
-    if you point at localhost.</p>
+<div class="shell">
+  <!-- ============ RAIL ============ -->
+  <nav class="rail">
+    <div class="railtop"><span class="t-label">Capabilities</span>
+      <button class="btn-quiet" id="refresh" title="Reload from disk">↻</button></div>
+    <div id="caps"></div>
+    <div class="railfoot"><button class="btn-primary" id="newcap">New Capability</button></div>
+  </nav>
 
-  <div class="field">
-    <label for="url">Target</label>
-    <input id="url" value="http://localhost:8710/?tenant=meridian" spellcheck="false">
-    <div class="chips">
-      <button class="chip" data-url="http://localhost:8710/?tenant=meridian">MemberDesk · Meridian</button>
-      <button class="chip" data-url="http://localhost:8710/?tenant=harbor">MemberDesk · Harbor (L2)</button>
-      <button class="chip" data-url="https://books.toscrape.com/">Books to Scrape (live)</button>
-    </div>
+  <div class="main">
+    <!-- ============ START ============ -->
+    <section class="view on" id="v-start">
+      <div class="startwrap"><div class="card">
+        <h1 class="t-display">Record a New Capability</h1>
+        <p class="sub">Give the agent a target and a goal. It works the flow out once, on a live
+          session you can watch and take over. What it learns becomes a capability you can replay
+          without a model.</p>
+
+        <div class="field">
+          <label for="url">Target</label>
+          <input id="url" value="http://localhost:8710/?tenant=meridian" spellcheck="false" placeholder="https://…">
+          <div class="chips">
+            <button data-url="http://localhost:8710/?tenant=meridian">MemberDesk · Meridian</button>
+            <button data-url="http://localhost:8710/?tenant=harbor">MemberDesk · Harbor</button>
+            <button data-url="https://books.toscrape.com/">Books to Scrape</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="task">Goal</label>
+          <textarea id="task" rows="3" spellcheck="false" placeholder="Describe the outcome you want…">look up member 12345 and read their current savings balance</textarea>
+          <div class="chips">
+            <button class="task">look up member 55501 and report their account status and checking balance</button>
+            <button class="task">look up member 99999 and read their savings balance</button>
+            <button class="task">open the book 'The Grand Design' from the Science category and read its price including tax</button>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="go" style="width:100%;padding:11px">Start Run</button>
+        <div id="starterr"></div>
+      </div></div>
+    </section>
+
+    <!-- ============ CAPABILITY ============ -->
+    <section class="view" id="v-cap"><div class="scroll"><div class="detail" id="capbody"></div></div></section>
+
+    <!-- ============ SESSION ============ -->
+    <section class="view" id="v-session">
+      <div class="sbar">
+        <span class="mode discovery" id="mode">Discovery</span>
+        <span class="sgoal" id="sgoal"></span>
+        <span id="outcome" class="pill" style="display:none"></span>
+        <span class="who agent" id="who"><span class="dot"></span><span id="whotext">Agent</span></span>
+        <button id="takeover">Take Over</button>
+        <button id="handback" style="display:none">Hand Back</button>
+        <button class="btn-danger" id="stop">Stop</button>
+      </div>
+      <div class="sbody">
+        <div class="stage">
+          <canvas id="screen" class="agent" width="1024" height="700"></canvas>
+          <div id="stagenote">Waiting for the first frame…</div>
+        </div>
+        <div class="side">
+          <div class="sidehead"><span class="t-label" id="sidetitle">Activity</span>
+            <button class="btn-quiet" id="rawtoggle">Raw Log</button></div>
+          <div id="plan" style="display:none"></div>
+          <div id="feed"></div>
+          <div id="result"><div class="t-label" id="resulth">Result</div><pre id="resultb"></pre></div>
+        </div>
+      </div>
+      <div class="foot">
+        <button id="save" style="display:none">Save as Capability</button>
+        <button id="done" style="display:none">Done</button>
+        <div class="sp"></div>
+        <div class="meta" id="tokens"></div>
+      </div>
+    </section>
   </div>
-
-  <div class="field">
-    <label for="task">Goal</label>
-    <textarea id="task" rows="3" spellcheck="false">look up member 12345 and read their current savings balance</textarea>
-    <div class="chips">
-      <button class="chip task">look up member 55501 and report their account status and checking balance</button>
-      <button class="chip task">look up member 99999 and read their savings balance</button>
-      <button class="chip task">open the book 'The Grand Design' from the Science category and read its price including tax</button>
-    </div>
-  </div>
-
-  <button class="primary" id="go">Start run</button>
-  <div id="starterr"></div>
-  <div style="margin-top:18px;text-align:center">
-    <button class="chip" id="opencaps2">Saved capabilities &rarr;</button>
-  </div>
-</div></section>
-
-<!-- ============ SESSION ============ -->
-<section id="session">
-  <div class="sbar">
-    <div class="goal"><b id="sgoal"></b></div>
-    <span id="outcome" class="pill" style="display:none"></span>
-    <span id="who" class="who agent"><span class="dot"></span><span id="whotext">AGENT</span></span>
-    <button id="takeover">Take over</button>
-    <button id="handback" style="display:none">Hand back</button>
-    <button id="stop">Stop</button>
-  </div>
-
-  <div class="body">
-    <div class="stage">
-      <canvas id="screen" width="1024" height="700"></canvas>
-      <div id="stagehint">waiting for the first frame…</div>
-    </div>
-    <div class="rail">
-      <div class="railhead"><span>Activity</span><button id="rawtoggle">Raw log</button></div>
-      <div id="steps"></div>
-      <div id="result"><h3 id="resulth">Result</h3><pre id="resultb"></pre></div>
-    </div>
-  </div>
-
-  <div class="foot">
-    <button class="save" id="save" style="display:none">Save as capability</button>
-    <button id="newrun">New run</button>
-    <div class="spacer"></div>
-    <div class="meta" id="tokens"></div>
-    <button id="opencaps">Capabilities</button>
-  </div>
-</section>
-
+</div>
 <div id="raw"></div>
-<div id="scrim"></div>
-
-<!-- ============ CAPABILITIES ============ -->
-<aside id="drawer">
-  <div class="dhead">
-    <h2>Saved capabilities</h2>
-    <button id="compile">Compile latest run</button>
-    <button id="closecaps">Close</button>
-  </div>
-  <div id="caplist"></div>
-</aside>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => { const n = document.createElement(tag);
-  if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c;
+  if (x !== undefined) n.textContent = x; return n; };
+const frag = (...kids) => { const f = document.createDocumentFragment();
+  for (const k of kids) if (k) f.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); return f; };
 
-/* One place that knows what is going on. Every render reads from here. */
-const S = {
-  holder: 'agent', control: 'agent',
-  goal: '', runDir: null, outcome: null, hasCheckpoint: false,
-  tokens: { in: 0, out: 0 }, frames: 0,
-};
+const S = { view:'start', mode:'discovery', holder:'agent', control:'agent',
+  goal:'', runDir:null, outcome:null, hasCheckpoint:false, frames:0, caps:[], selected:null, plan:null };
 
-/* ---------- activity feed: sentences, not JSON ---------- */
-const cx = $('screen').getContext('2d');
-const img = new Image();
-img.onload = () => {
-  const c = $('screen');
-  if (c.width !== img.width || c.height !== img.height) { c.width = img.width; c.height = img.height; }
-  cx.drawImage(img, 0, 0);
-  if (S.frames++ === 0) $('stagehint').style.display = 'none';
-};
-
-const q = (s) => s === undefined || s === null || s === '' ? '' : String(s);
-const short = (s, n = 46) => { s = q(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
-
-/**
- * Turn a run event into something a person can read. The raw log is still one
- * keystroke away; this is what you watch while it works.
- */
-function describe(ev) {
-  const d = ev.detail || {};
-  const target = q(d.target).replace(/ in frame "[^"]*"$/, '');
-  const named = /named "([^"]+)"/.exec(target)?.[1];
-  const anchored = /"([^"]+)"$/.exec(target)?.[1];
-  const label = named || anchored || target;
-
-  switch (ev.kind) {
-    case 'discovery.start': return { mark: '▸', cls: 'system', html: ['starting · ', ['code', q(d.model)]] };
-    case 'replay.start':    return { mark: '▸', cls: 'system', html: ['replaying · ', ['code', q(d.capability)]] };
-    case 'replay.resume':   return { mark: '↻', cls: 'system', html: ['resuming at step ' + q(d.fromStep)] };
-    case 'navigate':        return { mark: '→', cls: 'agent',  html: ['opened ', ['code', short(d.url, 52)]] };
-    case 'observe':         return null;
-    case 'model.step':      return null;
-    case 'act.type':
-    case 'step.type':       return { mark: '✓', cls: 'agent ok', html: ['typed ', ['code', q(d.text ?? d.value)], ' into ' + label] };
-    case 'act.click':
-    case 'step.click':      return { mark: '✓', cls: 'agent ok', html: ['clicked ' + label] };
-    case 'act.select':
-    case 'step.select':     return { mark: '✓', cls: 'agent ok', html: ['chose ', ['code', q(d.text ?? d.value)], ' in ' + label] };
-    case 'act.extract':     return { mark: '◆', cls: 'agent',    html: ['read ', ['code', q(d.as)], ' from ' + label] };
-    case 'outputs':         return { mark: '◆', cls: 'agent',    html: ['extracted ' + Object.keys(d.outputs || {}).length + ' output(s)'] };
-    case 'finish':          return { mark: '●', cls: 'agent ok', html: ['goal reached'] };
-    case 'escalate':
-    case 'escalation.raised': return { mark: '!', cls: 'system warn', html: ['needs a human — ' + short(d.reason, 90)] };
-    case 'outcome.matched': return { mark: '◇', cls: 'system ' + (d.classification === 'business_outcome' ? 'ok' : 'warn'),
-                                     html: [q(d.classification).replace('_', ' ') + ' · ', ['code', q(d.name)]] };
-    case 'outcome.recovered': return { mark: '↻', cls: 'system ok', html: ['recovered from ', ['code', q(d.name)]] };
-    case 'policy.blocked':  return { mark: '✗', cls: 'system bad', html: ['refused — ' + short(d.reason, 96)] };
-    case 'policy.approved': return { mark: '⚠', cls: 'system warn', html: ['irreversible step allowed · ' + short(label, 40)] };
-    case 'step.skipped':    return { mark: '·', cls: 'system', html: ['skipped step ' + q(d.step) + ' — already done'] };
-    case 'descriptor.unverified': return { mark: '⚠', cls: 'system warn', html: ['fragile target — ' + short(d.problem, 80)] };
-    case 'surface.thin':    return { mark: '⚠', cls: 'system warn', html: ['little to work with here — ' + short(d.note, 90)] };
-    case 'manual.click':    return { mark: '✓', cls: 'operator',
-                                     html: [q(d.control) ? 'you clicked ' + short(d.control, 40)
-                                                         : 'you clicked an unlabelled area'] };
-    case 'manual.input':    return { mark: '✓', cls: 'operator', html: d.value === undefined
-                                      ? ['you filled ' + (q(d.control) || 'a field') + ' ', ['em', '(value not recorded)']]
-                                      : ['you typed ', ['code', short(d.value, 30)], ' into ' + (q(d.control) || 'a field')] };
-    case 'manual.submit':   return { mark: '✓', cls: 'operator', html: ['you submitted the form'] };
-    case 'barge_in':        return { mark: '·', cls: 'system', html: ['waiting for the agent to reach a step boundary'] };
-    case 'discovery.paused':  return { divider: 'you have control' };
-    case 'discovery.resumed': return { divider: 'agent resumed' };
-    case 'control.transition': return null;
-    case 'discovery.end':
-    case 'discovery.error':
-    case 'discovery.timeout': return null;
-    default:
-      if (ev.kind.startsWith('replay.')) return null;
-      return { mark: '·', cls: 'system', html: [ev.kind] };
-  }
+/* ---------------- views ---------------- */
+function show(v) {
+  S.view = v;
+  for (const id of ['v-start','v-cap','v-session']) $(id).classList.toggle('on', id === 'v-' + v);
+  if (v !== 'session') { $('raw').style.display = 'none'; $('rawtoggle').textContent = 'Raw Log'; }
 }
 
-function pushStep(ev) {
+/* ---------------- stage ---------------- */
+const cx = $('screen').getContext('2d');
+const img = new Image();
+img.onload = () => { const c = $('screen');
+  if (c.width !== img.width || c.height !== img.height) { c.width = img.width; c.height = img.height; }
+  cx.drawImage(img, 0, 0);
+  if (S.frames++ === 0) renderControl(); };
+
+function renderControl() {
+  const human = S.holder === 'operator';
+  $('who').className = 'who ' + S.holder;
+  $('whotext').textContent = S.holder === 'nobody' ? 'Handing Over' : S.holder === 'operator' ? 'Operator' : 'Agent';
+  $('screen').className = human ? 'operator' : 'agent';
+  $('takeover').style.display = human ? 'none' : '';
+  $('handback').style.display = human ? '' : 'none';
+  const pending = S.control === 'pause_requested';
+  $('takeover').disabled = pending;
+  $('takeover').textContent = pending ? 'Yielding…' : 'Take Over';
+  const note = $('stagenote');
+  if (human) { note.style.display = ''; note.className = 'human';
+    note.textContent = 'You are driving. Click and type directly on the screen.'; }
+  else if (S.frames === 0) { note.style.display = ''; note.className = '';
+    note.textContent = 'Waiting for the first frame…'; }
+  else note.style.display = 'none';
+}
+
+const at = (e) => { const c = $('screen'), r = c.getBoundingClientRect();
+  return { x:(e.clientX - r.left) * (c.width / r.width), y:(e.clientY - r.top) * (c.height / r.height) }; };
+$('screen').addEventListener('mousedown', (e) => { const p = at(e); window.runner.input({ type:'mouse', action:'down', x:p.x, y:p.y }); });
+$('screen').addEventListener('mouseup',   (e) => { const p = at(e); window.runner.input({ type:'mouse', action:'up',   x:p.x, y:p.y }); });
+window.addEventListener('keydown', (e) => {
+  if (S.holder !== 'operator' || S.view !== 'session') return;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA') return;
+  e.preventDefault();
+  if (e.key.length === 1) window.runner.input({ type:'text', text:e.key });
+  else window.runner.input({ type:'key', action:'down', key:e.key });
+});
+$('takeover').onclick = () => window.runner.control({ action:'take' });
+$('handback').onclick = () => window.runner.control({ action:'handback' });
+
+/* ---------------- activity feed ---------------- */
+const q = (s) => s === undefined || s === null ? '' : String(s);
+const cut = (s, n = 44) => { s = q(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const labelOf = (t) => { t = q(t).replace(/ in frame "[^"]*"$/, '');
+  return /named "([^"]+)"/.exec(t)?.[1] || /"([^"]+)"$/.exec(t)?.[1] || t; };
+
+function describe(ev) {
+  const d = ev.detail || {};
+  const L = labelOf(d.target);
+  switch (ev.kind) {
+    case 'discovery.start': return { mk:'·', cls:'agent', kids:['Working it out with ', el('code', null, q(d.model))] };
+    case 'replay.start':    return { mk:'·', cls:'agent', kids:['Replaying ', el('code', null, q(d.capability)), ' — no model'] };
+    case 'navigate':        return { mk:'→', cls:'agent', kids:['Opened ', el('code', null, cut(d.url, 50))] };
+    case 'step.begin':      return null;
+    case 'step.waypoint':   return null;
+    case 'step.resolved':   return null;
+    case 'act.type': case 'step.type':
+      return { mk:'✓', cls:'agent ok', kids:['Typed ', el('code', null, q(d.text ?? d.value)), ' into ', bold(L)] };
+    case 'act.click': case 'step.click':
+      return { mk:'✓', cls:'agent ok', kids:['Clicked ', bold(L)] };
+    case 'act.select': case 'step.select':
+      return { mk:'✓', cls:'agent ok', kids:['Chose ', el('code', null, q(d.text ?? d.value)), ' in ', bold(L)] };
+    case 'act.extract':     return { mk:'◆', cls:'agent', kids:['Read ', el('code', null, q(d.as)), ' from ', bold(L)] };
+    case 'output.read':     return { mk:'◆', cls:'agent', kids:['Read ', el('code', null, q(d.name)), ' = ', el('code', null, cut(d.value, 24))] };
+    case 'checkpoint.verified': return { mk:'●', cls:'agent ok', kids:['Checkpoint held — arrived'] };
+    case 'finish':          return { mk:'●', cls:'agent ok', kids:['Goal reached'] };
+    case 'escalate': case 'escalation.raised':
+      return { mk:'!', cls:'agent warn', kids:['Needs a human — ' + cut(d.reason, 80)] };
+    case 'outcome.matched':
+      return { mk:'◇', cls:'agent ' + (d.classification === 'business_outcome' ? 'ok' : 'warn'),
+               kids:[q(d.classification).replace(/_/g,' ') + ' — ', el('code', null, q(d.name))] };
+    case 'outcome.recovered': return { mk:'↻', cls:'agent ok', kids:['Recovered from ', el('code', null, q(d.name))] };
+    case 'policy.blocked':  return { mk:'✗', cls:'agent bad', kids:['Refused — ' + cut(d.reason, 92)] };
+    case 'policy.approved': return { mk:'!', cls:'agent warn', kids:['Irreversible step allowed — ' + cut(L, 34)] };
+    case 'step.skipped':    return { mk:'·', cls:'agent', kids:['Skipped step ' + q(d.step) + ' — already done'] };
+    case 'descriptor.unverified': return { mk:'!', cls:'agent warn', kids:['Fragile target — ' + cut(d.problem, 76)] };
+    case 'surface.thin':    return { mk:'!', cls:'agent warn', kids:['Little to work with — ' + cut(d.note, 84)] };
+    case 'manual.click':    return { mk:'✓', cls:'operator', kids:[q(d.control) ? frag('You clicked ', bold(cut(d.control, 36))) : 'You clicked an unlabelled area'] };
+    case 'manual.input':    return { mk:'✓', cls:'operator', kids: d.value === undefined
+                              ? [frag('You filled ', bold(q(d.control) || 'a field'), ' — value not recorded')]
+                              : [frag('You typed ', el('code', null, cut(d.value, 24)), ' into ', bold(q(d.control) || 'a field'))] };
+    case 'manual.submit':   return { mk:'✓', cls:'operator', kids:['You submitted the form'] };
+    case 'discovery.paused':  return { seam:'You have control' };
+    case 'discovery.resumed': return { seam:'Agent resumed' };
+    default: return null;
+  }
+}
+const bold = (t) => el('b', null, t);
+
+function pushEvent(ev) {
+  planProgress(ev);
   const d = describe(ev);
   if (!d) return;
-  const list = $('steps');
-  if (d.divider) { list.appendChild(el('div', 'divider', d.divider)); }
+  const list = $('feed');
+  if (d.seam) list.appendChild(el('div', 'seam', d.seam));
   else {
-    const row = el('div', 'step ' + d.cls);
-    row.appendChild(el('span', 'mark', d.mark));
-    const what = el('span', 'what');
-    for (const part of d.html) {
-      if (Array.isArray(part)) what.appendChild(el(part[0], null, part[1]));
-      else what.appendChild(document.createTextNode(part));
-    }
-    row.appendChild(what);
+    const row = el('div', 'ev ' + d.cls);
+    row.appendChild(el('span', 'mk', d.mk));
+    const tx = el('span', 'tx');
+    for (const k of d.kids) tx.appendChild(typeof k === 'string' ? document.createTextNode(k) : k);
+    row.appendChild(tx);
     list.appendChild(row);
   }
   list.scrollTop = list.scrollHeight;
 }
 
-/* ---------- control ---------- */
-function renderControl() {
-  const w = $('who');
-  w.className = 'who ' + S.holder;
-  $('whotext').textContent = S.holder.toUpperCase();
-  const live = S.holder === 'operator';
-  $('screen').classList.toggle('live', live);
-  $('takeover').style.display = live ? 'none' : '';
-  $('handback').style.display = live ? '' : 'none';
-  $('takeover').disabled = S.control === 'pause_requested';
-  if (S.control === 'pause_requested') $('takeover').textContent = 'Yielding…';
-  else $('takeover').textContent = 'Take over';
-  const hint = $('stagehint');
-  if (S.frames > 0) {
-    hint.style.display = live ? '' : 'none';
-    hint.textContent = live ? 'you are driving — click and type directly on the screen' : '';
+/* ---------------- replay plan: the artifact, lighting up ---------------- */
+function renderPlan(plan) {
+  S.plan = plan;
+  const p = $('plan');
+  p.textContent = '';
+  p.style.display = '';
+  $('feed').style.flex = '0 0 auto';
+  $('feed').style.maxHeight = '36%';
+  $('sidetitle').textContent = 'Recorded Plan';
+  for (const s of plan.steps) {
+    const row = el('div', 'pstep');
+    row.id = 'ps' + s.index;
+    row.appendChild(el('span', 'n', String(s.index)));
+    const d = el('span', 'd');
+    d.appendChild(document.createTextNode(s.kind + ' '));
+    d.appendChild(el('b', null, labelOf(s.target)));
+    if (s.value) { d.appendChild(document.createTextNode(' ')); d.appendChild(el('code', null, s.value)); }
+    row.appendChild(d);
+    row.appendChild(el('span', 'via', ''));
+    p.appendChild(row);
   }
 }
 
-/* Relayed through the main process — the renderer never touches the channel
-   directly, so no CORS hole is opened on a live operator session. */
-const control = (body) => window.runner.control(body);
-const post = (_path, body) => window.runner.input(body);
+function planProgress(ev) {
+  if (!S.plan) return;
+  const d = ev.detail || {};
+  const row = d.step ? $('ps' + d.step) : null;
+  if (ev.kind === 'step.begin' && row) {
+    for (const r of document.querySelectorAll('.pstep.active')) r.classList.remove('active');
+    row.classList.add('active');
+  }
+  if (ev.kind === 'step.resolved' && row) row.querySelector('.via').textContent = 'via ' + d.via;
+  if ((ev.kind.startsWith('step.') && /type|click|select|press/.test(ev.kind)) && row) {
+    row.classList.remove('active'); row.classList.add('done');
+  }
+  if (ev.kind === 'step.skipped' && row) { row.classList.remove('active'); row.classList.add('done'); }
+}
 
-$('takeover').onclick = () => control({ action: 'take' });
-$('handback').onclick = () => control({ action: 'handback' });
-
-/* Raw coordinates into the live session — no selectors, exactly what a remote
-   console would send to a containerised browser. */
-const at = (e) => { const c = $('screen'), r = c.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) }; };
-$('screen').addEventListener('mousedown', (e) => { const p = at(e); post('/input', { type:'mouse', action:'down', x:p.x, y:p.y }); });
-$('screen').addEventListener('mouseup',   (e) => { const p = at(e); post('/input', { type:'mouse', action:'up',   x:p.x, y:p.y }); });
-window.addEventListener('keydown', (e) => {
-  if (S.holder !== 'operator') return;
-  const t = e.target && e.target.tagName;
-  if (t === 'INPUT' || t === 'TEXTAREA') return;
-  e.preventDefault();
-  if (e.key.length === 1) post('/input', { type: 'text', text: e.key });
-  else post('/input', { type: 'key', action: 'down', key: e.key });
-});
-
-/* ---------- session channel ---------- */
+/* ---------------- channel ---------------- */
 window.runner.onSessionEvent((d) => {
-    if (d.frame) img.src = 'data:image/jpeg;base64,' + d.frame;
-    if (d.state) { S.holder = d.state.holder; S.control = d.state.control; renderControl(); }
-    if (d.event) pushStep(d.event);
-    if (d.escalation) {
-      $('result').style.display = 'block';
-      $('resulth').textContent = 'Intervention requested';
-      $('resultb').textContent = d.escalation.reason +
-        (d.escalation.atStep ? '\n\nstopped at step ' + d.escalation.atStep : '') +
-        '\n\nTake over to continue, then hand back.';
-    }
+  if (d.frame) img.src = 'data:image/jpeg;base64,' + d.frame;
+  if (d.state) { S.holder = d.state.holder; S.control = d.state.control; renderControl(); }
+  if (d.event) pushEvent(d.event);
+  if (d.escalation) showResult('Intervention Requested',
+    d.escalation.reason + (d.escalation.atStep ? '\n\nStopped at step ' + d.escalation.atStep : '') +
+    '\n\nTake over to continue, then hand back.');
 });
+function showResult(h, b) { $('result').style.display = 'block'; $('resulth').textContent = h; $('resultb').textContent = b; }
 
-/* ---------- run lifecycle ---------- */
 window.runner.onLog((line) => {
-  const clean = line.replace(/\x1b\[[0-9;]*m/g, '');
-  $('raw').appendChild(document.createTextNode(clean));
+  const t = line.replace(/\x1b\[[0-9;]*m/g, '');
+  $('raw').appendChild(document.createTextNode(t));
   $('raw').scrollTop = $('raw').scrollHeight;
-  const m = /in=(\d+)\s+out=(\d+)/.exec(clean);
-  if (m) { S.tokens = { in: +m[1], out: +m[2] };
-    $('tokens').textContent = `${(S.tokens.in/1000).toFixed(1)}k in · ${S.tokens.out} out`; }
+  const m = /in=(\d+)\s+out=(\d+)/.exec(t);
+  if (m) $('tokens').textContent = `${(+m[1]/1000).toFixed(1)}k in · ${m[2]} out`;
 });
 
 window.runner.onDone((info) => {
   S.runDir = info.runDir; S.outcome = info.outcome; S.hasCheckpoint = info.hasCheckpoint;
-  const p = $('outcome');
-  p.style.display = '';
-  p.textContent = info.outcome.replace('_', ' ');
-  p.className = 'pill ' + (info.outcome === 'success' ? 'p-ok'
-    : info.outcome === 'timeout' || info.outcome === 'max_steps' ? 'p-warn' : 'p-bad');
-
+  setOutcome(info.outcome);
   const s = $('save');
-  s.style.display = '';
-  s.textContent = info.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
-  s.title = info.hasCheckpoint ? 'Compile this run into a replayable capability'
-    : 'No checkpoint was established. The steps it did complete can still be kept.';
+  s.style.display = ''; s.textContent = info.hasCheckpoint ? 'Save as Capability' : 'Save as Incomplete';
+  $('done').style.display = '';
 });
 
-$('go').onclick = async () => {
+window.runner.onReplayPlan((plan) => renderPlan(plan));
+window.runner.onReplayDone((r) => {
+  setOutcome(r.status);
+  $('done').style.display = '';
+  const body = r.status === 'success' ? JSON.stringify(r.outputs, null, 2)
+    : r.status === 'business_outcome' ? `${r.outcome}\n\nAn answer the caller asked for — not a crash.`
+    : r.status === 'escalated' ? `${r.reason}\n\nA human is needed.`
+    : `${r.failure?.code}\nexpected: ${r.failure?.expected}\nobserved: ${r.failure?.observed}`;
+  showResult(r.status === 'success' ? 'Outputs' : 'Result', body + `\n\n${r.ms}ms · no model invoked`);
+  if (r.status !== 'success' && S.plan) {
+    const active = document.querySelector('.pstep.active');
+    if (active) { active.classList.remove('active'); active.classList.add('failed'); }
+  }
+});
+
+function setOutcome(o) {
+  const p = $('outcome');
+  p.style.display = '';
+  p.textContent = q(o).replace(/_/g, ' ');
+  p.className = 'pill ' + (o === 'success' || o === 'business_outcome' ? 'p-ok'
+    : o === 'escalated' || o === 'timeout' || o === 'max_steps' ? 'p-warn' : 'p-bad');
+}
+
+/* ---------------- starting things ---------------- */
+function resetSession(mode, goal) {
+  Object.assign(S, { mode, goal, runDir:null, outcome:null, hasCheckpoint:false, frames:0, plan:null });
+  $('mode').textContent = mode === 'replay' ? 'Replay' : 'Discovery';
+  $('mode').className = 'mode ' + mode;
+  $('sgoal').textContent = goal;
+  $('feed').textContent = ''; $('feed').style.flex = ''; $('feed').style.maxHeight = '';
+  $('plan').textContent = ''; $('plan').style.display = 'none';
+  $('sidetitle').textContent = 'Activity';
+  $('raw').textContent = ''; $('tokens').textContent = '';
+  $('outcome').style.display = 'none'; $('save').style.display = 'none'; $('done').style.display = 'none';
+  $('result').style.display = 'none';
+  renderControl();
+  show('session');
+}
+
+$('go').onclick = async (e) => {
+  const b = e.currentTarget;
   const url = $('url').value.trim(), task = $('task').value.trim();
   if (!url || !task) { $('starterr').textContent = 'A target and a goal are both required.'; return; }
-  $('go').disabled = true; $('go').textContent = 'Starting…'; $('starterr').textContent = '';
-
+  b.disabled = true; b.textContent = ''; b.appendChild(el('span', 'spin')); b.appendChild(document.createTextNode('Start Run'));
+  $('starterr').textContent = '';
   const res = await window.runner.start({ url, task });
-  $('go').disabled = false; $('go').textContent = 'Start run';
+  b.disabled = false; b.textContent = 'Start Run';
   if (!res.ok) { $('starterr').textContent = res.error; return; }
-
-  Object.assign(S, { goal: task, runDir: null, outcome: null, hasCheckpoint: false, frames: 0 });
-  $('sgoal').textContent = task;
-  $('steps').textContent = ''; $('raw').textContent = ''; $('tokens').textContent = '';
-  $('outcome').style.display = 'none'; $('save').style.display = 'none';
-  $('result').style.display = 'none';
-  $('stagehint').style.display = ''; $('stagehint').textContent = 'waiting for the first frame…';
-  $('start').style.display = 'none'; $('session').style.display = 'flex';
+  resetSession('discovery', task);
 };
 
-$('stop').onclick = async () => { await window.runner.stop(); pushStep({ kind: 'x', detail: {} }); };
-$('newrun').onclick = async () => {
-  await window.runner.stop();
-  $('session').style.display = 'none'; $('start').style.display = 'flex';
-};
-$('rawtoggle').onclick = () => {
-  const r = $('raw');
-  const on = r.style.display !== 'block';
-  r.style.display = on ? 'block' : 'none';
-  $('rawtoggle').textContent = on ? 'Hide raw' : 'Raw log';
-};
+$('stop').onclick = () => window.runner.stop();
+$('done').onclick = async () => { await window.runner.stop(); await loadCaps(); show(S.selected ? 'cap' : 'start'); };
+$('rawtoggle').onclick = () => { const r = $('raw'); const on = r.style.display !== 'block';
+  r.style.display = on ? 'block' : 'none'; $('rawtoggle').textContent = on ? 'Hide Log' : 'Raw Log'; };
 
-$('save').onclick = async () => {
-  const b = $('save');
-  b.disabled = true; b.textContent = 'Saving…';
-  $('result').style.display = 'block';
-  $('resulth').textContent = 'Saving';
-  $('resultb').textContent = 'compiling…';
-
-  let r = await window.runner.compileLatest({ runDir: S.runDir, partial: !S.hasCheckpoint });
-  if (!r.ok && r.partialAvailable) r = await window.runner.compileLatest({ runDir: S.runDir, partial: true });
-
-  b.disabled = false;
-  b.textContent = S.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
-  if (!r.ok) { $('resulth').textContent = 'Could not save'; $('resultb').textContent = r.error; return; }
-  $('resulth').textContent = r.incomplete ? 'Saved as incomplete' : 'Saved';
-  $('resultb').textContent = (r.id ? r.id + '\n' : '') + r.path +
-    (r.incomplete
-      ? '\n\nNo checkpoint, so nothing can verify success. Not invocable until the flow is finished.'
-      : '\n\nOpen Capabilities to run it with different inputs.');
+$('save').onclick = async (e) => {
+  const b = e.currentTarget; const lbl = b.textContent;
+  b.disabled = true; b.textContent = ''; b.appendChild(el('span','spin')); b.appendChild(document.createTextNode(lbl));
+  showResult('Saving', 'Compiling this run into a capability…');
+  let r = await window.runner.compileLatest({ runDir:S.runDir, partial:!S.hasCheckpoint });
+  if (!r.ok && r.partialAvailable) r = await window.runner.compileLatest({ runDir:S.runDir, partial:true });
+  b.disabled = false; b.textContent = lbl;
+  if (!r.ok) return showResult('Could Not Save', r.error);
+  showResult(r.incomplete ? 'Saved as Incomplete' : 'Saved',
+    (r.id ? r.id + '\n' : '') + r.path +
+    (r.incomplete ? '\n\nNo checkpoint, so nothing can verify success. Not invocable until the flow is finished.'
+                  : '\n\nSelect it in the sidebar to replay it with different inputs.'));
+  await loadCaps();
+  if (r.id) select(r.id);
 };
 
-/* ---------- capabilities drawer ---------- */
-const CLS = { business_outcome: 'biz', recoverable: 'rec', hard_failure: 'hard', escalate: 'esc' };
-const openDrawer = () => { $('drawer').classList.add('open'); $('scrim').classList.add('on'); loadCaps(); };
-const closeDrawer = () => { $('drawer').classList.remove('open'); $('scrim').classList.remove('on'); };
-$('opencaps').onclick = openDrawer;
-$('opencaps2').onclick = openDrawer;
-$('closecaps').onclick = closeDrawer;
-$('scrim').onclick = closeDrawer;
+/* ---------------- capabilities ---------------- */
+$('newcap').onclick = () => { S.selected = null; renderRail(); show('start'); };
+$('refresh').onclick = () => loadCaps();
+
+async function loadCaps() { S.caps = await window.runner.listCapabilities(); renderRail(); 
+  if (S.selected) { const c = S.caps.find((x) => x.id === S.selected); if (c) renderCap(c); } }
+
+function renderRail() {
+  const box = $('caps'); box.textContent = '';
+  if (!S.caps.length) { const n = el('div', 'note', 'None yet.'); n.style.padding = '4px 9px'; box.appendChild(n); return; }
+  for (const c of S.caps) {
+    const b = el('button', 'capitem' + (c.id === S.selected ? ' on' : ''));
+    b.appendChild(el('span', 'dot ' + (c.approval === 'approved' ? 'd-ok' : c.approval === 'incomplete' ? 'd-bad' : 'd-warn')));
+    b.appendChild(el('span', 'nm', c.id));
+    b.onclick = () => select(c.id);
+    box.appendChild(b);
+  }
+}
+function select(id) { S.selected = id; renderRail();
+  const c = S.caps.find((x) => x.id === id); if (c) { renderCap(c); show('cap'); } }
 
 function defaultUrlFor(c) {
   const t = c.app?.recordedTenant || '';
@@ -475,119 +574,87 @@ function defaultUrlFor(c) {
   return '';
 }
 
-async function loadCaps() {
-  const list = $('caplist');
-  const caps = await window.runner.listCapabilities();
-  list.textContent = '';
-  if (!caps.length) {
-    const e = el('div', 'empty');
-    e.appendChild(document.createTextNode('Nothing saved yet. Run a goal, then press '));
-    e.appendChild(el('b', null, 'Save as capability'));
-    e.appendChild(document.createTextNode('.'));
-    list.appendChild(e);
-    return;
-  }
-  for (const c of caps) list.appendChild(capCard(c));
-}
+function renderCap(c) {
+  const body = $('capbody'); body.textContent = '';
 
-function capCard(c) {
-  const card = el('div', 'cap');
-  const head = el('div', 'caph');
+  const head = el('div', 'dhead');
   head.appendChild(el('span', 'id', c.id));
-  head.appendChild(el('span', 'v', `v${c.version}${c.versions.length > 1 ? ` of ${c.versions.length}` : ''} · ${c.steps} steps`));
   head.appendChild(el('span', 'pill ' + (c.approval === 'approved' ? 'p-ok' : c.approval === 'incomplete' ? 'p-bad' : 'p-warn'), c.approval));
-  card.appendChild(head);
-  if (c.description) card.appendChild(el('div', 'capd', c.description));
-  if (c.supersededBy && c.supersededBy.length) {
-    // An approved version outranks a later draft. Say so, rather than leaving
-    // the version number looking like a mistake.
-    card.appendChild(el('div', 'capd',
-      `Approved — callers get this even though v${c.supersededBy.join(', v')} ` +
-      `${c.supersededBy.length > 1 ? 'exist' : 'exists'} as a later draft.`));
-  }
+  body.appendChild(head);
+  body.appendChild(el('div', 'note', `v${c.version} of ${c.versions.length} · ${c.steps} steps · recorded against ${c.app?.vendorProduct || 'unknown'}`));
+  if (c.description) { const p = el('p', null, c.description); p.style.cssText = 'color:var(--ink-2);margin:14px 0 0;max-width:62ch'; body.appendChild(p); }
+  if (c.supersededBy?.length) body.appendChild(el('div', 'note',
+    `Approved — callers get this even though v${c.supersededBy.join(', v')} exists as a later draft.`));
 
-  const body = el('div', 'capb');
-  const inputs = {};
-  if (c.inputs.length) {
-    const io = el('div', 'io');
-    for (const p of c.inputs) {
-      io.appendChild(el('label', null, `${p.name}${p.required ? '' : '?'} · ${p.type}`));
-      const i = el('input'); i.value = p.example || ''; i.placeholder = p.example || '';
-      i.oninput = () => { inputs[p.name] = i.value; };
-      inputs[p.name] = i.value;
-      io.appendChild(i);
-    }
-    body.appendChild(io);
-  }
-  const urlRow = el('div', 'io');
-  urlRow.appendChild(el('label', null, 'target'));
-  const urlIn = el('input'); urlIn.value = defaultUrlFor(c);
-  urlRow.appendChild(urlIn);
-  body.appendChild(urlRow);
+  // contract
+  const sect = (t) => { const s = el('div', 'sect'); s.appendChild(el('div', 't-label', t)); return s; };
+  const contract = sect('Contract');
+  const dl = el('dl', 'kv');
+  if (c.inputs.length) { dl.appendChild(el('dt', null, 'takes'));
+    const dd = el('dd'); for (const p of c.inputs) dd.appendChild(el('span', 'chip', `${p.name}: ${p.type}`)); dl.appendChild(dd); }
+  if (c.outputs.length) { dl.appendChild(el('dt', null, 'returns'));
+    const dd = el('dd'); for (const o of c.outputs) dd.appendChild(el('span', 'chip c-ok', `${o.name}: ${o.type}`)); dl.appendChild(dd); }
+  if (c.outcomes.length) { dl.appendChild(el('dt', null, 'or'));
+    const dd = el('dd');
+    const K = { business_outcome:'c-ok', recoverable:'c-info', hard_failure:'c-bad', escalate:'c-warn' };
+    for (const o of c.outcomes) dd.appendChild(el('span', 'chip ' + (K[o.classification] || ''), o.name));
+    dl.appendChild(dd); }
+  contract.appendChild(dl);
+  body.appendChild(contract);
 
-  const meta = el('div');
-  meta.style.fontSize = '11px'; meta.style.color = 'var(--faint)';
-  meta.appendChild(document.createTextNode('returns '));
-  for (const o of c.outputs) meta.appendChild(el('span', 'tag', `${o.name}: ${o.type}`));
-  if (c.outcomes.length) {
-    meta.appendChild(el('div', null, 'or'));
-    for (const o of c.outcomes) meta.appendChild(el('span', 'tag ' + (CLS[o.classification] || ''), o.name));
-  }
-  body.appendChild(meta);
-
-  const res = el('div', 'capres');
+  // run
   if (c.approval === 'incomplete') {
-    body.appendChild(el('div', 'blocked',
-      `Not invocable — ${c.incompleteReason || 'the run never finished'}. There is no checkpoint, so nothing could verify success.`));
+    const s = sect('Run');
+    const e = el('div', 'empty');
+    e.appendChild(el('h3', null, 'Not invocable'));
+    e.appendChild(document.createTextNode(c.incompleteReason || 'The run never finished.'));
+    e.appendChild(el('div', 'note', 'There is no checkpoint, so nothing could verify success. Finish the recording first.'));
+    s.appendChild(e); body.appendChild(s);
   } else {
-    const row = el('div');
-    row.style.display = 'flex'; row.style.gap = '9px'; row.style.alignItems = 'center';
-    const run = el('button', 'save', 'Run');
-    const note = el('span', null, 'no model — deterministic replay');
-    note.style.fontSize = '11px'; note.style.color = 'var(--faint)';
-    row.appendChild(run); row.appendChild(note);
-    body.appendChild(row);
+    const s = sect('Run');
+    const bar = el('div', 'runbar');
+    const inputs = {};
+    for (const p of c.inputs) {
+      const f = el('div', 'f');
+      const lab = el('label', null, `${p.name} · ${p.type}`); lab.htmlFor = 'in-' + p.name;
+      const i = el('input'); i.id = 'in-' + p.name; i.value = p.example || ''; i.placeholder = (p.example || '') + '…';
+      i.oninput = () => { inputs[p.name] = i.value; }; inputs[p.name] = i.value;
+      f.appendChild(lab); f.appendChild(i); bar.appendChild(f);
+    }
+    const uf = el('div', 'f');
+    const ul = el('label', null, 'Target'); ul.htmlFor = 'in-url';
+    const ui = el('input'); ui.id = 'in-url'; ui.value = defaultUrlFor(c);
+    uf.appendChild(ul); uf.appendChild(ui); bar.appendChild(uf);
 
+    const run = el('button', 'btn-primary', 'Run Live');
+    run.style.padding = '9px 18px';
     run.onclick = async () => {
-      run.disabled = true; run.textContent = 'Running…';
-      res.style.display = 'block'; res.textContent = 'replaying…';
-      const r = await window.runner.runCapability({ id: c.id, inputs, url: urlIn.value.trim() });
-      run.disabled = false; run.textContent = 'Run';
-      res.textContent = '';
-      if (!r.ok) { res.appendChild(el('span', 'blocked', r.error)); return; }
-      const x = r.result;
-      const cls = x.status === 'success' || x.status === 'business_outcome' ? 'p-ok'
-                : x.status === 'escalated' ? 'p-warn' : 'p-bad';
-      const h = el('div');
-      h.appendChild(el('span', 'pill ' + cls, x.status.replace('_', ' ')));
-      h.appendChild(document.createTextNode(' ' + x.ms + 'ms'));
-      res.appendChild(h);
-      const pre = el('pre');
-      pre.textContent =
-        x.status === 'success' ? JSON.stringify(x.outputs, null, 2)
-        : x.status === 'business_outcome' ? `${x.outcome}\n${x.message}\n\n(an answer, not a crash)`
-        : x.status === 'escalated' ? `${x.reason}\n\na human is needed`
-        : `${x.failure.code}\nexpected: ${x.failure.expected}\nobserved: ${x.failure.observed}`;
-      res.appendChild(pre);
+      run.disabled = true;
+      resetSession('replay', `${c.id} · ${JSON.stringify(inputs)}`);
+      const r = await window.runner.runCapabilityLive({ id:c.id, inputs, url:ui.value.trim() });
+      run.disabled = false;
+      if (!r.ok) { showResult('Could Not Start', r.error); }
     };
+    bar.appendChild(run);
+    s.appendChild(bar);
+    s.appendChild(el('div', 'note', 'Replays the recorded steps with no model in the loop. You will watch it happen.'));
+    body.appendChild(s);
   }
-  card.appendChild(body);
-  card.appendChild(res);
-  return card;
+
+  // versions
+  const vs = sect('Versions');
+  for (const v of c.versions.slice().reverse()) {
+    const row = el('div', 'vrow');
+    row.appendChild(el('span', 'mono', 'v' + v));
+    if (v === c.version) row.appendChild(el('span', 'pill p-ok', 'in use'));
+    vs.appendChild(row);
+  }
+  body.appendChild(vs);
 }
 
-$('compile').onclick = async () => {
-  const b = $('compile');
-  b.disabled = true; b.textContent = 'Compiling…';
-  let r = await window.runner.compileLatest({});
-  if (!r.ok && r.partialAvailable) r = await window.runner.compileLatest({ partial: true });
-  b.disabled = false; b.textContent = 'Compile latest run';
-  if (!r.ok) { const e = el('div', 'empty'); e.style.color = 'var(--bad)'; e.textContent = r.error;
-               $('caplist').prepend(e); return; }
-  loadCaps();
-};
+document.querySelectorAll('.chips button[data-url]').forEach((b) => b.onclick = () => { $('url').value = b.dataset.url; });
+document.querySelectorAll('.chips button.task').forEach((b) => b.onclick = () => { $('task').value = b.textContent.trim(); });
 
-document.querySelectorAll('.chip[data-url]').forEach((b) => b.onclick = () => { $('url').value = b.dataset.url; });
-document.querySelectorAll('.chip.task').forEach((b) => b.onclick = () => { $('task').value = b.textContent.trim(); });
 renderControl();
+loadCaps();
 </script></body></html>
