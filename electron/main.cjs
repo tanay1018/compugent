@@ -8,6 +8,7 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const http = require('node:http');
 const net = require('node:net');
 const path = require('node:path');
 
@@ -68,6 +69,7 @@ function killTree(proc) {
 }
 
 function stopRun() {
+  detachSession();
   if (child) { killTree(child); child = null; }
 }
 
@@ -114,11 +116,70 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
   child.on('exit', (code) => { send('run:exit', { code }); child = null; });
 
   const ok = await waitFor(port);
-  if (!ok) { stopRun(); return { ok: false, error: 'the run did not start — check the log below' }; }
-  return { ok: true, consoleUrl: `http://localhost:${port}/` };
+  if (!ok) { stopRun(); return { ok: false, error: 'the run did not start — open the raw log for the reason' }; }
+  attachSession(port);
+  // The port is deliberately NOT returned: the renderer has no business
+  // holding a handle to the control channel.
+  return { ok: true };
 });
 
-ipcMain.handle('run:stop', () => { stopRun(); return { ok: true }; });
+/**
+ * Session channel proxy.
+ *
+ * The renderer is a file:// page and the session channel is http://localhost,
+ * so the two are cross-origin. The alternative -- opening CORS on the channel
+ * -- would let any page on this machine drive an operator session that is
+ * mid-flight inside a bank application. Everything is relayed through the main
+ * process instead: the renderer never learns the port and never issues a
+ * cross-origin request.
+ */
+let sessionStream = null;
+
+function attachSession(port) {
+  detachSession();
+  const req = http.get({ host: '127.0.0.1', port, path: '/events' }, (res) => {
+    res.setEncoding('utf8');
+    let buf = '';
+    res.on('data', (chunk) => {
+      buf += chunk;
+      // SSE frames are separated by a blank line.
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) {
+        const raw = buf.slice(0, i); buf = buf.slice(i + 2);
+        const line = raw.split('\n').find((l) => l.startsWith('data: '));
+        if (!line) continue;
+        try { send('session:event', JSON.parse(line.slice(6))); } catch {}
+      }
+    });
+  });
+  req.on('error', () => {});
+  sessionStream = { req, port };
+}
+
+function detachSession() {
+  if (!sessionStream) return;
+  try { sessionStream.req.destroy(); } catch {}
+  sessionStream = null;
+}
+
+function relay(path, body) {
+  return new Promise((resolve) => {
+    if (!sessionStream) return resolve({ ok: false });
+    const payload = JSON.stringify(body ?? {});
+    const req = http.request(
+      { host: '127.0.0.1', port: sessionStream.port, path, method: 'POST',
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) } },
+      (res) => { res.resume(); res.on('end', () => resolve({ ok: true })); },
+    );
+    req.on('error', () => resolve({ ok: false }));
+    req.end(payload);
+  });
+}
+
+ipcMain.handle('session:control', (_e, body) => relay('/control', body));
+ipcMain.handle('session:input', (_e, body) => relay('/input', body));
+
+ipcMain.handle('run:stop', () => { stopRun(); detachSession(); return { ok: true }; });
 
 /**
  * The capability catalog: what has been recorded and can now be invoked
@@ -134,12 +195,23 @@ ipcMain.handle('caps:list', () => {
     if (!fs.statSync(dir).isDirectory()) continue;
     const versions = fs.readdirSync(dir)
       .map((f) => /^v(\d+)\.json$/.exec(f)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b);
-    const v = versions.at(-1);
-    if (v === undefined) continue;
+    if (!versions.length) continue;
+
+    // Show the version a caller would actually GET, which is the highest
+    // APPROVED one — not simply the highest. Listing a later draft here while
+    // Run executes an approved predecessor would be the catalog lying about
+    // what the button does.
+    const read = (n) => JSON.parse(fs.readFileSync(path.join(dir, `v${n}.json`), 'utf8'));
+    let v = versions.at(-1);
+    for (const n of versions) {
+      try { if (read(n).approval === 'approved') v = n; } catch { /* skip unreadable */ }
+    }
     try {
-      const a = JSON.parse(fs.readFileSync(path.join(dir, `v${v}.json`), 'utf8'));
+      const a = read(v);
       out.push({
-        id: a.id, version: a.version, versions, name: a.name, description: a.description,
+        id: a.id, version: a.version, versions,
+        supersededBy: versions.filter((n) => n > a.version),
+        name: a.name, description: a.description,
         approval: a.approval, incompleteReason: a.incompleteReason,
         inputs: a.inputs, outputs: a.outputs,
         outcomes: (a.outcomes || []).map((o) => ({ name: o.name, classification: o.classification })),
@@ -216,8 +288,8 @@ app.whenReady().then(() => {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      // The console is loaded in a <webview>, which needs this enabled.
-      webviewTag: true,
+      // No <webview>: the UI is one document that talks to the session over IPC.
+      webviewTag: false,
     },
   });
   win.loadFile(path.join(__dirname, 'shell.html'));

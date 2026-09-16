@@ -455,23 +455,33 @@ export class PlaywrightSurface implements Surface {
       const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
       const labelFor = (el) => {
         if (!el || !el.getAttribute) return '';
-        const a = el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('alt');
+        // Prefer the nearest real CONTROL. A click that lands on a layout
+        // container would otherwise be logged as sixty characters of page
+        // body, which tells an auditor nothing about what was done.
+        const ctl = el.closest && el.closest('a,button,input,select,textarea,[role=button],[role=link]');
+        const t = ctl || el;
+        const a = t.getAttribute && (t.getAttribute('aria-label') || t.getAttribute('title') || t.getAttribute('alt'));
         if (a) return clean(a);
-        if (el.value && el.type === 'submit') return clean(el.value);
-        const td = el.closest && el.closest('td');
+        if (t.value && (t.type === 'submit' || t.type === 'button')) return clean(t.value);
+        const td = t.closest && t.closest('td');
         if (td) for (let p = td.previousElementSibling; p; p = p.previousElementSibling) {
-          const t = clean(p.textContent); if (t) return t;
+          const x = clean(p.textContent); if (x) return x;
         }
-        return clean(el.textContent);
+        const own = clean(t.textContent);
+        // Only trust element text when it reads like a label, not a paragraph.
+        if (ctl && own && own.length <= 40) return own;
+        if (!ctl) return '';
+        return own.slice(0, 40);
       };
       const send = (kind, e) => {
         const el = e.target;
         if (!el || !el.tagName) return;
+        const label = labelFor(el);
         const tag = el.tagName.toLowerCase();
         const isSecret = /password|hidden/i.test(el.type || '');
         try {
           window.__cua_op({
-            kind, tag, label: labelFor(el),
+            kind, tag, label,
             ...(kind === 'input' && !isSecret ? { value: String(el.value ?? '').slice(0, 80) } : {}),
           });
         } catch {}

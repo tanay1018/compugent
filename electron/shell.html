@@ -2,389 +2,592 @@
 <title>Computer-Use Runner</title>
 <style>
 :root{
-  --bg:#14161a; --panel:#1b1e25; --line:#2b303a; --ink:#dde1e8; --dim:#8891a0;
-  --navy:#7fa0f0; --moss:#7cc496; --rust:#e59070; --amber:#e5b878;
+  --bg:#101216; --panel:#171A20; --panel2:#1C2028; --line:#272C36; --line2:#333947;
+  --ink:#E2E6EC; --dim:#8A93A3; --faint:#5C6474;
+  --agent:#7FA3F0; --operator:#F0A868; --ok:#6FC08C; --bad:#E07A62; --warn:#DFC178;
+  --focus:#7FA3F0;
 }
 *{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;flex-direction:column;overflow:hidden}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);overflow:hidden;
+  font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+button{font:inherit;cursor:pointer;border-radius:5px;border:1px solid var(--line2);
+  background:var(--panel2);color:var(--ink);padding:6px 12px}
+button:hover:not(:disabled){border-color:var(--faint);background:#222734}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+input,textarea{width:100%;background:#0B0D11;border:1px solid var(--line);color:var(--ink);
+  border-radius:5px;padding:9px 11px;font:13px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
+input:focus,textarea:focus{border-color:var(--focus);outline:none}
 
-.titlebar{height:38px;flex:0 0 auto;-webkit-app-region:drag;display:flex;align-items:center;
-  justify-content:center;border-bottom:1px solid var(--line);background:var(--panel);
-  font-size:12px;letter-spacing:.06em;color:var(--dim)}
+/* ---------- chrome ---------- */
+.titlebar{height:34px;flex:0 0 auto;-webkit-app-region:drag;display:flex;align-items:center;
+  justify-content:center;background:var(--panel);border-bottom:1px solid var(--line);
+  font-size:11.5px;letter-spacing:.05em;color:var(--faint)}
 
-/* ---- setup ---- */
-#setup{flex:1;display:flex;align-items:center;justify-content:center;padding:28px;overflow:auto}
-.card{width:100%;max-width:620px}
-h1{font-size:19px;margin:0 0 6px;letter-spacing:-.01em;color:var(--ink)}
-.sub{color:var(--dim);margin:0 0 26px;font-size:12.5px;line-height:1.6}
-label{display:block;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
-input,textarea{width:100%;background:#101318;border:1px solid var(--line);color:var(--ink);
-  border-radius:4px;padding:10px 12px;font:13px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
-input:focus,textarea:focus{outline:none;border-color:var(--navy)}
-.field{margin-bottom:16px}
-.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.preset{background:none;border:1px solid var(--line);color:var(--dim);border-radius:3px;
-  padding:5px 9px;font:11.5px ui-monospace,Menlo,monospace;cursor:pointer}
-.preset:hover{border-color:var(--navy);color:var(--ink)}
-.go{width:100%;margin-top:8px;background:var(--navy);color:#0d1017;border:none;border-radius:4px;
-  padding:12px;font:600 13px ui-monospace,Menlo,monospace;cursor:pointer;letter-spacing:.02em}
-.go:hover{filter:brightness(1.08)} .go:disabled{opacity:.45;cursor:not-allowed}
-.err{color:var(--rust);margin-top:12px;font-size:12px;min-height:16px}
+/* ---------- start screen ---------- */
+#start{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;overflow:auto}
+.card{width:100%;max-width:640px}
+h1{font-size:21px;margin:0 0 7px;letter-spacing:-.01em;font-weight:600}
+.sub{color:var(--dim);margin:0 0 26px;font-size:13px;line-height:1.65}
+label{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 6px;font-weight:600}
+.field{margin-bottom:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.chip{background:none;border:1px solid var(--line);color:var(--dim);padding:5px 10px;
+  font-size:11.5px;border-radius:4px}
+.chip:hover{color:var(--ink);border-color:var(--agent)}
+.primary{width:100%;background:var(--agent);color:#0B0D11;border:none;padding:12px;
+  font-weight:650;font-size:13.5px;letter-spacing:.01em}
+.primary:hover:not(:disabled){filter:brightness(1.08);background:var(--agent)}
+#starterr{color:var(--bad);margin-top:12px;min-height:17px;font-size:12.5px}
 
-/* ---- tabs ---- */
-.tabs{display:flex;gap:2px;margin-bottom:22px;border-bottom:1px solid var(--line)}
-.tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);
-  padding:8px 14px;font:12px ui-monospace,Menlo,monospace;cursor:pointer;margin-bottom:-1px}
-.tab.on{color:var(--ink);border-bottom-color:var(--navy)}
-.tab:hover{color:var(--ink)}
+/* ---------- session ---------- */
+#session{flex:1;display:none;flex-direction:column;min-height:0}
+.sbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:9px 13px;
+  background:var(--panel);border-bottom:1px solid var(--line)}
+.goal{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+.goal b{color:var(--ink);font-weight:500}
+.who{display:flex;align-items:center;gap:7px;padding:5px 11px;border-radius:99px;
+  font-size:11px;font-weight:700;letter-spacing:.08em;white-space:nowrap}
+.who .dot{width:7px;height:7px;border-radius:99px;background:currentColor}
+.who.agent{color:var(--agent);background:#16233C}
+.who.operator{color:var(--operator);background:#332316}
+.who.nobody{color:var(--faint);background:#20242C}
+.pill{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  padding:4px 8px;border-radius:4px;border:1px solid currentColor;white-space:nowrap}
+.p-ok{color:var(--ok)} .p-bad{color:var(--bad)} .p-warn{color:var(--warn)} .p-dim{color:var(--faint)}
 
-/* ---- capability cards ---- */
-.cap{border:1px solid var(--line);border-radius:5px;background:var(--panel);margin-bottom:14px;overflow:hidden}
-.cap-h{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.cap-id{font-size:13px;color:var(--ink);font-weight:600}
-.cap-v{font-size:11px;color:var(--dim)}
-.badge{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:3px 6px;border-radius:2px;border:1px solid currentColor}
-.b-draft{color:var(--amber)} .b-approved{color:var(--moss)} .b-incomplete{color:var(--rust)}
-.cap-d{padding:10px 14px;color:var(--dim);font-size:11.5px;line-height:1.6;border-bottom:1px solid var(--line)}
-.cap-b{padding:12px 14px;display:grid;gap:10px}
-.io{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center}
-.io label{margin:0;align-self:center;font-size:10px}
-.io input{padding:7px 10px;font-size:12px}
-.meta{font-size:10.5px;color:var(--dim);line-height:1.7}
-.meta b{color:#a8b2c2;font-weight:400}
-.chip{display:inline-block;border:1px solid var(--line);border-radius:2px;padding:1px 5px;margin:0 3px 3px 0;font-size:10px}
-.c-biz{color:var(--moss)} .c-rec{color:var(--navy)} .c-hard{color:var(--rust)} .c-esc{color:var(--amber)}
-.runrow{display:flex;gap:8px;align-items:center}
-.runbtn{background:var(--moss);color:#0d1017;border:none;border-radius:4px;padding:9px 20px;
-  font:600 12px ui-monospace,Menlo,monospace;cursor:pointer}
-.runbtn:hover{filter:brightness(1.08)} .runbtn:disabled{opacity:.4;cursor:not-allowed}
-.res{border-top:1px solid var(--line);padding:11px 14px;font-size:11.5px;display:none}
-.res.on{display:block}
-.res .st{font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:10.5px}
-.res pre{margin:7px 0 0;background:#101318;border:1px solid var(--line);border-radius:3px;
-  padding:9px 11px;overflow-x:auto;font-size:11px;color:#b8c0cc;white-space:pre-wrap}
-.empty{color:var(--dim);font-size:12px;line-height:1.7;border:1px dashed var(--line);
-  border-radius:5px;padding:20px;text-align:center}
-.why{border:1px solid var(--rust);border-radius:4px;padding:10px 12px;margin-bottom:12px;
-  font-size:11.5px;line-height:1.6;color:#e8b9a6;background:#241a16}
-.why b{color:var(--rust);display:block;margin-bottom:4px}
-.why button{margin-top:9px}
-.blocked{font-size:11px;color:var(--rust);line-height:1.6}
+.body{flex:1;display:flex;min-height:0}
+.stage{flex:1;min-width:0;display:flex;align-items:flex-start;justify-content:center;
+  background:#07080A;padding:12px;overflow:auto;position:relative}
+#screen{max-width:100%;background:#fff;border:1px solid var(--line);border-radius:3px;
+  cursor:not-allowed;display:block}
+#screen.live{cursor:crosshair;border-color:var(--operator);box-shadow:0 0 0 1px var(--operator)}
+#stagehint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  background:rgba(12,14,18,.94);border:1px solid var(--line2);border-radius:5px;
+  padding:7px 13px;font-size:11.5px;color:var(--dim);pointer-events:none}
 
-/* ---- running ---- */
-#run{flex:1;display:none;flex-direction:column;min-height:0}
-.bar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:9px 14px;
-  border-bottom:1px solid var(--line);background:var(--panel)}
-.goal{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
-.goal b{color:var(--dim);font-weight:400;margin-right:7px}
-.btn{background:none;border:1px solid var(--line);color:var(--ink);border-radius:3px;
-  padding:6px 12px;font:12px ui-monospace,Menlo,monospace;cursor:pointer;white-space:nowrap}
-.btn:hover{border-color:var(--navy)}
-.btn.stop{color:var(--rust)}
-.btn.save{border-color:var(--moss);color:var(--moss);font-weight:600}
-.btn.save:hover{background:#17301f}
-#outcome{white-space:nowrap}
-#saveres{position:absolute;right:14px;top:46px;z-index:20;max-width:440px;background:var(--panel);
-  border:1px solid var(--line);border-radius:5px;padding:12px 14px;font-size:11.5px;line-height:1.6;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
-#saveres b{display:block;margin-bottom:5px}
-#saveres .ok{color:var(--moss)} #saveres .warn{color:var(--amber)} #saveres .bad{color:var(--rust)}
-#saveres button{margin-top:9px}
-.split{flex:1;display:flex;min-height:0}
-webview{flex:1;min-width:0;border:none;background:#fff}
-#term{flex:0 0 var(--termw,260px);border-left:1px solid var(--line);background:#101318;padding:10px 12px;
-  overflow:auto;font-size:11.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:#b8c0cc}
-#term .ok{color:var(--moss)} #term .warn{color:var(--amber)} #term .bad{color:var(--rust)}
-.wait{position:absolute;inset:38px 0 0 0;display:flex;align-items:center;justify-content:center;
-  background:var(--bg);color:var(--dim);font-size:12.5px;z-index:5}
+/* ---------- right rail ---------- */
+.rail{flex:0 0 340px;display:flex;flex-direction:column;min-height:0;
+  background:var(--panel);border-left:1px solid var(--line)}
+.railhead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:9px 13px;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.railhead button{padding:3px 8px;font-size:10.5px;letter-spacing:.04em}
+#steps{flex:1;overflow:auto;padding:5px 0}
+.step{display:flex;gap:9px;padding:7px 13px;font-size:12.5px;line-height:1.5;
+  border-left:2px solid transparent}
+.step .mark{flex:0 0 14px;text-align:center;color:var(--faint);font-size:11px;padding-top:1px}
+.step .what{flex:1;min-width:0;word-break:break-word}
+.step .what em{font-style:normal;color:var(--faint)}
+.step.agent{border-left-color:#2B3B5C}
+.step.operator{border-left-color:#5C452B;background:#1B1713}
+.step.system{color:var(--dim)}
+.step.ok .mark{color:var(--ok)} .step.bad .mark{color:var(--bad)} .step.warn .mark{color:var(--warn)}
+.step code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--ink);
+  background:#0E1014;padding:1px 4px;border-radius:3px}
+.divider{padding:7px 13px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--faint);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  background:var(--panel2);margin:5px 0}
+#result{flex:0 0 auto;max-height:42%;overflow:auto;border-top:1px solid var(--line);
+  padding:11px 13px;display:none;background:var(--panel2)}
+#result h3{margin:0 0 7px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+#result pre{margin:0;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;
+  white-space:pre-wrap;word-break:break-word;color:var(--ink);line-height:1.6}
+
+/* ---------- footer ---------- */
+.foot{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:9px 13px;
+  background:var(--panel);border-top:1px solid var(--line)}
+.foot .spacer{flex:1}
+.foot .meta{font-size:11.5px;color:var(--faint);font-family:ui-monospace,Menlo,monospace}
+.save{border-color:var(--ok);color:var(--ok);font-weight:650}
+.save:hover:not(:disabled){background:#14271C;border-color:var(--ok)}
+
+/* ---------- capabilities drawer ---------- */
+#drawer{position:fixed;inset:34px 0 0 auto;width:min(560px,92vw);background:var(--panel);
+  border-left:1px solid var(--line2);box-shadow:-18px 0 40px rgba(0,0,0,.45);
+  transform:translateX(102%);transition:transform .18s ease;display:flex;flex-direction:column;z-index:40}
+#drawer.open{transform:none}
+.dhead{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:12px 15px;
+  border-bottom:1px solid var(--line)}
+.dhead h2{margin:0;font-size:15px;font-weight:600;flex:1}
+#caplist{flex:1;overflow:auto;padding:13px 15px}
+.cap{border:1px solid var(--line);border-radius:7px;background:var(--panel2);margin-bottom:12px;overflow:hidden}
+.caph{padding:11px 13px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;
+  gap:9px;flex-wrap:wrap}
+.caph .id{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:600}
+.caph .v{font-size:11px;color:var(--faint);font-family:ui-monospace,Menlo,monospace}
+.capd{padding:9px 13px;font-size:11.5px;line-height:1.6;color:var(--dim);border-bottom:1px solid var(--line)}
+.capb{padding:11px 13px;display:grid;gap:9px}
+.io{display:grid;grid-template-columns:auto 1fr;gap:7px 11px;align-items:center}
+.io label{margin:0;font-size:10px}
+.io input{padding:6px 9px;font-size:12px}
+.tag{display:inline-block;border:1px solid var(--line2);border-radius:4px;padding:2px 6px;
+  margin:0 4px 4px 0;font-size:10.5px;font-family:ui-monospace,Menlo,monospace;color:var(--dim)}
+.tag.biz{color:var(--ok);border-color:#2C4436} .tag.rec{color:var(--agent);border-color:#2B3B5C}
+.tag.hard{color:var(--bad);border-color:#4A2B24} .tag.esc{color:var(--warn);border-color:#4A3F24}
+.capres{border-top:1px solid var(--line);padding:10px 13px;font-size:11.5px;display:none}
+.capres pre{margin:6px 0 0;font-family:ui-monospace,Menlo,monospace;font-size:11px;
+  white-space:pre-wrap;color:var(--dim);line-height:1.6}
+.blocked{font-size:11.5px;color:var(--bad);line-height:1.6}
+.empty{color:var(--dim);font-size:12.5px;line-height:1.75;border:1px dashed var(--line2);
+  border-radius:7px;padding:24px;text-align:center}
+#scrim{position:fixed;inset:34px 0 0 0;background:rgba(6,7,9,.6);display:none;z-index:30}
+#scrim.on{display:block}
+
+/* ---------- raw log ---------- */
+#raw{position:fixed;left:0;right:340px;bottom:0;height:34%;background:#07080A;
+  border-top:1px solid var(--line2);padding:10px 13px;overflow:auto;display:none;z-index:20;
+  font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.55;
+  white-space:pre-wrap;word-break:break-word;color:#9AA3B2}
 </style></head><body>
 
 <div class="titlebar">computer-use runner</div>
 
-<section id="setup"><div class="card">
-  <div class="tabs">
-    <button class="tab on" id="t-new">New run</button>
-    <button class="tab" id="t-caps">Capabilities</button>
-  </div>
-
-  <div id="pane-caps" style="display:none">
-    <h1>Saved capabilities</h1>
-    <p class="sub">Recorded once, replayable with different inputs and <b>no model in the loop</b>.
-      This is the path an AI agent would call in production.</p>
-    <div class="runrow" style="margin-bottom:16px">
-      <button class="btn" id="refresh">Refresh</button>
-      <button class="btn" id="compile">Compile latest run &rarr; capability</button>
-    </div>
-    <div id="caplist"></div>
-  </div>
-
-  <div id="pane-new">
-  <h1>Start a run</h1>
-  <p class="sub">Give it a target and a goal. The browser session opens here — watch every step,
-    and take control whenever you want. The bundled MemberDesk app starts automatically
+<!-- ============ START ============ -->
+<section id="start"><div class="card">
+  <h1>Run a goal against a live app</h1>
+  <p class="sub">The browser session opens here. Watch every step, take over whenever you want,
+    and save what worked as a replayable capability. The bundled MemberDesk app starts itself
     if you point at localhost.</p>
 
   <div class="field">
-    <label for="url">Target URL</label>
+    <label for="url">Target</label>
     <input id="url" value="http://localhost:8710/?tenant=meridian" spellcheck="false">
-    <div class="presets">
-      <button class="preset" data-url="http://localhost:8710/?tenant=meridian">MemberDesk · Meridian</button>
-      <button class="preset" data-url="http://localhost:8710/?tenant=harbor">MemberDesk · Harbor (L2)</button>
-      <button class="preset" data-url="https://books.toscrape.com/">Books to Scrape (live)</button>
+    <div class="chips">
+      <button class="chip" data-url="http://localhost:8710/?tenant=meridian">MemberDesk · Meridian</button>
+      <button class="chip" data-url="http://localhost:8710/?tenant=harbor">MemberDesk · Harbor (L2)</button>
+      <button class="chip" data-url="https://books.toscrape.com/">Books to Scrape (live)</button>
     </div>
   </div>
 
   <div class="field">
     <label for="task">Goal</label>
     <textarea id="task" rows="3" spellcheck="false">look up member 12345 and read their current savings balance</textarea>
-    <div class="presets">
-      <button class="preset task">look up member 55501 and report their account status and checking balance</button>
-      <button class="preset task">look up member 99999 and read their savings balance</button>
-      <button class="preset task">open the book 'The Grand Design' from the Science category and read its price including tax</button>
+    <div class="chips">
+      <button class="chip task">look up member 55501 and report their account status and checking balance</button>
+      <button class="chip task">look up member 99999 and read their savings balance</button>
+      <button class="chip task">open the book 'The Grand Design' from the Science category and read its price including tax</button>
     </div>
   </div>
 
-  <button class="go" id="go">Start run</button>
-  <div class="err" id="err"></div>
+  <button class="primary" id="go">Start run</button>
+  <div id="starterr"></div>
+  <div style="margin-top:18px;text-align:center">
+    <button class="chip" id="opencaps2">Saved capabilities &rarr;</button>
   </div>
 </div></section>
 
-<section id="run">
-  <div class="bar">
-    <div class="goal"><b>goal</b><span id="rgoal"></span></div>
-    <span id="outcome" class="badge" style="display:none"></span>
-    <button class="btn save" id="save" style="display:none">Save as capability</button>
-    <button class="btn" id="toggleterm">Log</button>
-    <button class="btn" id="newrun">New run</button>
-    <button class="btn stop" id="stop">Stop</button>
+<!-- ============ SESSION ============ -->
+<section id="session">
+  <div class="sbar">
+    <div class="goal"><b id="sgoal"></b></div>
+    <span id="outcome" class="pill" style="display:none"></span>
+    <span id="who" class="who agent"><span class="dot"></span><span id="whotext">AGENT</span></span>
+    <button id="takeover">Take over</button>
+    <button id="handback" style="display:none">Hand back</button>
+    <button id="stop">Stop</button>
   </div>
-  <div id="saveres"></div>
-  <div class="split">
-    <webview id="view" src="about:blank"></webview>
-    <div id="term"></div>
+
+  <div class="body">
+    <div class="stage">
+      <canvas id="screen" width="1024" height="700"></canvas>
+      <div id="stagehint">waiting for the first frame…</div>
+    </div>
+    <div class="rail">
+      <div class="railhead"><span>Activity</span><button id="rawtoggle">Raw log</button></div>
+      <div id="steps"></div>
+      <div id="result"><h3 id="resulth">Result</h3><pre id="resultb"></pre></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="save" id="save" style="display:none">Save as capability</button>
+    <button id="newrun">New run</button>
+    <div class="spacer"></div>
+    <div class="meta" id="tokens"></div>
+    <button id="opencaps">Capabilities</button>
   </div>
 </section>
 
+<div id="raw"></div>
+<div id="scrim"></div>
+
+<!-- ============ CAPABILITIES ============ -->
+<aside id="drawer">
+  <div class="dhead">
+    <h2>Saved capabilities</h2>
+    <button id="compile">Compile latest run</button>
+    <button id="closecaps">Close</button>
+  </div>
+  <div id="caplist"></div>
+</aside>
+
 <script>
 const $ = (id) => document.getElementById(id);
-const setup = $('setup'), run = $('run'), term = $('term'), view = $('view');
+const el = (tag, cls, text) => { const n = document.createElement(tag);
+  if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 
-document.querySelectorAll('.preset[data-url]').forEach(b =>
-  b.onclick = () => { $('url').value = b.dataset.url; });
-document.querySelectorAll('.preset.task').forEach(b =>
-  b.onclick = () => { $('task').value = b.textContent.trim(); });
+/* One place that knows what is going on. Every render reads from here. */
+const S = {
+  holder: 'agent', control: 'agent',
+  goal: '', runDir: null, outcome: null, hasCheckpoint: false,
+  tokens: { in: 0, out: 0 }, frames: 0,
+};
 
-function log(line){
-  const span = document.createElement('span');
-  const clean = line.replace(/\x1b\[[0-9;]*m/g, '');
-  if (/SUCCESS|✓/.test(clean)) span.className = 'ok';
-  else if (/UNVERIFIED|WARN|warning/i.test(clean)) span.className = 'warn';
-  else if (/GAVE_UP|FAILED|Error|✗/.test(clean)) span.className = 'bad';
-  span.textContent = clean;
-  term.appendChild(span);
-  term.scrollTop = term.scrollHeight;
+/* ---------- activity feed: sentences, not JSON ---------- */
+const cx = $('screen').getContext('2d');
+const img = new Image();
+img.onload = () => {
+  const c = $('screen');
+  if (c.width !== img.width || c.height !== img.height) { c.width = img.width; c.height = img.height; }
+  cx.drawImage(img, 0, 0);
+  if (S.frames++ === 0) $('stagehint').style.display = 'none';
+};
+
+const q = (s) => s === undefined || s === null || s === '' ? '' : String(s);
+const short = (s, n = 46) => { s = q(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+
+/**
+ * Turn a run event into something a person can read. The raw log is still one
+ * keystroke away; this is what you watch while it works.
+ */
+function describe(ev) {
+  const d = ev.detail || {};
+  const target = q(d.target).replace(/ in frame "[^"]*"$/, '');
+  const named = /named "([^"]+)"/.exec(target)?.[1];
+  const anchored = /"([^"]+)"$/.exec(target)?.[1];
+  const label = named || anchored || target;
+
+  switch (ev.kind) {
+    case 'discovery.start': return { mark: '▸', cls: 'system', html: ['starting · ', ['code', q(d.model)]] };
+    case 'replay.start':    return { mark: '▸', cls: 'system', html: ['replaying · ', ['code', q(d.capability)]] };
+    case 'replay.resume':   return { mark: '↻', cls: 'system', html: ['resuming at step ' + q(d.fromStep)] };
+    case 'navigate':        return { mark: '→', cls: 'agent',  html: ['opened ', ['code', short(d.url, 52)]] };
+    case 'observe':         return null;
+    case 'model.step':      return null;
+    case 'act.type':
+    case 'step.type':       return { mark: '✓', cls: 'agent ok', html: ['typed ', ['code', q(d.text ?? d.value)], ' into ' + label] };
+    case 'act.click':
+    case 'step.click':      return { mark: '✓', cls: 'agent ok', html: ['clicked ' + label] };
+    case 'act.select':
+    case 'step.select':     return { mark: '✓', cls: 'agent ok', html: ['chose ', ['code', q(d.text ?? d.value)], ' in ' + label] };
+    case 'act.extract':     return { mark: '◆', cls: 'agent',    html: ['read ', ['code', q(d.as)], ' from ' + label] };
+    case 'outputs':         return { mark: '◆', cls: 'agent',    html: ['extracted ' + Object.keys(d.outputs || {}).length + ' output(s)'] };
+    case 'finish':          return { mark: '●', cls: 'agent ok', html: ['goal reached'] };
+    case 'escalate':
+    case 'escalation.raised': return { mark: '!', cls: 'system warn', html: ['needs a human — ' + short(d.reason, 90)] };
+    case 'outcome.matched': return { mark: '◇', cls: 'system ' + (d.classification === 'business_outcome' ? 'ok' : 'warn'),
+                                     html: [q(d.classification).replace('_', ' ') + ' · ', ['code', q(d.name)]] };
+    case 'outcome.recovered': return { mark: '↻', cls: 'system ok', html: ['recovered from ', ['code', q(d.name)]] };
+    case 'policy.blocked':  return { mark: '✗', cls: 'system bad', html: ['refused — ' + short(d.reason, 96)] };
+    case 'policy.approved': return { mark: '⚠', cls: 'system warn', html: ['irreversible step allowed · ' + short(label, 40)] };
+    case 'step.skipped':    return { mark: '·', cls: 'system', html: ['skipped step ' + q(d.step) + ' — already done'] };
+    case 'descriptor.unverified': return { mark: '⚠', cls: 'system warn', html: ['fragile target — ' + short(d.problem, 80)] };
+    case 'surface.thin':    return { mark: '⚠', cls: 'system warn', html: ['little to work with here — ' + short(d.note, 90)] };
+    case 'manual.click':    return { mark: '✓', cls: 'operator',
+                                     html: [q(d.control) ? 'you clicked ' + short(d.control, 40)
+                                                         : 'you clicked an unlabelled area'] };
+    case 'manual.input':    return { mark: '✓', cls: 'operator', html: d.value === undefined
+                                      ? ['you filled ' + (q(d.control) || 'a field') + ' ', ['em', '(value not recorded)']]
+                                      : ['you typed ', ['code', short(d.value, 30)], ' into ' + (q(d.control) || 'a field')] };
+    case 'manual.submit':   return { mark: '✓', cls: 'operator', html: ['you submitted the form'] };
+    case 'barge_in':        return { mark: '·', cls: 'system', html: ['waiting for the agent to reach a step boundary'] };
+    case 'discovery.paused':  return { divider: 'you have control' };
+    case 'discovery.resumed': return { divider: 'agent resumed' };
+    case 'control.transition': return null;
+    case 'discovery.end':
+    case 'discovery.error':
+    case 'discovery.timeout': return null;
+    default:
+      if (ev.kind.startsWith('replay.')) return null;
+      return { mark: '·', cls: 'system', html: [ev.kind] };
+  }
 }
-window.runner.onLog(log);
-window.runner.onExit(({code}) => log(`\n· run process exited (${code})\n`));
 
-let lastRun = null;
+function pushStep(ev) {
+  const d = describe(ev);
+  if (!d) return;
+  const list = $('steps');
+  if (d.divider) { list.appendChild(el('div', 'divider', d.divider)); }
+  else {
+    const row = el('div', 'step ' + d.cls);
+    row.appendChild(el('span', 'mark', d.mark));
+    const what = el('span', 'what');
+    for (const part of d.html) {
+      if (Array.isArray(part)) what.appendChild(el(part[0], null, part[1]));
+      else what.appendChild(document.createTextNode(part));
+    }
+    row.appendChild(what);
+    list.appendChild(row);
+  }
+  list.scrollTop = list.scrollHeight;
+}
 
-window.runner.onDone((info) => {
-  lastRun = info;
-  const badge = $('outcome');
-  badge.style.display = '';
-  badge.textContent = info.outcome.replace('_', ' ');
-  badge.className = 'badge ' + (info.outcome === 'success' ? 'b-approved' : 'b-incomplete');
+/* ---------- control ---------- */
+function renderControl() {
+  const w = $('who');
+  w.className = 'who ' + S.holder;
+  $('whotext').textContent = S.holder.toUpperCase();
+  const live = S.holder === 'operator';
+  $('screen').classList.toggle('live', live);
+  $('takeover').style.display = live ? 'none' : '';
+  $('handback').style.display = live ? '' : 'none';
+  $('takeover').disabled = S.control === 'pause_requested';
+  if (S.control === 'pause_requested') $('takeover').textContent = 'Yielding…';
+  else $('takeover').textContent = 'Take over';
+  const hint = $('stagehint');
+  if (S.frames > 0) {
+    hint.style.display = live ? '' : 'none';
+    hint.textContent = live ? 'you are driving — click and type directly on the screen' : '';
+  }
+}
 
-  const save = $('save');
-  save.style.display = '';
-  save.textContent = info.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
-  save.title = info.hasCheckpoint
-    ? 'Compile this run into a replayable capability'
-    : 'This run never established what success looks like. The steps it did complete can still be kept.';
+/* Relayed through the main process — the renderer never touches the channel
+   directly, so no CORS hole is opened on a live operator session. */
+const control = (body) => window.runner.control(body);
+const post = (_path, body) => window.runner.input(body);
+
+$('takeover').onclick = () => control({ action: 'take' });
+$('handback').onclick = () => control({ action: 'handback' });
+
+/* Raw coordinates into the live session — no selectors, exactly what a remote
+   console would send to a containerised browser. */
+const at = (e) => { const c = $('screen'), r = c.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) }; };
+$('screen').addEventListener('mousedown', (e) => { const p = at(e); post('/input', { type:'mouse', action:'down', x:p.x, y:p.y }); });
+$('screen').addEventListener('mouseup',   (e) => { const p = at(e); post('/input', { type:'mouse', action:'up',   x:p.x, y:p.y }); });
+window.addEventListener('keydown', (e) => {
+  if (S.holder !== 'operator') return;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA') return;
+  e.preventDefault();
+  if (e.key.length === 1) post('/input', { type: 'text', text: e.key });
+  else post('/input', { type: 'key', action: 'down', key: e.key });
 });
 
-$('save').onclick = async (ev) => {
-  const b = ev.currentTarget;
-  const box = $('saveres');
-  b.disabled = true; b.textContent = 'Saving…';
-  box.style.display = 'block';
-  box.innerHTML = '<span class="meta">compiling…</span>';
+/* ---------- session channel ---------- */
+window.runner.onSessionEvent((d) => {
+    if (d.frame) img.src = 'data:image/jpeg;base64,' + d.frame;
+    if (d.state) { S.holder = d.state.holder; S.control = d.state.control; renderControl(); }
+    if (d.event) pushStep(d.event);
+    if (d.escalation) {
+      $('result').style.display = 'block';
+      $('resulth').textContent = 'Intervention requested';
+      $('resultb').textContent = d.escalation.reason +
+        (d.escalation.atStep ? '\n\nstopped at step ' + d.escalation.atStep : '') +
+        '\n\nTake over to continue, then hand back.';
+    }
+});
 
-  // Save THIS run, not whatever happens to be newest, and fall straight to
-  // --partial when the run has no checkpoint — the button already said so.
-  let r = await window.runner.compileLatest({ runDir: lastRun?.runDir, partial: !lastRun?.hasCheckpoint });
-  if (!r.ok && r.partialAvailable) {
-    r = await window.runner.compileLatest({ runDir: lastRun?.runDir, partial: true });
-  }
-  b.disabled = false;
-  b.textContent = lastRun?.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
+/* ---------- run lifecycle ---------- */
+window.runner.onLog((line) => {
+  const clean = line.replace(/\x1b\[[0-9;]*m/g, '');
+  $('raw').appendChild(document.createTextNode(clean));
+  $('raw').scrollTop = $('raw').scrollHeight;
+  const m = /in=(\d+)\s+out=(\d+)/.exec(clean);
+  if (m) { S.tokens = { in: +m[1], out: +m[2] };
+    $('tokens').textContent = `${(S.tokens.in/1000).toFixed(1)}k in · ${S.tokens.out} out`; }
+});
 
-  if (!r.ok) { box.innerHTML = '<b class="bad">Could not save</b>' + r.error; return; }
-  box.innerHTML =
-    '<b class="' + (r.incomplete ? 'warn' : 'ok') + '">' +
-    (r.incomplete ? 'Saved as incomplete' : 'Saved') + '</b>' +
-    (r.id ? '<code>' + r.id + '</code><br>' : '') + r.path +
-    (r.incomplete
-      ? '<br><br>No checkpoint, so nothing can verify success — it will not be invocable until the flow is finished.'
-      : '<br><br>Open the <b>Capabilities</b> tab to run it with different inputs.') +
-    '<br><button class="btn" id="dismisssave">Dismiss</button>';
-  document.getElementById('dismisssave').onclick = () => { box.style.display = 'none'; };
-};
+window.runner.onDone((info) => {
+  S.runDir = info.runDir; S.outcome = info.outcome; S.hasCheckpoint = info.hasCheckpoint;
+  const p = $('outcome');
+  p.style.display = '';
+  p.textContent = info.outcome.replace('_', ' ');
+  p.className = 'pill ' + (info.outcome === 'success' ? 'p-ok'
+    : info.outcome === 'timeout' || info.outcome === 'max_steps' ? 'p-warn' : 'p-bad');
+
+  const s = $('save');
+  s.style.display = '';
+  s.textContent = info.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
+  s.title = info.hasCheckpoint ? 'Compile this run into a replayable capability'
+    : 'No checkpoint was established. The steps it did complete can still be kept.';
+});
 
 $('go').onclick = async () => {
   const url = $('url').value.trim(), task = $('task').value.trim();
-  if (!url || !task) { $('err').textContent = 'A target URL and a goal are both required.'; return; }
-  $('go').disabled = true; $('go').textContent = 'Starting…'; $('err').textContent = '';
-  term.textContent = '';
+  if (!url || !task) { $('starterr').textContent = 'A target and a goal are both required.'; return; }
+  $('go').disabled = true; $('go').textContent = 'Starting…'; $('starterr').textContent = '';
 
   const res = await window.runner.start({ url, task });
   $('go').disabled = false; $('go').textContent = 'Start run';
-  if (!res.ok) { $('err').textContent = res.error; setup.style.display='flex'; return; }
+  if (!res.ok) { $('starterr').textContent = res.error; return; }
 
-  $('rgoal').textContent = task;
-  lastRun = null;
-  $('outcome').style.display = 'none';
-  $('save').style.display = 'none';
-  $('saveres').style.display = 'none';
-  setup.style.display = 'none';
-  run.style.display = 'flex';
-  view.src = res.consoleUrl;
+  Object.assign(S, { goal: task, runDir: null, outcome: null, hasCheckpoint: false, frames: 0 });
+  $('sgoal').textContent = task;
+  $('steps').textContent = ''; $('raw').textContent = ''; $('tokens').textContent = '';
+  $('outcome').style.display = 'none'; $('save').style.display = 'none';
+  $('result').style.display = 'none';
+  $('stagehint').style.display = ''; $('stagehint').textContent = 'waiting for the first frame…';
+  $('start').style.display = 'none'; $('session').style.display = 'flex';
 };
 
-let termOn = true;
-$('toggleterm').onclick = () => {
-  termOn = !termOn;
-  term.style.display = termOn ? 'block' : 'none';
+$('stop').onclick = async () => { await window.runner.stop(); pushStep({ kind: 'x', detail: {} }); };
+$('newrun').onclick = async () => {
+  await window.runner.stop();
+  $('session').style.display = 'none'; $('start').style.display = 'flex';
+};
+$('rawtoggle').onclick = () => {
+  const r = $('raw');
+  const on = r.style.display !== 'block';
+  r.style.display = on ? 'block' : 'none';
+  $('rawtoggle').textContent = on ? 'Hide raw' : 'Raw log';
 };
 
-// ---- tabs -------------------------------------------------------------
-const paneNew = $('pane-new'), paneCaps = $('pane-caps');
-$('t-new').onclick = () => {
-  $('t-new').classList.add('on'); $('t-caps').classList.remove('on');
-  paneNew.style.display = ''; paneCaps.style.display = 'none';
-};
-$('t-caps').onclick = () => {
-  $('t-caps').classList.add('on'); $('t-new').classList.remove('on');
-  paneCaps.style.display = ''; paneNew.style.display = 'none';
-  loadCaps();
+$('save').onclick = async () => {
+  const b = $('save');
+  b.disabled = true; b.textContent = 'Saving…';
+  $('result').style.display = 'block';
+  $('resulth').textContent = 'Saving';
+  $('resultb').textContent = 'compiling…';
+
+  let r = await window.runner.compileLatest({ runDir: S.runDir, partial: !S.hasCheckpoint });
+  if (!r.ok && r.partialAvailable) r = await window.runner.compileLatest({ runDir: S.runDir, partial: true });
+
+  b.disabled = false;
+  b.textContent = S.hasCheckpoint ? 'Save as capability' : 'Save as incomplete';
+  if (!r.ok) { $('resulth').textContent = 'Could not save'; $('resultb').textContent = r.error; return; }
+  $('resulth').textContent = r.incomplete ? 'Saved as incomplete' : 'Saved';
+  $('resultb').textContent = (r.id ? r.id + '\n' : '') + r.path +
+    (r.incomplete
+      ? '\n\nNo checkpoint, so nothing can verify success. Not invocable until the flow is finished.'
+      : '\n\nOpen Capabilities to run it with different inputs.');
 };
 
-// ---- capability catalog ----------------------------------------------
-const CLS = { business_outcome:'c-biz', recoverable:'c-rec', hard_failure:'c-hard', escalate:'c-esc' };
+/* ---------- capabilities drawer ---------- */
+const CLS = { business_outcome: 'biz', recoverable: 'rec', hard_failure: 'hard', escalate: 'esc' };
+const openDrawer = () => { $('drawer').classList.add('open'); $('scrim').classList.add('on'); loadCaps(); };
+const closeDrawer = () => { $('drawer').classList.remove('open'); $('scrim').classList.remove('on'); };
+$('opencaps').onclick = openDrawer;
+$('opencaps2').onclick = openDrawer;
+$('closecaps').onclick = closeDrawer;
+$('scrim').onclick = closeDrawer;
 
-function defaultUrlFor(cap){
-  const t = cap.app?.recordedTenant || '';
+function defaultUrlFor(c) {
+  const t = c.app?.recordedTenant || '';
   if (/^https?:/.test(t)) return t;
-  if (cap.app?.vendorProduct?.includes('MemberDesk')) return `http://localhost:8710/?tenant=${t || 'meridian'}`;
   if (/toscrape/.test(t)) return 'https://books.toscrape.com/';
+  if (c.app?.vendorProduct?.includes('MemberDesk')) return `http://localhost:8710/?tenant=${t || 'meridian'}`;
   return '';
 }
 
-async function loadCaps(){
+async function loadCaps() {
   const list = $('caplist');
   const caps = await window.runner.listCapabilities();
-  if (!caps.length){
-    list.innerHTML = '<div class="empty">No capabilities yet.<br>Record one on the <b>New run</b> tab, ' +
-      'then press <b>Compile latest run</b>.</div>';
+  list.textContent = '';
+  if (!caps.length) {
+    const e = el('div', 'empty');
+    e.appendChild(document.createTextNode('Nothing saved yet. Run a goal, then press '));
+    e.appendChild(el('b', null, 'Save as capability'));
+    e.appendChild(document.createTextNode('.'));
+    list.appendChild(e);
     return;
   }
-  list.innerHTML = '';
-  for (const c of caps){
-    const el = document.createElement('div');
-    el.className = 'cap';
-    const inputs = c.inputs.map(p =>
-      `<label for="in-${c.id}-${p.name}">${p.name}${p.required?'':'?'} · ${p.type}</label>` +
-      `<input id="in-${c.id}-${p.name}" data-p="${p.name}" placeholder="${(p.example||'').replace(/"/g,'&quot;')}" ` +
-      `value="${(p.example||'').replace(/"/g,'&quot;')}" spellcheck="false">`).join('');
-    const outs = c.outputs.map(o => `<span class="chip">${o.name}: ${o.type}</span>`).join('');
-    const ocs = c.outcomes.map(o => `<span class="chip ${CLS[o.classification]||''}">${o.name}</span>`).join('');
-    el.innerHTML =
-      `<div class="cap-h"><span class="cap-id">${c.id}</span>` +
-      `<span class="cap-v">v${c.version}${c.versions.length>1?` · ${c.versions.length} versions`:''} · ${c.steps} steps</span>` +
-      `<span class="badge b-${c.approval}">${c.approval}</span></div>` +
-      `<div class="cap-d">${c.description||''}</div>` +
-      `<div class="cap-b">` +
-        (inputs ? `<div class="io">${inputs}</div>` : '<div class="meta">no inputs</div>') +
-        `<div class="io"><label>target</label><input class="url" value="${defaultUrlFor(c)}" spellcheck="false"></div>` +
-        `<div class="meta"><b>returns</b> ${outs || '&mdash;'}` +
-          (ocs ? `<br><b>or</b> ${ocs}` : '') + `</div>` +
-        (c.approval === 'incomplete'
-          ? `<div class="blocked">Not invocable — ${c.incompleteReason || 'the run never finished'}.` +
-            `<br>There is no checkpoint, so nothing could verify success. Finish the recording first.</div>`
-          : `<div class="runrow"><button class="runbtn">Run</button>` +
-            `<span class="meta" style="opacity:.75">no model — deterministic replay</span></div>`) +
-      `</div><div class="res"></div>`;
-
-    const res = el.querySelector('.res');
-    const runBtn = el.querySelector('.runbtn');
-    if (runBtn) runBtn.onclick = async (ev) => {
-      const btn = ev.currentTarget;
-      btn.disabled = true; btn.textContent = 'Running…';
-      res.className = 'res on'; res.innerHTML = '<span class="meta">replaying…</span>';
-      const inputs = {};
-      el.querySelectorAll('input[data-p]').forEach(i => { inputs[i.dataset.p] = i.value; });
-      const url = el.querySelector('.url').value.trim();
-      const r = await window.runner.runCapability({ id: c.id, inputs, url });
-      btn.disabled = false; btn.textContent = 'Run';
-      if (!r.ok){ res.innerHTML = `<span class="st bad">error</span><pre>${r.error}</pre>`; return; }
-      const x = r.result;
-      const colour = x.status==='success' ? 'ok' : x.status==='business_outcome' ? 'ok'
-                   : x.status==='escalated' ? 'warn' : 'bad';
-      let body = '';
-      if (x.status==='success') body = JSON.stringify(x.outputs, null, 2);
-      else if (x.status==='business_outcome') body = `${x.outcome}\n${x.message}\n\n(an ANSWER, not a crash — the caller handles it)`;
-      else if (x.status==='escalated') body = `${x.reason}\n\na human is needed`;
-      else body = `${x.failure.code}\nexpected: ${x.failure.expected}\nobserved: ${x.failure.observed}`;
-      const steps = (x.steps||[]).map(st =>
-        `  ${st.status==='ok'?'✓':st.status==='skipped'?'·':'✗'} ${st.index}. ${st.kind} ${st.target||''}` +
-        `${st.resolvedVia?`  via:${st.resolvedVia}`:''}`).join('\n');
-      res.innerHTML = `<span class="st ${colour}">${x.status.replace('_',' ')}</span> ` +
-        `<span class="meta">${x.ms}ms</span><pre>${body}\n\n${steps}</pre>`;
-    };
-    list.appendChild(el);
-  }
+  for (const c of caps) list.appendChild(capCard(c));
 }
 
-$('refresh').onclick = loadCaps;
-async function compile(partial){
-  const b = $('compile');
-  b.disabled = true; b.textContent = partial ? 'Saving…' : 'Compiling…';
-  const r = await window.runner.compileLatest({ partial });
-  b.disabled = false; b.textContent = 'Compile latest run → capability';
+function capCard(c) {
+  const card = el('div', 'cap');
+  const head = el('div', 'caph');
+  head.appendChild(el('span', 'id', c.id));
+  head.appendChild(el('span', 'v', `v${c.version}${c.versions.length > 1 ? ` of ${c.versions.length}` : ''} · ${c.steps} steps`));
+  head.appendChild(el('span', 'pill ' + (c.approval === 'approved' ? 'p-ok' : c.approval === 'incomplete' ? 'p-bad' : 'p-warn'), c.approval));
+  card.appendChild(head);
+  if (c.description) card.appendChild(el('div', 'capd', c.description));
+  if (c.supersededBy && c.supersededBy.length) {
+    // An approved version outranks a later draft. Say so, rather than leaving
+    // the version number looking like a mistake.
+    card.appendChild(el('div', 'capd',
+      `Approved — callers get this even though v${c.supersededBy.join(', v')} ` +
+      `${c.supersededBy.length > 1 ? 'exist' : 'exists'} as a later draft.`));
+  }
 
-  const list = $('caplist');
-  if (r.ok) { await loadCaps(); return; }
+  const body = el('div', 'capb');
+  const inputs = {};
+  if (c.inputs.length) {
+    const io = el('div', 'io');
+    for (const p of c.inputs) {
+      io.appendChild(el('label', null, `${p.name}${p.required ? '' : '?'} · ${p.type}`));
+      const i = el('input'); i.value = p.example || ''; i.placeholder = p.example || '';
+      i.oninput = () => { inputs[p.name] = i.value; };
+      inputs[p.name] = i.value;
+      io.appendChild(i);
+    }
+    body.appendChild(io);
+  }
+  const urlRow = el('div', 'io');
+  urlRow.appendChild(el('label', null, 'target'));
+  const urlIn = el('input'); urlIn.value = defaultUrlFor(c);
+  urlRow.appendChild(urlIn);
+  body.appendChild(urlRow);
 
-  const box = document.createElement('div');
-  box.className = 'why';
-  if (r.partialAvailable) {
-    // The run did not finish. Its steps are still worth keeping — but saving
-    // them has to be a deliberate act, not a silent fallback, or an
-    // un-invocable artifact ends up in the catalog looking usable.
-    box.innerHTML = '<b>That run did not finish</b>' +
-      'There is no checkpoint, so nothing could verify success. The steps it did ' +
-      'complete can still be kept as an <b style="display:inline">incomplete</b> capability — ' +
-      'a record of what was learned, and a starting point for finishing the job. ' +
-      'It will not be invocable.<br>' +
-      '<button class="btn" id="savepartial">Save anyway as incomplete</button>';
+  const meta = el('div');
+  meta.style.fontSize = '11px'; meta.style.color = 'var(--faint)';
+  meta.appendChild(document.createTextNode('returns '));
+  for (const o of c.outputs) meta.appendChild(el('span', 'tag', `${o.name}: ${o.type}`));
+  if (c.outcomes.length) {
+    meta.appendChild(el('div', null, 'or'));
+    for (const o of c.outcomes) meta.appendChild(el('span', 'tag ' + (CLS[o.classification] || ''), o.name));
+  }
+  body.appendChild(meta);
+
+  const res = el('div', 'capres');
+  if (c.approval === 'incomplete') {
+    body.appendChild(el('div', 'blocked',
+      `Not invocable — ${c.incompleteReason || 'the run never finished'}. There is no checkpoint, so nothing could verify success.`));
   } else {
-    box.innerHTML = '<b>Could not compile</b>' + r.error;
+    const row = el('div');
+    row.style.display = 'flex'; row.style.gap = '9px'; row.style.alignItems = 'center';
+    const run = el('button', 'save', 'Run');
+    const note = el('span', null, 'no model — deterministic replay');
+    note.style.fontSize = '11px'; note.style.color = 'var(--faint)';
+    row.appendChild(run); row.appendChild(note);
+    body.appendChild(row);
+
+    run.onclick = async () => {
+      run.disabled = true; run.textContent = 'Running…';
+      res.style.display = 'block'; res.textContent = 'replaying…';
+      const r = await window.runner.runCapability({ id: c.id, inputs, url: urlIn.value.trim() });
+      run.disabled = false; run.textContent = 'Run';
+      res.textContent = '';
+      if (!r.ok) { res.appendChild(el('span', 'blocked', r.error)); return; }
+      const x = r.result;
+      const cls = x.status === 'success' || x.status === 'business_outcome' ? 'p-ok'
+                : x.status === 'escalated' ? 'p-warn' : 'p-bad';
+      const h = el('div');
+      h.appendChild(el('span', 'pill ' + cls, x.status.replace('_', ' ')));
+      h.appendChild(document.createTextNode(' ' + x.ms + 'ms'));
+      res.appendChild(h);
+      const pre = el('pre');
+      pre.textContent =
+        x.status === 'success' ? JSON.stringify(x.outputs, null, 2)
+        : x.status === 'business_outcome' ? `${x.outcome}\n${x.message}\n\n(an answer, not a crash)`
+        : x.status === 'escalated' ? `${x.reason}\n\na human is needed`
+        : `${x.failure.code}\nexpected: ${x.failure.expected}\nobserved: ${x.failure.observed}`;
+      res.appendChild(pre);
+    };
   }
-  list.prepend(box);
-  const sp = document.getElementById('savepartial');
-  if (sp) sp.onclick = () => { box.remove(); compile(true); };
+  card.appendChild(body);
+  card.appendChild(res);
+  return card;
 }
 
-$('compile').onclick = () => compile(false);
-
-$('stop').onclick = async () => { await window.runner.stop(); log('\n· stopped\n'); };
-$('newrun').onclick = async () => {
-  await window.runner.stop();
-  view.src = 'about:blank';
-  run.style.display = 'none';
-  setup.style.display = 'flex';
+$('compile').onclick = async () => {
+  const b = $('compile');
+  b.disabled = true; b.textContent = 'Compiling…';
+  let r = await window.runner.compileLatest({});
+  if (!r.ok && r.partialAvailable) r = await window.runner.compileLatest({ partial: true });
+  b.disabled = false; b.textContent = 'Compile latest run';
+  if (!r.ok) { const e = el('div', 'empty'); e.style.color = 'var(--bad)'; e.textContent = r.error;
+               $('caplist').prepend(e); return; }
+  loadCaps();
 };
+
+document.querySelectorAll('.chip[data-url]').forEach((b) => b.onclick = () => { $('url').value = b.dataset.url; });
+document.querySelectorAll('.chip.task').forEach((b) => b.onclick = () => { $('task').value = b.textContent.trim(); });
+renderControl();
 </script></body></html>

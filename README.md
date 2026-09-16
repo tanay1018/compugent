@@ -116,8 +116,25 @@ the window. The bundled MemberDesk target app starts automatically if the URL
 points at localhost. Take control at any point; hand back and the agent picks
 up from wherever you left it.
 
-Three panes: the live session, the actor-tagged event log, and the runner's own
-output (collapsible via **Log**). **New run** returns to the form.
+One window, one session. The live browser fills the stage; the rail beside it
+is the run in plain language rather than raw JSON:
+
+```
+·  starting · deepseek/deepseek-v4-flash
+✓  typed 12345 into Member ID
+✓  clicked Search
+◆  read savingsBalance from Savings
+●  goal reached
+```
+
+Who is driving is always visible in the header — **AGENT** or **OPERATOR** —
+and taking over outlines the screen so there is no doubt that clicks and
+keystrokes are going into the live session. Operator actions land in the same
+feed, tinted, so the history reads as one story across the handoff. The raw
+event log is one button away.
+
+**Save as capability** appears when the run finishes, and **Capabilities**
+slides open a catalog you can run with different inputs.
 
 The **Capabilities** tab is the other half — the catalog of what has been
 recorded, with typed inputs, declared outputs, and the business outcomes each

@@ -1,0 +1,147 @@
+{
+  "goal": "look up member 12345 and read their current savings balance",
+  "entryUrl": "http://localhost:8710/?tenant=meridian",
+  "model": "deepseek/deepseek-v4-flash",
+  "startedAt": "2026-09-16T05:58:10.113Z",
+  "finishedAt": "2026-09-16T05:58:26.061Z",
+  "outcome": "success",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "type",
+      "rationale": "Enter the target member ID in the Member ID field to look up member 12345.",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-16T05:58:14.802Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "12345",
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/lookup?tenant=meridian"
+    },
+    {
+      "index": 2,
+      "kind": "click",
+      "rationale": "Search for member 12345 by member number.",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-16T05:58:17.631Z"
+        }
+      },
+      "targetVerified": true,
+      "effect": "reversible",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    },
+    {
+      "index": 3,
+      "kind": "extract",
+      "rationale": "This is the balance value displayed in the same row as the \"Savings\" account label on the member detail screen — that is the current savings balance for member 12345.",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Savings"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-16T05:58:21.753Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "savingsBalance",
+      "observedValue": "$4,182.55",
+      "effect": "read",
+      "locationAfter": "http://localhost:8710/detail?tenant=meridian&q1=12345&q2=M"
+    }
+  ],
+  "warnings": [],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "Member Detail",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "main"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-09-16T05:58:24.218Z"
+      }
+    },
+    "description": "Looked up member 12345 (Sarah Chen, Active) and read their savings balance: $4,182.55 (located by the text in the same row as the \"Savings\" account label). The \"Member Detail\" heading confirms we reached the correct screen."
+  },
+  "summary": "Looked up member 12345 (Sarah Chen, Active) and read their savings balance: $4,182.55 (located by the text in the same row as the \"Savings\" account label). The \"Member Detail\" heading confirms we reached the correct screen.",
+  "usage": {
+    "inputTokens": 10346,
+    "inputTokenDetails": {
+      "noCacheTokens": 4202,
+      "cacheReadTokens": 6144,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 685,
+    "outputTokenDetails": {
+      "textTokens": 478,
+      "reasoningTokens": 207
+    },
+    "totalTokens": 11031
+  },
+  "stepUsage": [
+    {
+      "in": 1694,
+      "out": 180,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 1851,
+      "out": 98,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 2094,
+      "out": 261,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 2287,
+      "out": 116,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 2420,
+      "out": 30,
+      "reasoning": 0,
+      "cached": 0
+    }
+  ]
+}
