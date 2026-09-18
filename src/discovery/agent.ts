@@ -237,10 +237,44 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
            `The work the operator did may have already advanced the goal.\n\n${renderObservation(obs)}`;
   };
 
+  /**
+   * One action per step, enforced.
+   *
+   * A model may emit several tool calls in a single step, and the SDK will run
+   * all of them back to back. For a chat tool that is a throughput win; for a
+   * UI it is incoherent. Every action changes the screen, so the second call in
+   * a step was chosen against a screen that no longer exists by the time it
+   * runs -- it targets a stale node, and nothing re-perceives in between to
+   * notice.
+   *
+   * This was not theoretical. On weather.gov the model emitted click("Go") and
+   * type("10001") together; they executed 48ms apart, so Go was pressed on an
+   * empty form. The submit did nothing, and every later step reasoned about a
+   * failure whose cause had already scrolled out of view: seven more Go clicks
+   * and the run timed out on a form that works first try when driven one
+   * action at a time.
+   *
+   * Refusing the extra call is better than queueing it. The model is told why,
+   * gets a fresh observation, and picks its next action against the screen that
+   * actually exists.
+   */
+  let actedThisStep = false;
+
   const perform = async (
     kind: 'click' | 'type' | 'select',
     ref: number, why: string, text?: string,
   ): Promise<string> => {
+    if (actedThisStep) {
+      log.append('system', 'discovery.serialized', { kind, note: 'second action in one step refused' });
+      obs = await surface.observe();
+      return `NOT PERFORMED: one action per step.\n\n` +
+             `You asked for "${kind}" alongside another action. The screen changes after every ` +
+             `action, so this one was chosen against a screen that no longer exists. Nothing was ` +
+             `assumed on your behalf. Here is the state after the first action -- decide again ` +
+             `from what is actually there.\n\n${renderObservation(obs)}`;
+    }
+    actedThisStep = true;
+
     const interrupted = await honourBargeIn(kind);
     if (interrupted) return interrupted;
     const node = nodeByRef(ref);
@@ -356,7 +390,10 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       abortSignal: AbortSignal.timeout(timeoutMs),
       // Only the current screen is decidable-on; older ones are dead weight
       // that the loop would otherwise pay to resend on every step.
-      prepareStep: ({ messages }) => ({ messages: compactObservations(messages) }),
+      prepareStep: ({ messages }) => {
+        actedThisStep = false;   // new step, new screen, one action allowed
+        return { messages: compactObservations(messages) };
+      },
       /**
        * Per-step token accounting. Without this, a run reports one aggregate
        * number and there is no way to tell a big page from a long history from
@@ -458,7 +495,15 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
         finish: tool({
           description: 'The goal is met. Nominate a node proving you reached the right screen.',
           inputSchema: z.object({
-            checkpointRef: Ref.describe('a node whose presence proves arrival — prefer a stable label over a changing value'),
+            checkpointRef: Ref.describe(
+              'a node whose presence proves arrival. It must be something that will be there ' +
+              'for EVERY value this capability is later run with, not just the one you used. ' +
+              'Page furniture that happens to be present today is the wrong choice: a warning ' +
+              'banner, a promotion, a "discuss this issue" notice or anything conditional on ' +
+              'this particular record will be missing on the next one and the run will report ' +
+              'failure on a screen that is perfectly correct. Prefer the heading, the title, or ' +
+              'a label that is part of the page template itself.',
+            ),
             summary: z.string(),
           }),
           execute: async ({ checkpointRef, summary: s }) => {

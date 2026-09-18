@@ -149,6 +149,8 @@ export class PlaywrightSurface implements Surface {
     await this.cdp.send('DOM.getDocument', { depth: -1, pierce: true });
     const frames = await this.frames();
     const nodes: UINode[] = [];
+    /** Anchoring is a second pass so a budget can be spent on what matters. */
+    const candidates: UINode[] = [];
     let ref = 0;
 
     for (const f of frames) {
@@ -202,20 +204,41 @@ export class PlaywrightSurface implements Surface {
         // Cost is two CDP round trips per control. Bounded in practice
         // (actionable controls are a small fraction of a screen) but it is the
         // obvious place to batch if a wide results grid ever makes it hurt.
-        // Text and cells are anchored too, because OUTPUTS live in them. To
-        // extract a savings balance from a table layout you need "the cell in
-        // the row whose label says Savings" -- the value itself is the payload,
-        // never the identity.
-        const anchorable = ACTIONABLE.has(role) || role === 'text' || role === 'cell';
-        if (anchorable && ax.backendDOMNodeId !== undefined && nodes.length < 250) {
-          const enriched = await this.nearbyText(ax.backendDOMNodeId);
-          if (enriched) {
-            if (enriched.nearby) { node.anchorText = enriched.nearby; node.anchorRelation = enriched.rel; }
-            if (enriched.inputType) node.inputType = enriched.inputType;
-          }
-        }
+        if (ACTIONABLE.has(role) || role === 'text' || role === 'cell') candidates.push(node);
         nodes.push(node);
       }
+    }
+
+    /**
+     * Anchor pass, in priority order and within a budget.
+     *
+     * Enriching inline meant a flat cut-off partway through the document, and
+     * on a large page the anchoring silently switched off exactly where it was
+     * needed: a Wikipedia infobox -- clean label/value rows, the structure this
+     * system exists to read -- arrived with 82 unanchored cells because three
+     * hundred navigation links had already spent the budget.
+     *
+     * Priority is by how much the anchor is WORTH, not by role importance.
+     * Ranking all controls first was backwards: an article with 1577 links
+     * spent the entire budget on things whose own text already names them, and
+     * reached none of the 82 infobox cells. An anonymous control has no
+     * identity without its anchor; a cell is half of a label/value pair; a
+     * named link needs neither.
+     *
+     * Two CDP round trips each, so the budget is real — and on a very large
+     * page it will not cover everything. It now covers the right things.
+     */
+    const priority = (n: UINode) =>
+      ACTIONABLE.has(n.role) && n.name === '' ? 0   // anonymous control: the anchor IS its identity
+      : n.role === 'cell' ? 1                       // label/value pair: where outputs live
+      : ACTIONABLE.has(n.role) ? 2                  // named control: its name already works
+      : 3;                                          // loose text: rarely either
+    const budget = Number(process.env.MAX_ANCHOR_NODES ?? 260);
+    for (const node of candidates.sort((a, b) => priority(a) - priority(b)).slice(0, budget)) {
+      const enriched = await this.nearbyText(node.handle as number);
+      if (!enriched) continue;
+      if (enriched.nearby) { node.anchorText = enriched.nearby; node.anchorRelation = enriched.rel; }
+      if (enriched.inputType) node.inputType = enriched.inputType;
     }
 
     return {
@@ -299,13 +322,38 @@ export class PlaywrightSurface implements Surface {
     await this.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
 
     if (action.kind === 'type') {
-      // Select-all then overwrite, so replaying into a pre-filled field is
-      // idempotent rather than appending to whatever was already there.
-      for (const type of ['keyDown', 'keyUp'] as const) {
-        await this.cdp.send('Input.dispatchKeyEvent', {
-          type, modifiers: 4, key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65,
-        });
-      }
+      /**
+       * Clear the field before inserting.
+       *
+       * The previous approach dispatched a raw Cmd+A key event and trusted the
+       * browser to treat it as select-all. Raw CDP key events do not reliably
+       * trigger browser-level shortcuts, so on any field that already held a
+       * value the new text was APPENDED. Every input in the bundled app starts
+       * empty, which hid this completely until a real site's search box --
+       * which retains its query -- produced "wireless mousewireless mouse" and
+       * the run spent its whole budget trying to correct itself.
+       *
+       * Selecting the element's own contents is not a shortcut the page can
+       * swallow, and it still leaves the field focused so insertText lands and
+       * the app's own input handlers fire.
+       */
+      try {
+        const { object } = await this.cdp.send('DOM.resolveNode', { backendNodeId: node.handle as number });
+        if (object.objectId) {
+          await this.cdp.send('Runtime.callFunctionOn', {
+            objectId: object.objectId, returnByValue: true,
+            functionDeclaration: `function () {
+              this.focus && this.focus();
+              if (typeof this.select === 'function') { this.select(); return true; }
+              if (this.isContentEditable) {
+                const r = document.createRange(); r.selectNodeContents(this);
+                const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return true;
+              }
+              return false;
+            }`,
+          });
+        }
+      } catch { /* fall through -- insertText still works on an empty field */ }
       await this.cdp.send('Input.insertText', { text: action.text ?? '' });
     }
     if (action.kind === 'press' && action.key) {
@@ -319,6 +367,18 @@ export class PlaywrightSurface implements Surface {
    *  RAW COORDINATES -- it has no notion of selectors or descriptors. */
   async boundsOf(node: UINode): Promise<{ x: number; y: number }> {
     return this.centreOf(node);
+  }
+
+  /** Read a control's live value. Used by tests; the a11y tree lags input. */
+  async valueOf(r: { ok: boolean; node?: UINode }): Promise<string> {
+    if (!r.ok || !r.node) return '';
+    const { object } = await this.cdp.send('DOM.resolveNode', { backendNodeId: r.node.handle as number });
+    if (!object.objectId) return '';
+    const out = await this.cdp.send('Runtime.callFunctionOn', {
+      objectId: object.objectId, returnByValue: true,
+      functionDeclaration: 'function () { return String(this.value ?? this.textContent ?? ""); }',
+    });
+    return String((out.result?.value as string) ?? '');
   }
 
   async screenshot(): Promise<Buffer> {
@@ -339,7 +399,8 @@ export class PlaywrightSurface implements Surface {
    * (lookup -> interstitial -> detail); returning after the first one would
    * observe a page that is about to be replaced.
    */
-  async waitForStable({ timeoutMs = 15000, quietMs = 150, graceMs = 400, networkQuietMs = 350 } = {}): Promise<void> {
+  async waitForStable({ timeoutMs = 15000, quietMs = 150, graceMs = 400,
+                       networkQuietMs = 350, networkDeadlineMs = 2500 } = {}): Promise<void> {
     // A click dispatched over CDP returns before the browser has even started
     // navigating. Without a grace window, this returns instantly against the
     // page that is about to be replaced -- and the caller observes stale state.
@@ -356,9 +417,17 @@ export class PlaywrightSurface implements Surface {
         continue;
       }
       const ready = await this.page.evaluate(() => document.readyState === 'complete').catch(() => false);
-      // Ready AND navigation quiet AND nothing still being fetched. The last
-      // condition is what lets an async-rendered table finish arriving.
-      const netQuiet = this.inFlight === 0 && Date.now() - this.lastNetAt > networkQuietMs;
+      // Ready AND navigation quiet AND nothing still being fetched.
+      //
+      // The last condition is what lets an async-rendered table finish
+      // arriving -- but it is BEST EFFORT, on its own short deadline. A real
+      // site never goes network-idle: analytics, ad beacons and trackers keep
+      // firing indefinitely, so waiting for silence burned the full timeout on
+      // every single observation (20s a step, on a 133-node page). After the
+      // deadline we proceed on document-ready alone, which is what we did
+      // before async content was a consideration at all.
+      const waitedLongEnough = Date.now() - startedAt > networkDeadlineMs;
+      const netQuiet = waitedLongEnough || (this.inFlight === 0 && Date.now() - this.lastNetAt > networkQuietMs);
       if (ready && Date.now() - this.lastNavAt > quietMs && netQuiet) return;
       await new Promise((r) => setTimeout(r, 40));
     }

@@ -20,15 +20,44 @@ const unattended = args.includes('--unattended');
 const inputs: Record<string, string> = {};
 for (const a of args) { const m = /^([A-Za-z0-9_]+)=(.*)$/.exec(a); if (m) inputs[m[1]!] = m[2]!; }
 
+const artifact = new ArtifactStore().load(id);
+
+function artifactOrigin(): string | undefined {
+  const host = artifact?.app?.recordedTenant;
+  if (!host || !host.includes('.')) return undefined;   // a tenant slug, not a host
+  return `https://${host}${artifact.app.entryPath || '/'}`;
+}
+
 const urlFlag = args.indexOf('--url');
 const port = process.env.TARGET_APP_PORT ?? '8710';
 const tenant = process.env.TENANT ?? 'meridian';
 // --url points the SAME artifact at a different host. That is the multi-tenant
 // seam in miniature: the artifact stores a route pattern, never an origin.
-const baseUrl = urlFlag >= 0 ? args[urlFlag + 1]! : `http://localhost:${port}/?tenant=${tenant}`;
+
+/**
+ * Where to replay, in order of authority:
+ *
+ *   1. --url            an explicit override, always wins
+ *   2. the artifact     the origin it was actually recorded against
+ *   3. the local app    the development default
+ *
+ * (2) is the part that was missing. `recordedTenant` holds a tenant NAME for
+ * the multi-tenant demo app ("meridian") but a real HOSTNAME for a capability
+ * recorded on a public site ("forecast.weather.gov"). Without this, every
+ * artifact recorded off-box replayed against localhost and failed its first
+ * waypoint on a page that had never heard of it -- a confusing "element not
+ * found" for what was really "wrong website".
+ *
+ * A dot is the discriminator: tenant slugs do not contain one, hostnames do.
+ * This keeps the origin swappable, which is the whole point of storing a route
+ * pattern rather than a URL -- it just stops defaulting to the wrong origin.
+ */
+const recorded = artifactOrigin();
+const baseUrl = urlFlag >= 0 ? args[urlFlag + 1]!
+  : recorded ?? `http://localhost:${port}/?tenant=${tenant}`;
 
 const asJson = args.includes('--json');
-const artifact = new ArtifactStore().load(id);
+
 const repeatFlag = args.indexOf('--repeat');
 const repeat = repeatFlag >= 0 ? Math.max(1, Number(args[repeatFlag + 1] ?? 1)) : 1;
 

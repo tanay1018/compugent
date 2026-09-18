@@ -7,7 +7,7 @@ that artifact then replays deterministically with **no model in the decision
 loop**, which is the path an AI agent invokes in production.
 
 > Status: **Phase 8 — verified on a live public site.** See `../ROADMAP.md` for
-> the plan and `REPORT.md` (pending) for the design write-up.
+> the plan and `REPORT.md` for the design write-up.
 
 ## Setup
 

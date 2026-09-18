@@ -205,7 +205,41 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
   // --- Validate the proposal against the trace ---------------------------
   const paramByStep = new Map<number, ParamSpec>();
   const inputs: ParamSpec[] = [];
+
+  /**
+   * A parameter the caller could not possibly supply is not a parameter.
+   *
+   * Asked to generalise a Wikipedia lookup, the model proposed `companyName`
+   * ("Bank of America") and also `suggestionLabel` ("Bank of America American
+   * multinational banking and financial services corporation") -- the second
+   * being a string Wikipedia composed FROM the first. As a required input it
+   * is unanswerable: to call the capability you would have to already know the
+   * description of the article you are trying to find.
+   *
+   * Containment is the giveaway. One proposed value sitting inside another
+   * means the surface derived it, so the longer one is dropped and its step
+   * falls back to the anchor tier -- which holds the short value, and is the
+   * tier that generalises anyway.
+   */
+  const derived = new Set(
+    proposal.parameters.filter((p) =>
+      proposal.parameters.some((q) =>
+        q !== p && q.literalValue.length >= 4 &&
+        p.literalValue.length > q.literalValue.length &&
+        p.literalValue.includes(q.literalValue),
+      ),
+    ).map((p) => p.name),
+  );
+
   for (const p of proposal.parameters) {
+    if (derived.has(p.name)) {
+      warnings.push(
+        `dropped proposed parameter "${p.name}": its value is text the surface composed from ` +
+        `another parameter, so no caller could supply it. The step it came from is matched by ` +
+        `its anchor instead.`,
+      );
+      continue;
+    }
     const step = trace.steps.find((s) => s.index === p.stepIndex);
     if (!step) {
       warnings.push(`dropped proposed parameter "${p.name}": no step ${p.stepIndex}`);
@@ -228,11 +262,17 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       continue;
     }
 
-    const spec = ParamSpec.parse({
+    // One parameter may legitimately drive several steps -- a zip code typed
+    // into a search box and echoed into the result header is still ONE input.
+    // The proposal carries one entry per step, so pushing blindly produced a
+    // duplicate in the tool schema's `required` array and offered the caller
+    // the same argument twice.
+    const existing = inputs.find((i) => i.name === p.name);
+    const spec = existing ?? ParamSpec.parse({
       name: p.name, type: p.type, required: true, description: p.description,
       example: p.literalValue, sensitive: p.sensitive,
     });
-    inputs.push(spec);
+    if (!existing) inputs.push(spec);
     if (fromValue) paramByStep.set(p.stepIndex, spec);
   }
 
@@ -278,10 +318,70 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     let out = t;
     for (const p of inputs) {
       if (!p.example) continue;
-      if (out.name === p.example) out = { ...out, name: `{{${p.name}}}` };
+
+      /**
+       * Whole-string equality was too strict. A surface routinely embeds the
+       * value in a longer string it composed itself -- Wikipedia's checkpoint
+       * anchor is "Talk:Bank of America", not "Bank of America" -- and an
+       * exact match leaves that pinned to the recorded record forever.
+       *
+       * Substituting inside the string is only safe when the value is
+       * distinctive enough that its appearance is not a coincidence. A short
+       * example ("1", "NY") occurs inside unrelated text constantly, so the
+       * substitution is restricted to values long enough to mean something.
+       */
+      const embed = (text: string): string =>
+        p.example!.length >= 4 && text.includes(p.example!)
+          ? text.split(p.example!).join(`{{${p.name}}}`)
+          : text;
+
+      if (out.name === p.example) {
+        out = { ...out, name: `{{${p.name}}}` };
+      } else if (out.name && p.example!.length >= 4 && out.name.includes(p.example!)) {
+        /**
+         * The parameter is embedded in a name the SURFACE composed -- Wikipedia's
+         * suggestion reads "Bank of America American multinational banking and
+         * financial services corporation" -- and the rest of that string is data
+         * too, so the name cannot be generalised.
+         *
+         * Loosening it to a `contains` match on just the parameter was tried and
+         * is worse: every one of the eleven suggestions contains "Bank of
+         * America", so the name tier went from missing cleanly to matching
+         * everything, and the step failed as ambiguous even for the value it was
+         * recorded on.
+         *
+         * Left pinned, the name tier simply misses on a new value and resolution
+         * falls through to the ANCHOR, which holds `{{companyName}}` and does
+         * generalise. That fallthrough is what the tiers are for; the warning
+         * tells a reviewer the name is not what is doing the work.
+         */
+        warnings.push(
+          `step target name ${JSON.stringify(out.name)} embeds "${p.name}" in text the surface ` +
+          `composed, so it stays pinned to the recorded value. This step generalises through its ` +
+          `anchor instead — if it has none, re-record via a control that carries a real label.`,
+        );
+      }
+
       if (out.anchor?.text === p.example) out = { ...out, anchor: { ...out.anchor, text: `{{${p.name}}}` } };
+      else if (out.anchor?.text) out = { ...out, anchor: { ...out.anchor, text: embed(out.anchor.text) } };
     }
     return out;
+  };
+
+  /**
+   * An assertion carries the literal too, in whichever field its variant uses.
+   */
+  const parameteriseAssertion = (a: StateAssertion): StateAssertion => {
+    if (a.kind === 'nodeExists' || a.kind === 'nodeAbsent') return { ...a, target: parameteriseTarget(a.target) };
+    if (a.kind === 'all') return { ...a, of: a.of.map((x) => parameteriseAssertion(x) as typeof x) };
+    if (a.kind === 'textPresent') {
+      let text = a.text;
+      for (const p of inputs) {
+        if (p.example && p.example.length >= 4 && text.includes(p.example)) text = text.split(p.example).join(`{{${p.name}}}`);
+      }
+      return { ...a, text };
+    }
+    return a;
   };
 
   // Extraction is described by `outputs`, not replayed as an action.
@@ -345,7 +445,11 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     // produce the state, never guessed from a happy path.
     outcomes: [],
     steps,
-    ...(trace.checkpoint ? { checkpoint: trace.checkpoint } : {}),
+    // The checkpoint proves the run ARRIVED, so it has to generalise with the
+    // steps that get there. Left literal, a capability parameterised over
+    // companies walked correctly to the Microsoft article and then declared
+    // failure because the page did not mention Bank of America.
+    ...(trace.checkpoint ? { checkpoint: parameteriseAssertion(trace.checkpoint) } : {}),
     approval: complete ? 'draft' : 'incomplete',
     ...(incompleteReason ? { incompleteReason } : {}),
     provenance: {

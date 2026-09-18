@@ -20,7 +20,8 @@
     "watch": "tsx scripts/watch.ts",
     "desktop": "electron electron/main.cjs",
     "models": "tsx scripts/models.ts",
-    "approve": "tsx scripts/approve.ts"
+    "approve": "tsx scripts/approve.ts",
+    "verify": "tsx scripts/verify.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",

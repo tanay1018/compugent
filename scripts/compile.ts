@@ -4,7 +4,7 @@
  *   npm run compile                 # newest discovery run
  *   npm run compile -- <runDir>
  */
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { compileTrace, setVersionResolver } from '../src/compile/compiler.js';
 import { ArtifactStore } from '../src/store/artifacts.js';
@@ -24,7 +24,11 @@ const arg = process.argv[2];
 // ones a user is most likely to want compiled straight after recording.
 const runs = readdirSync('evidence')
   .filter((d) => d.startsWith('discovery-') || d.startsWith('watch-'))
-  .sort();
+  // By mtime, not by name: run directories are prefixed with how they were
+  // produced ("discovery-", "watch-"), so sorting by name ranked every watch
+  // run above every discovery run no matter which actually ran last, and
+  // `npm run compile` kept reaching for a stale trace.
+  .sort((a, b) => statSync(join('evidence', a)).mtimeMs - statSync(join('evidence', b)).mtimeMs);
 const latest = runs.at(-1);
 if (!arg && !latest) { console.error('no discovery runs in evidence/'); process.exit(1); }
 const runDir = arg ?? join('evidence', latest!);
