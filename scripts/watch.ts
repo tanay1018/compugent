@@ -132,6 +132,8 @@ console.log(`  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'
   console.log('__RUN_DONE__' + JSON.stringify({
     outcome: trace.outcome, steps: trace.steps.length, runDir: log.dir,
     hasCheckpoint: Boolean(trace.checkpoint),
+    reason: trace.blockedReason ?? null,
+    warnings: trace.warnings.slice(0, 3),
   }));
 
   if (trace.outcome === 'success') {

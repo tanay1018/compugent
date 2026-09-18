@@ -291,7 +291,7 @@ const el = (t, c, x) => { const n = document.createElement(t); if (c) n.classNam
 const frag = (...kids) => { const f = document.createDocumentFragment();
   for (const k of kids) if (k) f.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); return f; };
 
-const S = { view:'start', mode:'discovery', holder:'agent', control:'agent',
+const S = { view:'start', mode:'discovery', holder:'agent', control:'agent', stopped:false,
   goal:'', runDir:null, outcome:null, hasCheckpoint:false, frames:0, caps:[], selected:null, plan:null };
 
 /* ---------------- views ---------------- */
@@ -378,7 +378,15 @@ function describe(ev) {
     case 'policy.approved': return { mk:'!', cls:'agent warn', kids:['Irreversible step allowed — ' + cut(L, 34)] };
     case 'step.skipped':    return { mk:'·', cls:'agent', kids:['Skipped step ' + q(d.step) + ' — already done'] };
     case 'descriptor.unverified': return { mk:'!', cls:'agent warn', kids:['Fragile target — ' + cut(d.problem, 76)] };
-    case 'surface.thin':    return { mk:'!', cls:'agent warn', kids:['Little to work with — ' + cut(d.note, 84)] };
+    case 'surface.thin':
+      // Worth saying plainly: this is almost always a bot wall or a consent
+      // gate, not a fault in the run.
+      showResult('This Site Is Not Operable',
+        'The page exposed almost nothing to work with — no input controls and barely any clickable ' +
+        'elements.\n\nThat is usually a bot wall, a consent gate, or a canvas-rendered app with no ' +
+        'accessibility layer. Nothing here tries to defeat those.\n\nTargets known to work: the ' +
+        'bundled MemberDesk app, books.toscrape.com, Wikipedia, Hacker News.');
+      return { mk:'!', cls:'agent warn', kids:['Little to work with — ' + cut(d.note, 84)] };
     case 'manual.click':    return { mk:'✓', cls:'operator', kids:[q(d.control) ? frag('You clicked ', bold(cut(d.control, 36))) : 'You clicked an unlabelled area'] };
     case 'manual.input':    return { mk:'✓', cls:'operator', kids: d.value === undefined
                               ? [frag('You filled ', bold(q(d.control) || 'a field'), ' — value not recorded')]
@@ -448,6 +456,7 @@ function planProgress(ev) {
 
 /* ---------------- channel ---------------- */
 window.runner.onSessionEvent((d) => {
+  if (S.stopped) return;
   if (d.frame) img.src = 'data:image/jpeg;base64,' + d.frame;
   if (d.state) { S.holder = d.state.holder; S.control = d.state.control; renderControl(); }
   if (d.event) pushEvent(d.event);
@@ -471,6 +480,18 @@ window.runner.onDone((info) => {
   const s = $('save');
   s.style.display = ''; s.textContent = info.hasCheckpoint ? 'Save as Capability' : 'Save as Incomplete';
   $('done').style.display = '';
+
+  if (info.outcome !== 'success') {
+    // Why a run ended is the most useful thing on screen at that moment, and
+    // it was only appearing as one truncated line in the feed.
+    const heads = { gave_up:'Stopped — Needs a Human', blocked:'Blocked by Policy',
+                    timeout:'Timed Out', max_steps:'Ran Out of Steps', error:'Run Failed' };
+    let body = info.reason || 'The run did not reach the goal.';
+    if (info.warnings?.length) body += '\n\n' + info.warnings.map((w) => '· ' + w).join('\n');
+    if (S.hasCheckpoint === false) body += '\n\nNo checkpoint was established, so this cannot be replayed. ' +
+      'The steps it did complete can still be kept as an incomplete capability.';
+    showResult(heads[info.outcome] || 'Run Ended', body);
+  }
 });
 
 window.runner.onReplayPlan((plan) => renderPlan(plan));
@@ -498,7 +519,9 @@ function setOutcome(o) {
 
 /* ---------------- starting things ---------------- */
 function resetSession(mode, goal) {
-  Object.assign(S, { mode, goal, runDir:null, outcome:null, hasCheckpoint:false, frames:0, plan:null });
+  Object.assign(S, { mode, goal, runDir:null, outcome:null, hasCheckpoint:false, frames:0, plan:null, stopped:false });
+  $('stop').style.display = ''; $('stop').disabled = false;
+  $('takeover').style.display = ''; $('takeover').disabled = false;
   $('mode').textContent = mode === 'replay' ? 'Replay' : 'Discovery';
   $('mode').className = 'mode ' + mode;
   $('sgoal').textContent = goal;
@@ -524,7 +547,26 @@ $('go').onclick = async (e) => {
   resetSession('discovery', task);
 };
 
-$('stop').onclick = () => window.runner.stop();
+$('stop').onclick = async (e) => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  await window.runner.stop();
+  S.stopped = true;
+  // Stopping used to kill the child and change nothing on screen: a dead
+  // channel behind a live-looking session. Say so, and offer the way out.
+  $('mode').textContent = 'Stopped';
+  $('mode').className = 'mode';
+  $('takeover').disabled = true;
+  $('handback').style.display = 'none';
+  $('takeover').style.display = 'none';
+  $('screen').className = '';
+  $('stagenote').style.display = '';
+  $('stagenote').className = '';
+  $('stagenote').textContent = 'Session ended. The browser has been closed.';
+  if (!S.outcome) setOutcome('stopped');
+  $('done').style.display = '';
+  b.style.display = 'none';
+};
 $('done').onclick = async () => { await window.runner.stop(); await loadCaps(); show(S.selected ? 'cap' : 'start'); };
 $('rawtoggle').onclick = () => { const r = $('raw'); const on = r.style.display !== 'block';
   r.style.display = on ? 'block' : 'none'; $('rawtoggle').textContent = on ? 'Hide Log' : 'Raw Log'; };

@@ -388,6 +388,9 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
           inputSchema: z.object({ ref: Ref, value: z.string(), why: Why }),
           execute: ({ ref, value, why }) => perform('select', ref, why, value),
         }),
+        // Barge-in is honoured at EVERY tool boundary. Checking only the
+        // acting tools meant an operator who pressed Take Over while the agent
+        // was reading a value, finishing, or giving up waited forever.
         extract: tool({
           description:
             'Record that a value on screen is part of the answer. Use this for every output — ' +
@@ -398,6 +401,8 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
             why: Why,
           }),
           execute: async ({ ref, as, why }) => {
+            const interrupted = await honourBargeIn('extract');
+            if (interrupted) return interrupted;
             const node = nodeByRef(ref);
             // Extraction targets are anchor-only: the node's text IS the data,
             // so using it as the identity would pin the artifact to one member.
@@ -425,6 +430,8 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
             summary: z.string(),
           }),
           execute: async ({ checkpointRef, summary: s }) => {
+            const interrupted = await honourBargeIn('finish');
+            if (interrupted) return interrupted;
             const node = nodeByRef(checkpointRef);
             const described = describeNode(obs, node, node.name ? 'action' : 'extraction');
             checkpoint = { kind: 'nodeExists', target: described.descriptor, description: s };
@@ -440,6 +447,9 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
           execute: async ({ reason, blocking }) => {
             outcome = 'gave_up';
             blockedReason = `${reason} — blocked on: ${blocking}`;
+            // The run is over and a human is wanted. Do not make them wait for
+            // a step boundary that will never come.
+            if (opts.session) opts.session.agentActive = false;
             log.append('agent', 'escalate', { reason, blocking },
               log.saveScreenshot(await surface.screenshot(), 'stuck'));
             return 'Escalation recorded. Stop now.';

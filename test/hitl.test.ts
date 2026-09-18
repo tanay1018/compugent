@@ -153,3 +153,32 @@ test('an irreversible step that has NOT happened needs an operator decision', ()
   assert.equal(d.safe, true);
   assert.deepEqual(d.safe ? d.plan.needsApproval : [], [2]);
 });
+
+test('a pending handover cannot outlive the automation loop', () => {
+  // The bug: an operator pressed Take Over while the agent was calling a tool
+  // that was not one of the acting three. The loop then ENDED, so it never
+  // reached another step boundary, and nothing else was watching. Control sat
+  // on pause_requested forever and the button read "Yielding…" indefinitely.
+  const t = new ControlToken();
+  let active = true;
+  // Mirrors HandoffSession's setter: clearing the flag completes the handover.
+  const setActive = (v: boolean) => {
+    active = v;
+    if (!v && t.pauseRequested) t.yieldToOperator('automation stopped with a pause outstanding');
+  };
+
+  t.requestPause('operator pressed take over');
+  assert.equal(t.holder, 'agent', 'still the agent until it yields');
+
+  setActive(false);              // the loop finishes
+  assert.equal(active, false);
+  assert.equal(t.holder, 'operator', 'the operator must end up with control');
+  assert.equal(t.canOperatorAct, true);
+});
+
+test('clearing the flag with no pause pending changes nothing', () => {
+  const t = new ControlToken();
+  const setActive = (v: boolean) => { if (!v && t.pauseRequested) t.yieldToOperator('x'); };
+  setActive(false);
+  assert.equal(t.holder, 'agent');
+});

@@ -33,17 +33,31 @@ export class HandoffSession {
   /**
    * Is an automation loop currently executing?
    *
-   * Decides WHO yields. With a loop running, only the loop may hand over —
-   * at a step boundary, once its in-flight action has completed. With nothing
-   * running (sitting at an escalation) there is no boundary to wait for, so
-   * the console hands over immediately. Getting this wrong transfers control
-   * mid-action and puts an event in the log with no clear actor.
+   * Decides WHO yields. With a loop running, only the loop may hand over — at a
+   * step boundary, once its in-flight action has completed. With nothing
+   * running there is no boundary to wait for, so control transfers at once.
+   *
+   * A setter rather than a field, because the dangerous case is the loop
+   * STOPPING while a pause is outstanding: the operator has asked for control,
+   * the loop will never reach another boundary, and nothing else was watching.
+   * That left "Take Over" stuck on Yielding… forever. Clearing this now always
+   * completes a pending handover.
    */
-  agentActive = false;
+  private _agentActive = false;
+  get agentActive(): boolean { return this._agentActive; }
+  set agentActive(v: boolean) {
+    this._agentActive = v;
+    if (!v && this.control.pauseRequested) {
+      this.log.append('system', 'control.autoyield', {
+        note: 'automation stopped while a handover was pending',
+      });
+      this.control.yieldToOperator('automation stopped with a pause outstanding');
+    }
+  }
 
   constructor(
     private readonly surface: PlaywrightSurface,
-    private readonly log: RunLog,
+    readonly log: RunLog,
   ) {
     this.control.onChange((e) => {
       this.log.append(e.by, 'control.transition', { from: e.from, to: e.to, reason: e.reason });
