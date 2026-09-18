@@ -611,7 +611,12 @@ function select(id) { S.selected = id; renderRail();
 function defaultUrlFor(c) {
   const t = c.app?.recordedTenant || '';
   if (/^https?:/.test(t)) return t;
-  if (/toscrape/.test(t)) return 'https://books.toscrape.com/';
+  // A hostname if it has a dot, a tenant slug if it does not. This is checked
+  // BEFORE the product heuristic below because vendorProduct is written by the
+  // compile model and it does get this wrong -- it labelled a weather.gov
+  // capability "Corelink MemberDesk 7.2", which pointed Run Live at localhost.
+  // What the artifact recorded is a fact; what the model called it is a guess.
+  if (t.includes('.')) return `https://${t}${c.app?.entryPath || '/'}`;
   if (c.app?.vendorProduct?.includes('MemberDesk')) return `http://localhost:8710/?tenant=${t || 'meridian'}`;
   return '';
 }
