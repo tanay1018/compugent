@@ -92,13 +92,22 @@ if (repeat > 1) {
   for (const [i, r] of runs.entries()) {
     console.log(`  ${String(i + 1).padStart(2)}. ${r.status.padEnd(18)} ${String(r.ms).padStart(6)}ms  ${r.outputs.slice(0, 60)}`);
   }
-  const stable = distinct('status') === 1 && distinct('outputs') === 1 && distinct('tiers') === 1;
+  const consistent = distinct('status') === 1 && distinct('outputs') === 1 && distinct('tiers') === 1;
+  // Consistency alone is not the good news it looks like: three identical
+  // FAILURES are perfectly consistent, and printing a green STABLE for them
+  // (and exiting 0) would let a broken capability pass a CI gate built on
+  // --repeat. Determinism is only worth reporting about a run that worked.
+  const working = runs.every((r) => r.status === 'success' || r.status === 'business_outcome');
+  const stable = consistent && working;
   console.log(`\n  distinct statuses      ${distinct('status')}`);
   console.log(`  distinct outputs       ${distinct('outputs')}`);
   console.log(`  distinct resolution    ${distinct('tiers')}   (which tier each step matched through)`);
   console.log(`  timing                 ${Math.min(...times)}–${Math.max(...times)}ms`);
-  console.log(`\n  ${stable ? '\x1b[32mSTABLE\x1b[0m — identical result, outputs and resolution path every run'
-                            : '\x1b[31mFLAKY\x1b[0m — see the differing column above'}\n`);
+  const verdict =
+    stable            ? '\x1b[32mSTABLE\x1b[0m — identical result, outputs and resolution path every run'
+    : consistent      ? `\x1b[31mCONSISTENTLY FAILING\x1b[0m — every run ended "${runs[0]!.status}". Repeatable, but not working.`
+    :                   '\x1b[31mFLAKY\x1b[0m — see the differing column above';
+  console.log(`\n  ${verdict}\n`);
   process.exit(stable ? 0 : 1);
 }
 

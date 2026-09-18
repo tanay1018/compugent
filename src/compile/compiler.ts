@@ -67,6 +67,11 @@ export interface CompileOptions {
    * run into a capability is how an un-invocable artifact ends up in a catalog.
    */
   allowPartial?: boolean;
+  /**
+   * Capabilities already in the catalogue, so re-recording one produces a new
+   * VERSION of it rather than a new capability beside it.
+   */
+  knownCapabilities?: { id: string; description: string }[];
 }
 
 /**
@@ -196,9 +201,27 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       'identifier) and which are FIXED CONFIGURATION (they are part of how the capability works, like choosing which ' +
       'search mode a form uses)? Getting this wrong either pins the capability to one record, or exposes a knob no ' +
       'caller should have to think about.\n\n' +
-      'Copy literalValue exactly as given. Do not invent parameters that are not literals in the trace.',
+      'Copy literalValue exactly as given. Do not invent parameters that are not literals in the trace.\n\n' +
+      /**
+       * Identity has to be stable across recordings or the version chain
+       * breaks. Re-recording the same Wikipedia lookup produced
+       * `company.readWikipediaInfobox`, `wikipedia.readCompanyInfobox`,
+       * `wikipedia.getCompanyInfobox` and `company.getWikipediaInfoboxFacts`
+       * -- four capabilities that were one capability, none of them a new
+       * version of another, so approval and supersession had nothing to hold
+       * onto. The fix a naming convention cannot provide is telling the model
+       * what already exists.
+       */
+      'IDENTITY: if the capability below is one the catalogue already contains -- the same task on ' +
+      'the same surface, however differently it was worded or recorded -- reuse that id EXACTLY. ' +
+      'It will be saved as a new version of it. Only mint a new id for a capability that is ' +
+      'genuinely not in the list.',
     prompt:
       `GOAL AS STATED BY THE OPERATOR: ${trace.goal}\n\n` +
+      (opts.knownCapabilities?.length
+        ? `CAPABILITIES ALREADY IN THE CATALOGUE:\n` +
+          opts.knownCapabilities.map((c) => `  ${c.id} — ${c.description}`).join('\n') + `\n\n`
+        : '') +
       `RECORDED STEPS:\n${JSON.stringify(traceForModel, null, 2)}`,
   });
 
@@ -386,6 +409,18 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
 
   // Extraction is described by `outputs`, not replayed as an action.
   const actionSteps = trace.steps.filter((s) => s.kind !== 'extract');
+  /**
+   * A `type` step aimed at a non-input element looks like junk and is not.
+   *
+   * The weather trace types the zip into the textbox and then types it again
+   * into a `text` node, resolved by "ordinal 0 of 10 matching text nodes".
+   * Dropping it as unreplayable was tried, and the capability stopped working:
+   * that second type carries the newline that submits the form, so the run
+   * never left the search page. The ordinal is genuinely fragile, but it is
+   * load-bearing, and "this step cannot matter" was simply false.
+   *
+   * Left in, with the uniqueness warning it already carries.
+   */
   const { kept, dropped } = pruneCycles(actionSteps, trace.entryUrl);
   if (dropped.length) {
     warnings.push(

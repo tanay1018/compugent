@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "weather.getZipForecastSnapshot",
+  "id": "weather.readForecastByZip",
   "version": 1,
-  "name": "Get Zip Code Weather Forecast Snapshot",
-  "description": "Looks up the weather.gov (or similar) local forecast for a given US ZIP code and reads back the current temperature (°F), and tonight's forecast text. Use when an agent needs a quick current-conditions and overnight outlook snapshot for a specific ZIP code.",
+  "name": "Read Local Weather Forecast by ZIP Code",
+  "description": "Looks up the local weather forecast for a given US ZIP code on a weather forecasting site and reads the current temperature in Fahrenheit (alongside its current-conditions label) and tonight's forecast text from the 7-day outlook. Use this when an agent needs quick current-weather and short-term forecast details for a specific ZIP code.",
   "app": {
-    "vendorProduct": "Corelink MemberDesk 7.2",
+    "vendorProduct": "forecast.weather.gov",
     "recordedTenant": "forecast.weather.gov",
     "surfaceKind": "web",
     "entryPathPattern": "^/(\\?|$)",
@@ -16,7 +16,7 @@
       "name": "zipCode",
       "type": "string",
       "required": true,
-      "description": "US ZIP code to search for in the local forecast lookup box",
+      "description": "The US ZIP code to look up the local weather forecast for.",
       "example": "10001",
       "sensitive": false
     }
@@ -25,7 +25,7 @@
     {
       "name": "currentTemperatureF",
       "type": "number",
-      "description": "The current temperature reading in Fahrenheit shown in the Current Conditions section",
+      "description": "The current temperature reading in degrees Fahrenheit shown in the Current Conditions section, anchored to its condition label (e.g. Overcast).",
       "from": {
         "role": "text",
         "nameMatch": "normalized",
@@ -47,7 +47,7 @@
     {
       "name": "tonightForecastText",
       "type": "string",
-      "description": "The full text of tonight's forecast entry from the 7-day forecast panel",
+      "description": "The full forecast text block for tonight, taken from the 7-day forecast section's 'Tonight' day-period entry.",
       "from": {
         "role": "text",
         "nameMatch": "normalized",
@@ -134,8 +134,8 @@
         }
       },
       "value": {
-        "from": "param",
-        "param": "zipCode"
+        "from": "literal",
+        "value": "10001"
       },
       "waypoint": {
         "kind": "nodeExists",

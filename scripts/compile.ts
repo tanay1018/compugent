@@ -45,7 +45,25 @@ try {
   trace,
   allowPartial,
   discoveryRunId: runDir.split('/').at(-1)!,
-    vendorProduct: process.env.VENDOR_PRODUCT ?? 'Corelink MemberDesk 7.2',
+  knownCapabilities: new ArtifactStore().list().map((c) => {
+    const a = new ArtifactStore().load(c.id);
+    return { id: a.id, description: a.description };
+  }),
+    /**
+     * The local demo app's name was the unconditional default, so it was
+     * stamped onto every artifact -- a weather.gov capability and a Wikipedia
+     * capability both claimed to be "Corelink MemberDesk 7.2". That is not
+     * cosmetic: the Electron shell reads vendorProduct to decide where Run
+     * Live should point, and sent both to localhost.
+     *
+     * The demo app is identified by a tenant query parameter; anything else is
+     * a real site and names itself by its host.
+     */
+    vendorProduct: process.env.VENDOR_PRODUCT ?? (
+      new URL(trace.entryUrl).searchParams.get('tenant')
+        ? 'Corelink MemberDesk 7.2'
+        : new URL(trace.entryUrl).hostname
+    ),
     tenant: new URL(trace.entryUrl).searchParams.get('tenant') ?? new URL(trace.entryUrl).hostname,
   });
 } catch (e) {

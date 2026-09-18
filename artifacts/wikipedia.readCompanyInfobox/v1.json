@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "id": "wikipedia.readCompanyInfobox",
+  "version": 1,
+  "name": "Read Company Infobox from Wikipedia",
+  "description": "Searches Wikipedia for a given company name using the search box, opens the matching article from the suggestion dropdown, and reads key infobox fields (ISIN, industry, and headquarters) for that company. Use this when an agent needs quick, structured facts about a publicly known company sourced from its Wikipedia infobox.",
+  "app": {
+    "vendorProduct": "en.wikipedia.org",
+    "recordedTenant": "en.wikipedia.org",
+    "surfaceKind": "web",
+    "entryPathPattern": "^/(\\?|$)",
+    "entryPath": "/"
+  },
+  "inputs": [
+    {
+      "name": "companyName",
+      "type": "string",
+      "required": true,
+      "description": "The name of the company to search for on Wikipedia.",
+      "example": "Bank of America",
+      "sensitive": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "isin",
+      "type": "string",
+      "description": "The company's International Securities Identification Number as listed in the Wikipedia infobox.",
+      "from": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "ISIN"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:38:43.644Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": false
+    },
+    {
+      "name": "industry",
+      "type": "string",
+      "description": "The industry classification of the company as listed in the Wikipedia infobox.",
+      "from": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Industry"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:38:43.646Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": false
+    },
+    {
+      "name": "headquarters",
+      "type": "string",
+      "description": "The headquarters location(s) of the company as listed in the Wikipedia infobox.",
+      "from": {
+        "role": "cell",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Headquarters"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:38:43.646Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": false
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "s1",
+      "index": 1,
+      "kind": "click",
+      "target": {
+        "role": "link",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "labelledBy",
+          "text": "Search Wikipedia [ctrl-option-f]"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:38:22.286Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "link",
+          "name": "Search",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "labelledBy",
+            "text": "Search Wikipedia [ctrl-option-f]"
+          },
+          "scope": {
+            "frame": "root"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-18T03:38:22.286Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "This is the search input on the Wikipedia main page (labelled \"Search Wikipedia\"). I need to type the company name here to search."
+    },
+    {
+      "id": "s2",
+      "index": 2,
+      "kind": "type",
+      "target": {
+        "role": "combobox",
+        "name": "Search Wikipedia",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "labelledBy",
+          "text": "Search Wikipedia"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:38:29.335Z"
+        }
+      },
+      "value": {
+        "from": "param",
+        "param": "companyName"
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "combobox",
+          "name": "Search Wikipedia",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "labelledBy",
+            "text": "Search Wikipedia"
+          },
+          "scope": {
+            "frame": "root"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-18T03:38:29.335Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Typing into the focused Wikipedia search box to invoke the suggestion dropdown for \"Bank of America\"."
+    },
+    {
+      "id": "s3",
+      "index": 3,
+      "kind": "click",
+      "target": {
+        "role": "option",
+        "name": "Bank of America American multinational banking and financial services corporation",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "labelledBy",
+          "text": "{{companyName}}"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:38:35.473Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "option",
+          "name": "Bank of America American multinational banking and financial services corporation",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "labelledBy",
+            "text": "{{companyName}}"
+          },
+          "scope": {
+            "frame": "root"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-18T03:38:35.473Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "This is the top search suggestion matching the exact company name \"Bank of America\" (described as the American multinational banking corporation). Clicking it opens the Bank of America article."
+    }
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "cell",
+      "name": "US0605051046",
+      "nameMatch": "normalized",
+      "anchor": {
+        "relation": "inSameRowAs",
+        "text": "ISIN"
+      },
+      "scope": {
+        "frame": "root"
+      },
+      "ordinal": 0,
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-09-18T03:39:26.023Z"
+      }
+    },
+    "description": "Searched Wikipedia for \"Bank of America\", clicked the matching top suggestion, and opened the article at en.wikipedia.org/wiki/Bank_of_America. From the company infobox I extracted: ISIN = US0605051046; Industry = Financial services; Headquarters = Bank of America Corporate Center, Charlotte, North Carolina, U.S. (corporate/legal) / Bank of America Tower (Manhattan), New York City, U.S. (executive)."
+  },
+  "approval": "draft",
+  "provenance": {
+    "recordedAt": "2026-09-18T03:39:30.848Z",
+    "discoveryRunId": "discovery-2026-09-18T03-38-14-541Z",
+    "model": "deepseek/deepseek-v4-flash",
+    "goal": "Search Wikipedia for the company 'Bank of America' using the search box, click the matching suggestion in the dropdown to open its article, then read the company's ISIN, industry, and headquarters from the infobox.",
+    "warnings": [
+      "step target name \"Bank of America American multinational banking and financial services corporation\" embeds \"companyName\" in text the surface composed, so it stays pinned to the recorded value. This step generalises through its anchor instead — if it has none, re-record via a control that carries a real label.",
+      "step target name \"Bank of America American multinational banking and financial services corporation\" embeds \"companyName\" in text the surface composed, so it stays pinned to the recorded value. This step generalises through its anchor instead — if it has none, re-record via a control that carries a real label."
+    ]
+  }
+}

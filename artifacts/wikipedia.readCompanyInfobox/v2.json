@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "company.readWikipediaInfobox",
-  "version": 4,
+  "id": "wikipedia.readCompanyInfobox",
+  "version": 2,
   "name": "Read Company Infobox from Wikipedia",
-  "description": "Searches Wikipedia for a given company name using the search box, clicks the top matching suggestion to open its article, and extracts the company's ISIN, industry, and headquarters from the infobox. Use this when you need quick, structured company facts sourced from Wikipedia's infobox.",
+  "description": "Searches Wikipedia for a given company name using the search box, opens the matching article from the suggestion dropdown, and reads key infobox fields (ISIN, industry, and headquarters) for that company. Use this when an agent needs quick, structured facts about a publicly known company sourced from its Wikipedia infobox.",
   "app": {
-    "vendorProduct": "Corelink MemberDesk 7.2",
+    "vendorProduct": "en.wikipedia.org",
     "recordedTenant": "en.wikipedia.org",
     "surfaceKind": "web",
     "entryPathPattern": "^/(\\?|$)",
@@ -16,7 +16,7 @@
       "name": "companyName",
       "type": "string",
       "required": true,
-      "description": "The name of the company to search for on Wikipedia; typed into the search box to trigger the suggestion dropdown.",
+      "description": "The name of the company to search for on Wikipedia.",
       "example": "Bank of America",
       "sensitive": false
     }
@@ -48,7 +48,7 @@
     {
       "name": "industry",
       "type": "string",
-      "description": "The industry classification of the company as listed in the Wikipedia infobox.",
+      "description": "The industry sector the company operates in, as listed in the Wikipedia infobox.",
       "from": {
         "role": "cell",
         "nameMatch": "normalized",
@@ -71,7 +71,7 @@
     {
       "name": "headquarters",
       "type": "string",
-      "description": "The headquarters location(s) of the company as listed in the Wikipedia infobox.",
+      "description": "The headquarters location(s) of the company, as listed in the Wikipedia infobox.",
       "from": {
         "role": "cell",
         "nameMatch": "normalized",

@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "id": "weather.readForecastByZip",
+  "version": 2,
+  "name": "Read weather forecast by ZIP code",
+  "description": "Looks up the local weather forecast for a given US ZIP code on a weather forecasting site and reads the current temperature in Fahrenheit (alongside its current-conditions label) and tonight's forecast text from the 7-day outlook. Use this when an agent needs quick current-weather and short-term forecast details for a specific ZIP code.",
+  "app": {
+    "vendorProduct": "forecast.weather.gov",
+    "recordedTenant": "forecast.weather.gov",
+    "surfaceKind": "web",
+    "entryPathPattern": "^/(\\?|$)",
+    "entryPath": "/"
+  },
+  "inputs": [
+    {
+      "name": "zipCode",
+      "type": "string",
+      "required": true,
+      "description": "The US ZIP code to look up the local weather forecast for.",
+      "example": "10001",
+      "sensitive": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "currentTemperatureF",
+      "type": "string",
+      "description": "The current temperature in Fahrenheit, alongside its current-conditions label (e.g. Overcast).",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "Overcast"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:12:33.089Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": false
+    },
+    {
+      "name": "tonightForecastText",
+      "type": "string",
+      "description": "The forecast text for tonight from the 7-day outlook, including chance of precipitation, sky conditions, low temperature, and wind.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "Tonight"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:12:33.091Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": false
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "s1",
+      "index": 1,
+      "kind": "type",
+      "target": {
+        "role": "textbox",
+        "name": "Local forecast by \"City, St\" or ZIP code",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "labelledBy",
+          "text": "Local forecast by \"City, St\" or ZIP code"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:11:37.924Z"
+        }
+      },
+      "value": {
+        "from": "param",
+        "param": "zipCode"
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "textbox",
+          "name": "Local forecast by \"City, St\" or ZIP code",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "labelledBy",
+            "text": "Local forecast by \"City, St\" or ZIP code"
+          },
+          "scope": {
+            "frame": "root"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-18T03:11:37.924Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Enter the target zip code into the local forecast search box"
+    },
+    {
+      "id": "s2",
+      "index": 2,
+      "kind": "type",
+      "target": {
+        "role": "text",
+        "name": "{{zipCode}}",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:11:48.412Z"
+        }
+      },
+      "value": {
+        "from": "literal",
+        "value": "10001"
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "text",
+          "name": "{{zipCode}}",
+          "nameMatch": "normalized",
+          "scope": {
+            "frame": "root"
+          },
+          "ordinal": 0,
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-18T03:11:48.412Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Enter the target zip code 10001 into the local forecast search field"
+    }
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "New York City, Central Park (KNYC)",
+      "nameMatch": "normalized",
+      "anchor": {
+        "relation": "precededBy",
+        "text": "Current conditions at"
+      },
+      "scope": {
+        "frame": "root"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-09-18T03:12:40.800Z"
+      }
+    },
+    "description": "Retrieved the weather forecast for zip 10001 (New York, NY / Manhattan). Current conditions at New York City, Central Park (KNYC): Overcast, 78°F (extracted as currentTemperatureF, whose anchoring label \"Overcast\" is the current condition). Tonight's forecast text: \"A 40 percent chance of showers before 2am. Mostly cloudy, with a low around 71. West wind 5 to 7 mph.\" (extracted as tonightForecastText). Checkpoint: node [14] \"New York City, Central Park (KNYC)\" — the stable station label for this location."
+  },
+  "approval": "draft",
+  "provenance": {
+    "recordedAt": "2026-09-18T03:12:44.675Z",
+    "discoveryRunId": "discovery-2026-09-18T03-11-18-420Z",
+    "model": "deepseek/deepseek-v4-flash",
+    "goal": "Look up the weather forecast for zip code 10001. Read the current temperature in Fahrenheit, the current conditions, and tonight's forecast text.",
+    "warnings": [
+      "step 2 (type): not unique — disambiguated by ordinal 0 of 10 matching text nodes"
+    ]
+  }
+}
