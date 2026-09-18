@@ -151,6 +151,24 @@ SUCCESS  959ms                      BUSINESS OUTCOME  919ms
 **Compile latest run → capability** turns the most recent successful discovery
 run into a new artifact without leaving the app.
 
+## Live targets worth demoing
+
+Probed for operability (no model calls — `npm run observe -- <url>` does this
+in about two seconds):
+
+| target | shape it exercises |
+|---|---|
+| `scrapethissite.com/pages/forms/` | **search → results table → extract.** The closest public analogue to the bundled member lookup: a labelled search box and a results table whose cells are addressable by column header. |
+| `books.toscrape.com` | category → product detail → label/value table |
+| `quotes.toscrape.com` | repeated blocks, tag filtering, pagination |
+| `the-internet.herokuapp.com` | deliberately awkward controls — dynamic loading, iframes, JS dialogs |
+| `webscraper.io/test-sites/e-commerce/allinone` | listing → detail, prices and variants |
+| `parabank.parasoft.com` public pages | legacy JSP, table layout, no test ids |
+| `en.wikipedia.org`, `news.ycombinator.com` | large real pages (396 and 225 controls) |
+
+Avoid Amazon, H&M and most large retail — they serve a bot wall, and the run
+will say so rather than flailing.
+
 ## Which sites does this actually work on?
 
 Not all of them. Measured, by pointing the perception layer at a spread of real

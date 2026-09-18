@@ -137,3 +137,17 @@ test('interpolation reaches anchor text too', () => {
     { accountType: 'Savings' });
   assert.equal(r.ok, true);
 });
+
+test('an anchor made of run data is distinguishable from a label', () => {
+  // The live failure: a results table where `wins` was anchored to "1990" and
+  // `losses` to "44". Correct for that run, resolvable for no other input.
+  const isData = (a: string) =>
+    a !== '' && (/^[^A-Za-z]*$/.test(a) || /^[$£€]?[\d,.]+%?$/.test(a.trim()));
+
+  for (const bad of ['1990', '44', '$4,182.55', '12,345', '99%', '2026-01-01']) {
+    assert.equal(isData(bad), true, `${bad} should read as data`);
+  }
+  for (const good of ['Wins', 'Member ID', 'Price (incl. tax)', 'Team Name', 'Savings']) {
+    assert.equal(isData(good), false, `${good} should read as a label`);
+  }
+});

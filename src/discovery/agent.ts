@@ -414,12 +414,44 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
               return `WARNING: "${as}" cannot be relocated on a fresh page (${described.problem}). ` +
                      `Pick a node that sits next to a stable label instead.`;
             }
+            /**
+             * An anchor made of run DATA is as useless as naming the output by
+             * its own value -- it just moves the problem one cell sideways.
+             * Observed live: a results table where the model anchored `wins` to
+             * "1990" and `losses` to "44". Perfectly correct for that run, and
+             * resolvable for no other team.
+             *
+             * A label is text that stays put across invocations; a figure does
+             * not. Bare numbers, currency and dates are the giveaway.
+             */
+            const anchorText = described.descriptor.anchor?.text ?? '';
+            const looksLikeData =
+              anchorText !== '' &&
+              (/^[^A-Za-z]*$/.test(anchorText) ||
+               /^[$£€]?[\d,.]+%?$/.test(anchorText.trim()) ||
+               anchorText.trim() === String(value).trim());
+            if (looksLikeData) {
+              warnings.push(
+                `output "${as}" is anchored to "${anchorText}", which looks like this run's data ` +
+                `rather than a stable label — it will not resolve for other inputs`,
+              );
+              log.append('system', 'descriptor.unverified', {
+                output: as, problem: `anchor "${anchorText}" looks like run data, not a label`,
+              });
+            }
+
             steps.push({
               index: steps.length + 1, kind: 'extract', rationale: why,
               target: described.descriptor, targetVerified: true,
+              ...(looksLikeData ? { targetProblem: `anchored to "${anchorText}", which looks like run data` } : {}),
               outputName: as, observedValue: value, effect: 'read', locationAfter: contentLocation(obs),
             });
             log.append('agent', 'act.extract', { as, target: describeTarget(described.descriptor), why });
+            if (looksLikeData) {
+              return `Recorded "${as}", but it is anchored to ${JSON.stringify(anchorText)} — that is a VALUE ` +
+                `from this run, not a label, so it will not be found for other inputs. Re-extract it anchored ` +
+                `to a column header or field label if one exists.`;
+            }
             return `Recorded output "${as}" = ${JSON.stringify(value)}, located by ${describeTarget(described.descriptor)}.`;
           },
         }),
