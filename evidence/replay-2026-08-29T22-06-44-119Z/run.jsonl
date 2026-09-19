@@ -1,5 +1,0 @@
-{"seq":1,"ts":"2026-08-29T22:06:44.221Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v2","approval":"draft","inputs":{"memberId":"[REDACTED]"}}}
-{"seq":2,"ts":"2026-08-29T22:06:44.402Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
-{"seq":3,"ts":"2026-08-29T22:06:44.846Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
-{"seq":4,"ts":"2026-08-29T22:06:45.087Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
-{"seq":5,"ts":"2026-08-29T22:06:45.165Z","actor":"system","kind":"replay.failed","detail":{"status":"failed","failure":{"code":"output_mismatch","expected":"\"memberId\" to echo the \"memberId\" input (40006)","observed":"the screen reports \"12345\" — this is a different record","screenshot":"screenshots/004-failure.png"},"runId":"replay-2026-08-29T22-06-44-119Z","ms":944}}

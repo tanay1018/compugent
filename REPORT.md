@@ -55,6 +55,8 @@ The lookup field on the target app is a `textbox` with an empty name. "Member ID
 
 * **Why on named controls too.** Chrome synthesises `"Submit"` for an image input with no alt text. Trusting it pins the artifact to a browser default. Name and anchor are recorded together.
 
+Two budgets fight on a real page, and both had to change. Anchoring is a prioritised second pass — anonymous controls first (the anchor *is* their identity), then cells, then named controls, then loose prose — because enrichment costs two CDP round trips per node. And the render budget no longer ranks all controls above all data: on the Bank of America article, ~2000 links consumed the 140 node cap before the first infobox cell, so the model could not see ISIN anywhere on screen and went looking for it in the **edit view of a live encyclopedia**. Controls and anchored data now each get a guaranteed share, and all 39 anchored infobox cells render.
+
 ### 1.5 Acting
 
 * **How.** Scroll into view, box model centre, `Input.dispatchMouseEvent`. Typing is select all then `insertText`, so a prefilled field is overwritten, not appended to.
@@ -70,6 +72,7 @@ The lookup field on the target app is a `textbox` with an empty name. "Member ID
   1. every synthesised descriptor is resolved back against its observation; a miss marks the step `fragile`
   2. an output anchored to a number, a currency or its own value is rejected
   3. an irreversible action may not be repeated in one run (a ParaBank run once opened two accounts)
+* **One action per step, enforced.** A model may emit several tool calls in one step and the SDK will run them all, back to back. For a chat tool that is throughput; for a UI it is incoherent — every action changes the screen, so the second call was chosen against a screen that no longer exists when it runs, and nothing re-perceives in between to notice. On weather.gov the model emitted `click("Go")` and `type("10001")` together; they executed 48 ms apart, pressing Go on an empty form. The submit did nothing, and the run spent four minutes and seven more Go clicks reasoning about a failure whose cause had already scrolled out of the context. The extra call is now refused rather than queued: the model is told why and handed a fresh observation. Same task, same model: eleven flailing steps became four, and the run succeeded in about fifty seconds.
 * Cost: stale observations compacted before every call (74 percent fewer input characters on a sample run), reasoning effort `low`, 140 node cap.
 
 ### 1.7 Compilation
@@ -240,7 +243,32 @@ Four variants, not one status field: a caller that handles only success and fail
 
 `--repeat N` reports distinct statuses, outputs and resolution paths. The third column is the early warning: a step alternating between name and anchor is a descriptor drifting under a healthy looking result.
 
-### 3.7 UI drift
+Consistency is reported separately from working, because three identical failures are perfectly consistent. An earlier version printed `STABLE` for them and exited 0, which would have let a broken capability pass any CI gate built on `--repeat`.
+
+### 3.7 Determinism is not generalisation
+
+A capability that works only for the value it was recorded on is a recording, and repetition cannot tell the difference: the recorded case passes by construction, identically, every time. `--repeat` would call it STABLE and be right.
+
+`npm run verify` replays a capability against values it has **never seen**, and `--approve` makes promotion conditional on that evidence:
+
+```
+$ npm run verify -- wikipedia.readCompanyInfobox \
+    --case "companyName=Bank of America" --case "companyName=Toyota" --approve
+
+  pass  recorded  {"isin":"US0605051046","industry":"Financial services",...}
+  pass  unseen    {"isin":"JP3633400001","industry":"Automotive",...}
+
+  GENERALISES — 1 of 2 cases used values it was never recorded against
+  wikipedia.readCompanyInfobox v2 → approved, on 2 verified cases.
+```
+
+This is the rung that makes `approved` mean something stronger than `draft` rather than merely later, and it caught a real defect the day it was written. A weather.gov capability anchored its temperature to `precededBy "Overcast"` — the current conditions text, which is *data wearing the shape of a label*. The compiler could not know; it sees one trace. Verify ran it against a second ZIP and reported PINNED, because Beverly Hills was not overcast. Twenty four hours later New York read "Fair" and the capability failed on its own recorded ZIP as well.
+
+It was never approved. The model produced it, the compiler accepted it, and the gate refused it — which is the ladder doing exactly what it is for. A single green replay on the day of recording would have shipped it.
+
+The rule that falls out: **an anchor must be a label, not a value.** `inSameRowAs "ISIN"` holds because every company article has an ISIN row. `precededBy "Overcast"` holds until the weather changes.
+
+### 3.8 UI drift
 
 1. name and anchor both recorded
 2. relation relaxed before failing
@@ -441,8 +469,24 @@ The entry URL is checked before the browser moves.
 | catalog endpoint | `toToolSchema()`, desktop catalog | no network surface for an external agent |
 | screenshot redaction, console auth | | |
 
+### 7.1 Known limits on real sites
+
+These are measured, not suspected. Each is a real page the system handles badly.
+
+| limit | what happens | why it is not a tuning problem |
+|---|---|---|
+| **Bot walls** | amazon.com returns 6 accessibility nodes — the CDN block page | nothing is rendered to perceive; `/dp/` is disallowed for automated clients. Not a perception bug and not fixable from inside the browser |
+| **Values with no label** | weather.gov puts nothing label-shaped beside the temperature (`Current conditions at / STATION / Fair / 79°F`) | no anchor *choice* fixes it; the page has no label to anchor to. Caught by the gate (§3.7), never approved |
+| **Definition-list layouts** | openlibrary.org yields 133 nodes and **zero** anchored | anchoring reaches for a table row or preceding text; a `<dl>` presents neither. Needs a third relation kind, not a bigger budget |
+| **JSON in text nodes** | finance.yahoo.com anchored a control to `[{"fullExchangeName":"Nasd…` | embedded JSON is indistinguishable from prose to the AX tree; needs a shape filter on anchor candidates |
+| **No prompt caching** | `cached=0` on every model call | the gateway is not reusing the prefix. Pure cost, no correctness impact, and the largest single saving still on the table |
+
+The honest summary: this works on pages whose structure carries meaning — label/value rows, named controls, tables. It degrades on pages that are visually structured but semantically flat, and it does not work at all where a CDN decides it shouldn't.
+
 Next, in order:
 
-1. tenant overlay plus default state assertions from the compiler
-2. compiler generated idempotency probes: a `nodeExists` on the confirmation the recorded run saw after the step
-3. bounded single step recovery on replay failure, gated by the existing draft rule
+1. prompt prefix caching — the cheapest large win, and the one the token traces keep pointing at
+2. a `describedBy` anchor relation for definition lists, which is the one structural gap with real sites behind it
+3. tenant overlay plus default state assertions from the compiler
+4. compiler generated idempotency probes: a `nodeExists` on the confirmation the recorded run saw after the step
+5. bounded single step recovery on replay failure, gated by the existing draft rule

@@ -1,0 +1,31 @@
+{
+  "status": "failed",
+  "failure": {
+    "code": "output_missing",
+    "expected": "output \"currentTemperatureF\" at text precededBy \"Overcast\" in frame \"root\"",
+    "observed": "not present on the checkpoint screen",
+    "screenshot": "screenshots/011-failure.png"
+  },
+  "runId": "verify-2026-09-19T22-06-58-885Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "ok",
+      "ms": 2658,
+      "target": "textbox named \"Local forecast by \"City, St\" or ZIP code\" labelledBy \"Local forecast by \"City, St\" or ZIP code\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "type",
+      "status": "ok",
+      "ms": 2749,
+      "target": "text named \"{{zipCode}}\" in frame \"root\" #0",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 8121
+}

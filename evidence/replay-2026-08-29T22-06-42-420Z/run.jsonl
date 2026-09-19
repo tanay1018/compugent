@@ -1,8 +1,0 @@
-{"seq":1,"ts":"2026-08-29T22:06:42.541Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v2","approval":"draft","inputs":{"memberId":"[REDACTED]"}}}
-{"seq":2,"ts":"2026-08-29T22:06:42.730Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
-{"seq":3,"ts":"2026-08-29T22:06:43.176Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
-{"seq":4,"ts":"2026-08-29T22:06:43.419Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
-{"seq":5,"ts":"2026-08-29T22:06:43.457Z","actor":"system","kind":"outcome.matched","detail":{"name":"maintenance_notice","classification":"recoverable","detail":"text \"Scheduled maintenance begins at 23:00 ET.\" present","location":"http://localhost:8710/?tenant=meridian"},"screenshot":"screenshots/004-outcome-maintenance_notice.png"}
-{"seq":6,"ts":"2026-08-29T22:06:43.633Z","actor":"system","kind":"outcome.recovered","detail":{"name":"maintenance_notice","via":"dismiss"}}
-{"seq":7,"ts":"2026-08-29T22:06:43.685Z","actor":"agent","kind":"outputs","detail":{"outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"}}}
-{"seq":8,"ts":"2026-08-29T22:06:43.685Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"},"runId":"replay-2026-08-29T22-06-42-420Z","ms":1144}}

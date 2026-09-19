@@ -1,0 +1,39 @@
+{
+  "status": "success",
+  "outputs": {
+    "isin": "US5949181045",
+    "industry": "Information technology",
+    "headquarters": "Microsoft campus, Redmond, Washington, U.S."
+  },
+  "runId": "stability-1789855664346-1",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "click",
+      "status": "ok",
+      "ms": 2698,
+      "target": "link named \"Search\" labelledBy \"Search Wikipedia [ctrl-option-f]\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "type",
+      "status": "ok",
+      "ms": 2686,
+      "target": "combobox named \"Search Wikipedia\" labelledBy \"Search Wikipedia\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 3,
+      "id": "s3",
+      "kind": "click",
+      "status": "ok",
+      "ms": 2655,
+      "target": "option named \"Bank of America American multinational banking and financial services corporation\" labelledBy \"{{companyName}}\" in frame \"root\"",
+      "resolvedVia": "anchor"
+    }
+  ],
+  "ms": 11190
+}

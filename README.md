@@ -786,6 +786,75 @@ Three bugs only a real site could have surfaced, all fixed:
   124K input tokens. Node text is now capped at 200 chars: prose is never a
   target and never an output.
 
+## Sites people actually use
+
+`books.toscrape.com` exists to be scraped. The next question is whether this
+works where nobody made it easy.
+
+```bash
+npm run discover -- "Search Wikipedia for the company 'Bank of America' using the search box, \
+  click the matching suggestion, then read its ISIN, industry and headquarters from the infobox" \
+  --url "https://en.wikipedia.org/"
+npm run compile
+npm run verify -- wikipedia.readCompanyInfobox \
+  --case "companyName=Bank of America" --case "companyName=Toyota" --approve
+```
+
+Recorded once on Bank of America. With no model in the decision loop:
+
+| company | ISIN | industry | headquarters |
+|---|---|---|---|
+| Bank of America *(recorded)* | US0605051046 | Financial services | Charlotte, NC |
+| Microsoft | US5949181045 | Information technology | Redmond, WA |
+| Toyota | JP3633400001 | Automotive | Toyota City, Japan |
+| Airbus | NL0000235190 | Aerospace Defence | Leiden / Toulouse |
+| Nintendo | JP3756600007 | Video games Electronics | Kyoto, Japan |
+
+STABLE across repeats at ~11 s. An infobox cell has no accessible name of its
+own, so every extraction resolves through the label beside it — the same
+`inSameRowAs` path the bundled app was built to force, occurring naturally:
+
+```
+extract cell inSameRowAs "ISIN"           -> isin
+extract cell inSameRowAs "Industry"       -> industry
+extract cell inSameRowAs "Headquarters"   -> headquarters
+```
+
+### Proving it generalises
+
+A capability that works only for the value it was recorded on is a recording,
+and `--repeat` cannot tell the difference — the recorded case passes
+identically every time. `npm run verify` replays against values the artifact has
+never seen, and `--approve` makes promotion conditional on that evidence.
+
+It caught a real defect immediately. A weather.gov capability anchored its
+temperature to `precededBy "Overcast"` — the *current conditions text*, which is
+data wearing the shape of a label:
+
+```
+$ npm run verify -- weather.readForecastByZip --case "zipCode=10001" --case "zipCode=90210"
+
+  pass  recorded  {"currentTemperatureF":78,...}
+  fail  unseen    output_missing: currentTemperatureF at text precededBy "Overcast"
+
+  PINNED — works on the recorded value and fails on values it has not seen.
+```
+
+Beverly Hills was not overcast. A day later New York read "Fair" and it failed
+on its own recorded ZIP too. It was never approved: the model produced it, the
+compiler accepted it, and the gate refused to promote it. **An anchor must be a
+label, not a value.**
+
+### Where it does not work
+
+- **amazon.com** returns 6 accessibility nodes — the CDN block page. Nothing is
+  rendered to perceive, and `/dp/` is disallowed for automated clients. This is
+  not a perception bug and no amount of anchoring addresses it.
+- **openlibrary.org** yields 133 nodes and zero anchored: a definition-list
+  layout presents neither a table row nor preceding label text.
+
+`REPORT.md` §7.1 has the full measured list.
+
 ## Demo path
 
 The full thread, end to end:
@@ -806,3 +875,16 @@ npm run replay -- member.readSavingsBalance memberId=40004    # hard failure
 Only the first two commands need a key. Everything from `replay` onward runs
 offline against the saved artifact — see `evidence/README.md` for recorded runs
 of every branch.
+
+Then the same thread on a live site, ending at the gate that decides whether a
+capability is trustworthy enough to promote:
+
+```bash
+npm run discover -- "Search Wikipedia for the company 'Bank of America' using the search box, \
+  click the matching suggestion, then read its ISIN, industry and headquarters from the infobox" \
+  --url "https://en.wikipedia.org/"
+npm run compile
+npm run replay -- wikipedia.readCompanyInfobox "companyName=Microsoft" --repeat 3   # STABLE
+npm run verify  -- wikipedia.readCompanyInfobox \
+  --case "companyName=Bank of America" --case "companyName=Toyota" --approve       # GENERALISES
+```

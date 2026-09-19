@@ -1,0 +1,39 @@
+{
+  "status": "success",
+  "outputs": {
+    "isin": "US0605051046",
+    "industry": "Financial services",
+    "headquarters": "Bank of America Corporate Center, Charlotte, North Carolina, U.S. (corporate/legal) Bank of America Tower (Manhattan), New York City, U.S. (executive)"
+  },
+  "runId": "verify-2026-09-19T22-06-34-362Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "click",
+      "status": "ok",
+      "ms": 2683,
+      "target": "link named \"Search\" labelledBy \"Search Wikipedia [ctrl-option-f]\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "type",
+      "status": "ok",
+      "ms": 2657,
+      "target": "combobox named \"Search Wikipedia\" labelledBy \"Search Wikipedia\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 3,
+      "id": "s3",
+      "kind": "click",
+      "status": "ok",
+      "ms": 2663,
+      "target": "option named \"Bank of America American multinational banking and financial services corporation\" labelledBy \"{{companyName}}\" in frame \"root\"",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 10976
+}

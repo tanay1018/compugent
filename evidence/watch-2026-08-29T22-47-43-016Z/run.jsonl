@@ -1,3 +1,0 @@
-{"seq":1,"ts":"2026-08-29T22:47:43.163Z","actor":"system","kind":"discovery.start","detail":{"goal":"bath towels and get me first 5 lowest price items available","entryUrl":"http://www.amazon.com","model":"anthropic/claude-opus-5","maxSteps":25}}
-{"seq":2,"ts":"2026-08-29T22:47:43.867Z","actor":"agent","kind":"observe","detail":{"location":"https://www.amazon.com/","nodes":9},"screenshot":"screenshots/001-entry.png"}
-{"seq":3,"ts":"2026-08-29T22:47:44.220Z","actor":"system","kind":"discovery.error","detail":{"message":"GatewayInternalServerError: API key budget exceeded. Current spend: $15.45, limit: $15.00. Please contact your administrator to increase the budget.","afterMs":1057,"steps":0}}

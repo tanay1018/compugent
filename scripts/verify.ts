@@ -83,7 +83,7 @@ for (const inputs of cases) {
   const surface = await PlaywrightSurface.launch();
   try {
     await surface.navigate(baseUrl);
-    const log = new RunLog('evidence', `verify-${Date.now()}`);
+    const log = new RunLog('evidence', `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`);
     const r = await replay({ artifact, inputs, surface, log, baseUrl,
                              // Attended: unattended replay requires `approved`, and approval is
                              // what this script exists to earn. Verifying a draft is the point.

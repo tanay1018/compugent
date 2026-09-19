@@ -1,3 +1,0 @@
-{"seq":1,"ts":"2026-08-29T23:06:41.631Z","actor":"system","kind":"discovery.start","detail":{"goal":"look up member 67890 and read their savings balance","entryUrl":"http://localhost:8710/?tenant=meridian","model":"anthropic/claude-opus-5","maxSteps":20}}
-{"seq":2,"ts":"2026-08-29T23:06:41.878Z","actor":"agent","kind":"observe","detail":{"location":"http://localhost:8710/?tenant=meridian","nodes":11},"screenshot":"screenshots/001-entry.png"}
-{"seq":3,"ts":"2026-08-29T23:06:42.063Z","actor":"system","kind":"discovery.error","detail":{"message":"GatewayInternalServerError: API key budget exceeded. Current spend: $20.17, limit: $20.00. Please contact your administrator to increase the budget.","afterMs":432,"steps":0}}

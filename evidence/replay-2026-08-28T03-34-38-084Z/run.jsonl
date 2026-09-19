@@ -1,6 +1,0 @@
-{"seq":1,"ts":"2026-08-28T03:34:38.190Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v2","approval":"draft","inputs":{"memberId":"[REDACTED]"}}}
-{"seq":2,"ts":"2026-08-28T03:34:38.367Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
-{"seq":3,"ts":"2026-08-28T03:34:38.800Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
-{"seq":4,"ts":"2026-08-28T03:34:39.026Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
-{"seq":5,"ts":"2026-08-28T03:34:39.051Z","actor":"system","kind":"outcome.matched","detail":{"name":"permission_denied","classification":"business_outcome","detail":"text \"You are not authorized to view this member record.\" present","location":"http://localhost:8710/?tenant=meridian"},"screenshot":"screenshots/004-outcome-permission_denied.png"}
-{"seq":6,"ts":"2026-08-28T03:34:39.051Z","actor":"system","kind":"replay.business_outcome","detail":{"status":"business_outcome","outcome":"permission_denied","message":"The operator is not authorised to view this member record.","runId":"replay-2026-08-28T03-34-38-084Z","ms":861}}

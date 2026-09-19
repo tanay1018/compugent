@@ -70,7 +70,7 @@ if (repeat > 1) {
   const runs: Array<{ status: string; outputs: string; tiers: string; ms: number }> = [];
   for (let i = 0; i < repeat; i++) {
     const s = await PlaywrightSurface.launch();
-    const l = new RunLog('evidence', `stability-${Date.now()}-${i}`);
+    const l = new RunLog('evidence', `stability-${new Date().toISOString().replace(/[:.]/g, '-')}-${i}`);
     try {
       const r = await replay({ artifact, inputs, surface: s, policy: defaultPolicy(new URL(baseUrl).origin),
                                log: l, baseUrl, unattended });

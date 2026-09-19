@@ -1,6 +1,0 @@
-{"seq":1,"ts":"2026-08-29T22:51:59.365Z","actor":"system","kind":"replay.start","detail":{"capability":"catalogue.readBookPriceAndStock v1","approval":"draft","inputs":{"categoryName":"Science","bookTitle":"The Grand Design"}}}
-{"seq":2,"ts":"2026-08-29T22:52:00.340Z","actor":"agent","kind":"navigate","detail":{"url":"https://books.toscrape.com/"}}
-{"seq":3,"ts":"2026-08-29T22:52:00.847Z","actor":"agent","kind":"step.click","detail":{"step":1,"target":"link named \"{{categoryName}}\" in frame \"root\"","via":"name"}}
-{"seq":4,"ts":"2026-08-29T22:52:01.371Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"link named \"{{bookTitle}}\" in frame \"root\" #0","via":"name"}}
-{"seq":5,"ts":"2026-08-29T22:52:01.463Z","actor":"agent","kind":"outputs","detail":{"outputs":{"priceInclTax":13.76,"availability":"In stock (5 available)"}}}
-{"seq":6,"ts":"2026-08-29T22:52:01.464Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"priceInclTax":13.76,"availability":"In stock (5 available)"},"runId":"replay-2026-08-29T22-51-59-225Z","ms":2099}}

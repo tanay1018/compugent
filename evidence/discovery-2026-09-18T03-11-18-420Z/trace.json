@@ -1,0 +1,179 @@
+{
+  "goal": "Look up the weather forecast for zip code 10001. Read the current temperature in Fahrenheit, the current conditions, and tonight's forecast text.",
+  "entryUrl": "https://forecast.weather.gov/",
+  "model": "deepseek/deepseek-v4-flash",
+  "startedAt": "2026-09-18T03:11:18.754Z",
+  "finishedAt": "2026-09-18T03:12:44.675Z",
+  "outcome": "success",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "type",
+      "rationale": "Enter the target zip code into the local forecast search box",
+      "target": {
+        "role": "textbox",
+        "name": "Local forecast by \"City, St\" or ZIP code",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "labelledBy",
+          "text": "Local forecast by \"City, St\" or ZIP code"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:11:37.924Z"
+        }
+      },
+      "targetVerified": true,
+      "literal": "10001",
+      "effect": "reversible",
+      "locationAfter": "https://www.weather.gov/"
+    },
+    {
+      "index": 2,
+      "kind": "type",
+      "rationale": "Enter the target zip code 10001 into the local forecast search field",
+      "target": {
+        "role": "text",
+        "name": "10001",
+        "nameMatch": "normalized",
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:11:48.412Z"
+        }
+      },
+      "targetVerified": true,
+      "targetProblem": "not unique — disambiguated by ordinal 0 of 10 matching text nodes",
+      "literal": "10001",
+      "effect": "reversible",
+      "locationAfter": "https://forecast.weather.gov/MapClick.php?lat=40.7483136&lon=-73.9940525"
+    },
+    {
+      "index": 3,
+      "kind": "extract",
+      "rationale": "The current temperature readout \"78°F\" in the Current conditions section; its anchored-to label \"Overcast\" is the current condition",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "Overcast"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:12:33.089Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "currentTemperatureF",
+      "observedValue": "78°F",
+      "effect": "read",
+      "locationAfter": "https://forecast.weather.gov/MapClick.php?lat=40.7483136&lon=-73.9940525"
+    },
+    {
+      "index": 4,
+      "kind": "extract",
+      "rationale": "Tonight's forecast text block, anchored to the \"Tonight\" day-period label in the 7-day forecast",
+      "target": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "Tonight"
+        },
+        "scope": {
+          "frame": "root"
+        },
+        "ordinal": 0,
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-18T03:12:33.091Z"
+        }
+      },
+      "targetVerified": true,
+      "outputName": "tonightForecastText",
+      "observedValue": "A 40 percent chance of showers before 2am. Mostly cloudy, with a low around 71. West wind 5 to 7 mph.",
+      "effect": "read",
+      "locationAfter": "https://forecast.weather.gov/MapClick.php?lat=40.7483136&lon=-73.9940525"
+    }
+  ],
+  "warnings": [
+    "step 2 (type): not unique — disambiguated by ordinal 0 of 10 matching text nodes"
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "New York City, Central Park (KNYC)",
+      "nameMatch": "normalized",
+      "anchor": {
+        "relation": "precededBy",
+        "text": "Current conditions at"
+      },
+      "scope": {
+        "frame": "root"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-09-18T03:12:40.800Z"
+      }
+    },
+    "description": "Retrieved the weather forecast for zip 10001 (New York, NY / Manhattan). Current conditions at New York City, Central Park (KNYC): Overcast, 78°F (extracted as currentTemperatureF, whose anchoring label \"Overcast\" is the current condition). Tonight's forecast text: \"A 40 percent chance of showers before 2am. Mostly cloudy, with a low around 71. West wind 5 to 7 mph.\" (extracted as tonightForecastText). Checkpoint: node [14] \"New York City, Central Park (KNYC)\" — the stable station label for this location."
+  },
+  "summary": "Retrieved the weather forecast for zip 10001 (New York, NY / Manhattan). Current conditions at New York City, Central Park (KNYC): Overcast, 78°F (extracted as currentTemperatureF, whose anchoring label \"Overcast\" is the current condition). Tonight's forecast text: \"A 40 percent chance of showers before 2am. Mostly cloudy, with a low around 71. West wind 5 to 7 mph.\" (extracted as tonightForecastText). Checkpoint: node [14] \"New York City, Central Park (KNYC)\" — the stable station label for this location.",
+  "usage": {
+    "inputTokens": 37939,
+    "inputTokenDetails": {
+      "noCacheTokens": 22579,
+      "cacheReadTokens": 15360,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 4923,
+    "outputTokenDetails": {
+      "textTokens": 885,
+      "reasoningTokens": 4038
+    },
+    "totalTokens": 42862
+  },
+  "stepUsage": [
+    {
+      "in": 5194,
+      "out": 199,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 9362,
+      "out": 517,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 5156,
+      "out": 3585,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 8847,
+      "out": 516,
+      "reasoning": 0,
+      "cached": 0
+    },
+    {
+      "in": 9380,
+      "out": 106,
+      "reasoning": 0,
+      "cached": 0
+    }
+  ]
+}

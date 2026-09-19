@@ -1,6 +1,0 @@
-{"seq":1,"ts":"2026-09-16T06:04:40.967Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v2","approval":"approved","inputs":{"memberId":"[REDACTED]"}}}
-{"seq":2,"ts":"2026-09-16T06:04:41.364Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
-{"seq":3,"ts":"2026-09-16T06:04:41.819Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
-{"seq":4,"ts":"2026-09-16T06:04:42.266Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
-{"seq":5,"ts":"2026-09-16T06:04:42.312Z","actor":"agent","kind":"outputs","detail":{"outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"}}}
-{"seq":6,"ts":"2026-09-16T06:04:42.312Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"},"runId":"replay-2026-09-16T06-04-40-836Z","ms":1345}}
