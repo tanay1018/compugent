@@ -1,0 +1,49 @@
+# Publish the case-study site to GitHub Pages.
+#
+# The site's data is generated from evidence/ rather than committed, so the
+# build runs here on every push. build.mjs uses only Node builtins -- there is
+# nothing to install, which is why there is no npm step.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', 'evidence/**', 'artifacts/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A queued deploy should supersede an older one, but never cancel a deploy
+# that is mid-flight and already touching the live site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'        # build.mjs uses import.meta.dirname (21+)
+      - name: Generate site data from recorded evidence
+        run: node build.mjs
+        working-directory: site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -5,7 +5,7 @@
  * came out of an actual recorded run, so the case study cannot drift away from
  * what the system does. If a run is re-recorded, the site changes with it.
  */
-import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -70,10 +70,7 @@ const artifacts = [];
 for (const id of ['wikipedia.readCompanyInfobox', 'member.readSavingsBalance']) {
   const dir = join(ROOT, 'artifacts', id);
   if (!existsSync(dir)) continue;
-  const versions = readFileSync
-    ? (await import('node:fs')).readdirSync(dir).filter((f) => f.endsWith('.json')).sort()
-    : [];
-  const pick = versions.at(-1);
+  const pick = readdirSync(dir).filter((f) => f.endsWith('.json')).sort().at(-1);
   if (!pick) continue;
   artifacts.push(JSON.parse(readFileSync(join(dir, pick), 'utf8')));
 }

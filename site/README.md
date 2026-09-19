@@ -1,10 +1,10 @@
 # Case study site
 
-Static. No framework, no build step beyond copying data out of the repo.
+Static. No framework, and no dependencies — `build.mjs` uses only Node builtins.
 
 ```bash
-node build.mjs     # regenerate data/ from ../evidence and ../artifacts
-python3 -m http.server 8777
+node build.mjs                 # regenerate data/ from ../evidence and ../artifacts
+python3 -m http.server 8777    # then open http://localhost:8777
 ```
 
 `build.mjs` is the whole pipeline: it reads the featured runs' `run.jsonl`,
@@ -15,11 +15,10 @@ changes with it.
 
 ## Deploy
 
-Vercel, pointed at this directory:
+GitHub Pages, via `.github/workflows/pages.yml`. The workflow regenerates
+`data/` on every push, so nothing generated is committed.
 
-```bash
-npx vercel --cwd site
-```
+One-time setup: **Settings → Pages → Source: GitHub Actions**.
 
-`vercel.json` sets `buildCommand` to `node build.mjs`, so a deploy regenerates
-the data from whatever evidence is committed.
+Every path in the page is relative, so it serves correctly from a project
+subpath (`https://<user>.github.io/<repo>/`) without configuration.
