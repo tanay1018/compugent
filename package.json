@@ -21,7 +21,9 @@
     "desktop": "electron electron/main.cjs",
     "models": "tsx scripts/models.ts",
     "approve": "tsx scripts/approve.ts",
-    "verify": "tsx scripts/verify.ts"
+    "verify": "tsx scripts/verify.ts",
+    "build:runners": "node scripts/build-runners.mjs",
+    "build:app": "npm run build:runners && electron-builder"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.67",
@@ -32,8 +34,68 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "electron": "^44.0.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.12",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },
-  "main": "electron/main.cjs"
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "dev.tanay.compugent",
+    "productName": "Compugent",
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/runners",
+        "to": "runners"
+      },
+      {
+        "from": "artifacts",
+        "to": "seed-artifacts"
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/playwright/**",
+      "**/node_modules/playwright-core/**"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Development"
+    },
+    "directories": {
+      "output": "build/dist"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "tanay1018",
+        "repo": "compugent"
+      }
+    ]
+  },
+  "productName": "Compugent",
+  "description": "Record-once, replay-many computer-use automation. The model discovers; the artifact is the capability; replay never calls the model.",
+  "author": "Tanay Agrawal"
 }

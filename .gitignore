@@ -11,3 +11,5 @@ out/
 
 # generated from evidence/ by site/build.mjs
 site/data/
+
+build/

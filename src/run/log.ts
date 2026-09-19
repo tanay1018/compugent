@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { redactText } from '../policy/allowlist.js';
 
 /**
@@ -40,7 +40,12 @@ export class RunLog {
   readonly dir: string;
 
   constructor(baseDir: string, runId: string) {
-    this.dir = join(baseDir, runId);
+    // Same reason as the artifact store: a packaged build cannot write inside
+    // its own bundle, so DATA_DIR relocates evidence to somewhere writable.
+    // An absolute baseDir is taken as given -- a caller that specific means it.
+    this.dir = isAbsolute(baseDir)
+      ? join(baseDir, runId)
+      : join(process.env.DATA_DIR ?? '.', baseDir, runId);
     mkdirSync(join(this.dir, 'screenshots'), { recursive: true });
   }
 

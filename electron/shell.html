@@ -209,10 +209,47 @@ label{display:block;font:600 11px/1.4 var(--ui);letter-spacing:.08em;text-transf
     <div class="railtop"><span class="t-label">Capabilities</span>
       <button class="btn-quiet" id="refresh" title="Reload from disk">↻</button></div>
     <div id="caps"></div>
-    <div class="railfoot"><button class="btn-primary" id="newcap">New Capability</button></div>
+    <div class="railfoot">
+      <button class="btn-primary" id="newcap">New Capability</button>
+      <button class="btn-quiet" id="opensettings" title="API key and models">Settings</button>
+    </div>
   </nav>
 
   <div class="main">
+    <!-- ============ SETTINGS ============ -->
+    <section class="view" id="v-settings">
+      <div class="startwrap"><div class="card">
+        <h1 class="t-display">Settings</h1>
+        <p class="sub">Your key is written to this machine's application-support directory and
+          passed to runs through the environment. It is never sent anywhere else — there is no
+          server in this product that could receive it.</p>
+
+        <div class="field">
+          <label for="apikey">AI Gateway key</label>
+          <input id="apikey" type="password" spellcheck="false" autocomplete="off" placeholder="vck_…">
+          <p class="note" id="keystate"></p>
+        </div>
+
+        <div class="field">
+          <label for="dmodel">Discovery model · does the heavy lifting, many calls per run</label>
+          <input id="dmodel" spellcheck="false" placeholder="deepseek/deepseek-v4-flash">
+        </div>
+
+        <div class="field">
+          <label for="cmodel">Compile model · one call, and its judgement shapes the contract</label>
+          <input id="cmodel" spellcheck="false" placeholder="anthropic/claude-sonnet-5">
+        </div>
+
+        <div class="runbar">
+          <button class="btn-primary" id="savesettings">Save</button>
+          <button class="btn-quiet" id="getbrowser">Download browser</button>
+          <button class="btn-quiet" id="opendata">Open data folder</button>
+          <button class="btn-quiet" id="closesettings">Done</button>
+        </div>
+        <p class="note" id="setnote"></p>
+      </div></div>
+    </section>
+
     <!-- ============ START ============ -->
     <section class="view on" id="v-start">
       <div class="startwrap"><div class="card">
@@ -297,7 +334,7 @@ const S = { view:'start', mode:'discovery', holder:'agent', control:'agent', sto
 /* ---------------- views ---------------- */
 function show(v) {
   S.view = v;
-  for (const id of ['v-start','v-cap','v-session']) $(id).classList.toggle('on', id === 'v-' + v);
+  for (const id of ['v-start','v-cap','v-session','v-settings']) $(id).classList.toggle('on', id === 'v-' + v);
   if (v !== 'session') { $('raw').style.display = 'none'; $('rawtoggle').textContent = 'Raw Log'; }
 }
 
@@ -704,4 +741,57 @@ document.querySelectorAll('.chips button.task').forEach((b) => b.onclick = () =>
 
 renderControl();
 loadCaps();
+
+/* ------------------------------------------------------------- settings --
+ * The key is write-only from here: the main process returns a hint, never the
+ * value, so this document -- which is trivially inspectable -- never holds it.
+ */
+let settingsBack = 'start';
+
+async function openSettings() {
+  const s = await window.runner.getSettings();
+  $('apikey').value = '';
+  $('apikey').placeholder = s.hasKey ? s.keyHint : 'vck_…';
+  $('keystate').textContent = s.hasKey
+    ? 'A key is saved. Type a new one to replace it; leaving this blank keeps the current key.'
+    : 'No key yet. Discovery needs one — replaying a saved capability does not.';
+  $('dmodel').value = s.discoveryModel;
+  $('cmodel').value = s.compileModel;
+  $('setnote').textContent = `Data folder: ${s.dataDir}`;
+  show('settings');
+}
+
+$('opensettings').onclick = () => {
+  settingsBack = $('v-session').classList.contains('on') ? 'session'
+               : $('v-cap').classList.contains('on') ? 'cap' : 'start';
+  openSettings();
+};
+$('closesettings').onclick = () => show(settingsBack);
+
+$('savesettings').onclick = async () => {
+  const patch = { discoveryModel: $('dmodel').value, compileModel: $('cmodel').value };
+  // An empty box means "leave it alone", not "delete my key".
+  if ($('apikey').value.trim()) patch.apiKey = $('apikey').value.trim();
+  await window.runner.setSettings(patch);
+  $('setnote').textContent = 'Saved.';
+  openSettings();
+};
+
+$('getbrowser').onclick = async () => {
+  const b = $('getbrowser');
+  b.disabled = true;
+  $('setnote').textContent = 'Downloading the browser this app drives — about 150 MB, once. Watch the run log.';
+  const r = await window.runner.ensureBrowser();
+  b.disabled = false;
+  $('setnote').textContent = r.ok
+    ? (r.alreadyInstalled ? 'Browser already installed.' : 'Browser ready.')
+    : 'Download failed — see the log.';
+};
+
+$('opendata').onclick = () => window.runner.openDataDir();
+
+// First launch with nothing configured lands on Settings rather than on a
+// form that will refuse to run.
+window.runner.getSettings().then((s) => { if (!s.hasKey) openSettings(); });
+
 </script></body></html>

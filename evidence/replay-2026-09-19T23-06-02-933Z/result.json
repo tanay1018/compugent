@@ -1,0 +1,39 @@
+{
+  "status": "success",
+  "outputs": {
+    "isin": "JP3756600007",
+    "industry": "Video games Electronics",
+    "headquarters": "11–1 Kamitoba Hokodatecho, Minami-ku, Kyoto, Japan"
+  },
+  "runId": "replay-2026-09-19T23-06-02-933Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "click",
+      "status": "ok",
+      "ms": 3305,
+      "target": "link named \"Search\" labelledBy \"Search Wikipedia [ctrl-option-f]\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "type",
+      "status": "ok",
+      "ms": 3273,
+      "target": "combobox named \"Search Wikipedia\" labelledBy \"Search Wikipedia\" in frame \"root\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 3,
+      "id": "s3",
+      "kind": "click",
+      "status": "ok",
+      "ms": 3357,
+      "target": "option named \"Bank of America American multinational banking and financial services corporation\" labelledBy \"{{companyName}}\" in frame \"root\"",
+      "resolvedVia": "anchor"
+    }
+  ],
+  "ms": 13880
+}

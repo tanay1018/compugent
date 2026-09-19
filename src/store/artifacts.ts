@@ -12,7 +12,13 @@ import { CapabilityArtifact } from '../schema/artifact.js';
  * one file.
  */
 export class ArtifactStore {
-  constructor(private readonly root = 'artifacts') {
+  /**
+   * DATA_DIR relocates the whole store. A packaged desktop build cannot write
+   * inside its own application bundle, so the app points this at the user's
+   * application-support directory; from a source checkout it is unset and the
+   * store stays in the repo where it is easy to inspect and commit.
+   */
+  constructor(private readonly root = join(process.env.DATA_DIR ?? '.', 'artifacts')) {
     mkdirSync(this.root, { recursive: true });
   }
 
