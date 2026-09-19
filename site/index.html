@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Capability Artifacts</title>
+<meta name="description" content="A computer-use agent that records what it learns as a typed, versioned artifact — so the same task replays deterministically, with no model in the loop.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230E1014'/><rect x='3' y='4' width='10' height='2' rx='1' fill='%236E9BF2'/><rect x='3' y='7.5' width='7' height='2' rx='1' fill='%235FB88A'/><rect x='3' y='11' width='4' height='2' rx='1' fill='%23646D7E'/></svg>">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="kicker">Computer-use automation</div>
+    <h1>The model learns it once.<br>Then the model gets out of the way.</h1>
+    <p class="lede">An agent that drives real software through the accessibility tree, and writes down what it learned as a typed, versioned artifact. Replaying that artifact is deterministic: same steps, same resolution path, no model in the decision loop.</p>
+    <div class="rule">The model discovers.<br>The artifact is the capability.<br>Replay never calls the model.</div>
+    <div class="meta">
+      <span>TypeScript</span><span>Playwright / CDP</span><span>Zod</span>
+      <span>Electron</span><span>60 tests</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Why not just run the agent every time</h2>
+<p class="sub">Because an LLM in the loop makes every run a fresh negotiation with the UI. It is slow, it costs money per invocation, and — the part that matters for back-office work — it is not repeatable. The same request can take a different path on Tuesday than it did on Monday, and you cannot audit or approve a process that reinvents itself each time.</p>
+<p class="sub">So the model is used for the thing it is genuinely good at: <em>figuring out how the software works</em>, once, by looking at it. What it learns is compiled into an artifact — parameters, steps, targets, waypoints, outputs, failure classifications — and from then on the artifact is what runs.</p>
+
+<div class="cols">
+  <div class="card"><h4 class="agent">Discovery · minutes, costs tokens</h4><p>A model drives the surface, one action per step, re-reading the screen after each. Produces a trace.</p></div>
+  <div class="card"><h4 class="ok">Replay · ~11s, costs nothing</h4><p>Resolve target, act, verify waypoint, read outputs. Deterministic, auditable, no network call to a model.</p></div>
+</div>
+
+<h2>The hard part is naming things</h2>
+<p class="sub">Legacy business software does not label its inputs. The accessibility tree hands you a textbox with <em>no accessible name at all</em> — nothing to target it by. This is not an edge case; it is the normal condition of the software people actually use at work.</p>
+<p class="sub">So targeting is built around <strong>anchor relations</strong>: the thing next to it is its identity. A field in the same row as the label "ISIN". A control preceded by the text "Transfer amount". This makes the system work on surfaces that were never designed to be automated — and it is surface-agnostic, because the same relations exist in macOS AX and Windows UIA.</p>
+<pre><code>extract cell inSameRowAs "ISIN"           -> isin
+extract cell inSameRowAs "Industry"       -> industry
+extract cell inSameRowAs "Headquarters"   -> headquarters</code></pre>
+<p class="note">Those three lines are from a live Wikipedia article. An infobox cell has no name of its own — the label in the neighbouring cell is the only thing that identifies it.</p>
+
+<h2>Watch it think</h2>
+<p class="sub">Every run writes an actor-tagged log with the model's own reasoning for each action, plus a screenshot. Nothing below is written by hand — it is generated from recorded runs in the repository.</p>
+
+<div class="explorer" id="explorer">
+  <div class="tabs" id="tabs" role="tablist"></div>
+  <div class="runhead">
+    <p class="goal" id="goal"></p>
+    <div class="runstats" id="stats"></div>
+  </div>
+  <div class="body">
+    <div class="steps" id="steps"></div>
+    <div class="pane" id="pane"></div>
+  </div>
+</div>
+
+<h2>Determinism is not generalisation</h2>
+<p class="sub">A capability that works only for the value it was recorded on is a recording, not a capability — and repetition cannot tell the difference, because the recorded case passes identically every time. Proving it generalises means replaying it against values it has <em>never seen</em>.</p>
+
+<table>
+  <thead><tr><th>company</th><th>ISIN</th><th>industry</th><th>headquarters</th></tr></thead>
+  <tbody>
+    <tr class="recorded"><td>Bank of America</td><td class="mono">US0605051046</td><td>Financial services</td><td>Charlotte, NC</td></tr>
+    <tr><td>Microsoft</td><td class="mono">US5949181045</td><td>Information technology</td><td>Redmond, WA</td></tr>
+    <tr><td>Toyota</td><td class="mono">JP3633400001</td><td>Automotive</td><td>Toyota City, JP</td></tr>
+    <tr><td>Airbus</td><td class="mono">NL0000235190</td><td>Aerospace Defence</td><td>Leiden / Toulouse</td></tr>
+    <tr><td>Nintendo</td><td class="mono">JP3756600007</td><td>Video games</td><td>Kyoto, JP</td></tr>
+  </tbody>
+</table>
+<p class="note">Recorded once, on the first row. The rest replayed with no model involved, stable across repeats at ~11s.</p>
+
+<h3>The gate earning its place</h3>
+<p class="sub">A second capability read the temperature off a government weather site. It anchored that value to <code>precededBy "Overcast"</code> — the current conditions text, which is <em>data wearing the shape of a label</em>. The compiler could not know: it sees one trace, and on that trace the anchor was right there.</p>
+<pre><code>$ verify weather.readForecastByZip --case "zipCode=10001" --case "zipCode=90210"
+
+  <span class="ok">pass</span>  recorded  {"currentTemperatureF":78,...}
+  <span class="bad">fail</span>  unseen    output_missing: currentTemperatureF at precededBy "Overcast"
+
+  <span class="bad">PINNED</span> — works on the recorded value and fails on values it has not seen.</code></pre>
+<p class="sub">Beverly Hills was not overcast. Twenty-four hours later New York read "Fair", and the capability failed on its own recorded ZIP too. It was never promoted: the model produced it, the compiler accepted it, and the gate refused it. A single green replay on the day of recording would have shipped it.</p>
+<p class="sub"><strong>An anchor must be a label, not a value.</strong> <code>inSameRowAs "ISIN"</code> holds because every company article has an ISIN row. <code>precededBy "Overcast"</code> holds until the weather changes.</p>
+
+<h2>A human can take the wheel</h2>
+<p class="sub">Automation that cannot be interrupted is not deployable in an environment where a person is accountable for the outcome. Control is a single token with no shared state — either the agent holds it or the operator does, and the handover is atomic at a step boundary.</p>
+<p class="sub">When the operator hands it back, the agent does not resume at the step it was on. It re-reads the screen and re-locates itself in the plan, because the person may have done three steps of the work themselves, or navigated somewhere else entirely. <em>The plan is a map, not a program counter.</em></p>
+
+<h2>What it does not do</h2>
+<p class="sub">Measured, not suspected — each is a real page it handles badly.</p>
+<table>
+  <thead><tr><th>limit</th><th>what happens</th></tr></thead>
+  <tbody>
+    <tr><td>Bot walls</td><td>A major retailer returns 6 accessibility nodes — the CDN block page. Nothing is rendered to perceive.</td></tr>
+    <tr><td>Values with no label</td><td>Some pages put nothing label-shaped beside the number. No anchor <em>choice</em> fixes a page with no anchor.</td></tr>
+    <tr><td>Definition lists</td><td>A <code>&lt;dl&gt;</code> layout presents neither a table row nor preceding label text. Needs a third relation kind.</td></tr>
+    <tr><td>Prompt caching</td><td>Not yet reusing the prompt prefix across steps. Pure cost, no correctness impact.</td></tr>
+  </tbody>
+</table>
+<p class="note">It works on pages whose structure carries meaning. It degrades on pages that are visually structured but semantically flat, and it does not work where a CDN decides it shouldn't.</p>
+
+<footer class="wrap">
+  Built as a study of how computer-use agents can be made repeatable enough to trust.
+  Source, the full design report and every recorded run are in the repository.
+</footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

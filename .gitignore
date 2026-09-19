@@ -8,3 +8,6 @@ evidence/**/*.tmp
 dist/
 out/
 *.asar
+
+# generated from evidence/ by site/build.mjs
+site/data/
