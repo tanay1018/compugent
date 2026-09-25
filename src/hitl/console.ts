@@ -121,13 +121,14 @@ export class OperatorConsole {
           throw e;
         };
         this.server!.once('error', onError);
-        this.server!.listen(port, () => { this.server!.removeListener('error', onError); resolve(true); });
+        // Loopback only: the console forwards input into a live session and has no auth.
+        this.server!.listen(port, '127.0.0.1', () => { this.server!.removeListener('error', onError); resolve(true); });
       });
       if (bound) { this.port = port; break; }
       if (attempt === 39) throw new Error(`no free port for the operator console (tried ${first}-${first + 39})`);
     }
     await this.session.startStreaming();
-    return `http://localhost:${this.port}/`;
+    return `http://127.0.0.1:${this.port}/`;
   }
 
   async stop(): Promise<void> {
