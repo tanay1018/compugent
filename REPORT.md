@@ -452,34 +452,37 @@ The entry URL is checked before the browser moves.
 1. allowlist is origin and path, not per control
 2. classification is label based; an unlabelled destructive control reads as reversible until review
 3. redaction is heuristic and over broad: the compiler marked `memberId` sensitive, so evidence cannot show which member a run queried
-4. screenshots are not redacted
-5. the console has no authentication; localhost only
+4. screenshots are not redacted (§7)
+5. the console has no authentication; it binds to `127.0.0.1`, so any local process can drive it
 
-## 7. Cuts
+## 7. Not built
 
-| cut | seam in place | why |
+What is missing, what already exists for it, and what building it would involve.
+
+| gap | what exists | to build it |
 |---|---|---|
-| desktop driver | `DesktopSurface` stub | OS accessibility grant plus a second runtime; not expected by the brief |
-| visual / OCR tier | `visual` fallback kind | only matters for canvas and Citrix |
-| CSS / XPath fallbacks | accepted by the schema | surface specific; only `text` runs |
-| tenant overlays | `harbor` tenant, `recordedTenant` | format designed in 4.4 |
-| compiler-authored probes and `produces` | schema requires probes; replay honours them | a trace with an irreversible step needs the probe added by hand before it parses |
-| default-state assertions | waypoint vocabulary | the dropdown drift class in 4.5 |
-| assisted LLM fallback | escalation machinery | bounded, single-step, published as a new draft |
-| catalog endpoint | `toToolSchema()`, desktop catalog | no network surface for an external agent |
-| screenshot redaction, console auth | | |
+| **Desktop driver** | `DesktopSurface` implements every `Surface` method as a stub; nothing above the seam depends on the web | an out-of-process AX / UIA driver speaking JSON-RPC over stdio (§4.3), plus the OS accessibility permission on the machine running it |
+| **Visual / OCR tier** | the schema accepts `fallbacks[].kind = "visual"` | a screenshot + OCR resolver for canvas and Citrix surfaces, which expose no accessibility tree |
+| **CSS / XPath fallbacks** | the schema accepts them; the resolver only executes `text` fallbacks | executing them in `PlaywrightSurface`. They are web-only, so they would stay fallbacks, never the primary locator |
+| **Tenant overlays** | the target app has two tenants; artifacts record `recordedTenant` | per-tenant name and anchor overrides merged at load (§4.4). Today a `meridian` artifact does not resolve on `harbor` |
+| **Compiler-generated probes and `produces`** | the schema requires a probe on irreversible steps; replay and re-entry enforce it | derive a `nodeExists` probe from the confirmation screen the recorded run saw after the step. Until then, a trace with an irreversible step does not compile until a probe is added by hand |
+| **Default-state assertions** | waypoints can already express them | have the compiler assert values the run relied on but never set, such as the search-type dropdown default (§4.5) |
+| **Assisted recovery on replay failure** | escalation, and the draft / approved gate | a bounded, single-step model call when replay fails, with any fix saved as a new draft rather than applied in place |
+| **Catalog endpoint** | `toToolSchema()`; the desktop app lists and runs capabilities | an HTTP or MCP endpoint so an external agent can list and invoke capabilities |
+| **Screenshot redaction** | text in `run.jsonl` and `result.json` is redacted; screenshots are saved unmodified, so a balance or name on screen appears in the PNG | black out the boxes of sensitive nodes, which the observation already identifies, before each screenshot is written |
+| **Console authentication** | the console binds to `127.0.0.1`, so only local processes can reach it | a per-session token on every request, needed before the console can be exposed beyond the local machine |
 
 ### 7.1 Known limits on real sites
 
 Each row is a real page the system handles badly.
 
-| limit | what happens | why it is not a tuning problem |
+| limit | what happens | cause and what would address it |
 |---|---|---|
-| **Bot walls** | amazon.com returns 6 accessibility nodes — the CDN block page | nothing is rendered to perceive; `/dp/` is disallowed for automated clients. Not a perception bug and not fixable from inside the browser |
-| **Values with no label** | weather.gov puts nothing label-shaped beside the temperature (`Current conditions at / STATION / Fair / 79°F`) | no anchor *choice* fixes it; the page has no label to anchor to. Caught by the gate (§3.7), never approved |
-| **Definition-list layouts** | openlibrary.org yields 133 nodes and **zero** anchored | anchoring reaches for a table row or preceding text; a `<dl>` presents neither. Needs a third relation kind, not a bigger budget |
-| **JSON in text nodes** | finance.yahoo.com anchored a control to `[{"fullExchangeName":"Nasd…` | embedded JSON is indistinguishable from prose to the AX tree; needs a shape filter on anchor candidates |
-| **No prompt caching** | `cached=0` on every model call | compaction rewrites history every step, and the remaining stable prefix (~450 token system prompt) is below Anthropic's 1024 token minimum. Cost only, no correctness impact |
+| **Bot walls** | amazon.com returns 6 accessibility nodes: the CDN block page | the site serves a block page instead of the app. Getting past bot protection is out of scope; the run detects a page with nothing to operate and warns before spending a model call |
+| **Values with no label** | weather.gov puts nothing label-like beside the temperature (`Current conditions at / STATION / Fair / 79°F`) | there is no label to anchor to. `verify` caught this (§3.7) and the capability was never approved |
+| **Definition-list layouts** | openlibrary.org yields 133 nodes and **zero** anchored | anchoring looks for a table row or preceding text, and a `<dl>` has neither. Needs a `describedBy` relation |
+| **JSON in text nodes** | finance.yahoo.com anchored a control to `[{"fullExchangeName":"Nasd…` | embedded JSON looks like any other text in the accessibility tree. Needs a filter that rejects JSON-shaped anchor candidates |
+| **No prompt caching** | `cached=0` on every model call | compaction rewrites history every step, and the remaining stable prefix (~450 token system prompt) is below Anthropic's 1024 token minimum. Affects cost only |
 
 In short: this works on pages whose structure carries meaning (label/value rows, named controls, tables). It degrades on pages that are visually structured but semantically flat, and does not work behind bot protection.
 
