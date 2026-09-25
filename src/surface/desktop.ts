@@ -4,39 +4,32 @@ import type {
 import type { TargetDescriptor } from '../schema/target.js';
 
 /**
- * Desktop surface — DESIGNED, NOT IMPLEMENTED. See REPORT.md §4.
+ * Desktop surface: designed, not implemented. See REPORT.md §4.
  *
- * This file exists so the heterogeneity claim can be checked rather than
- * taken on faith: every method a desktop driver would need is present with
- * its real signature, and none of them required changing `Surface`,
- * `TargetDescriptor`, or the artifact schema.
+ * Every Surface method is present with its real signature and throws. Adding
+ * it required no changes to `Surface`, `TargetDescriptor` or the schema.
  *
- * How it would be built:
+ * Intended implementation:
  *
  *  - Perception. macOS AXUIElement (`AXRole`, `AXTitle`, `AXValue`,
  *    `AXChildren`) or Windows UIA (`ControlType`, `Name`, `AutomationId`)
  *    walked into the same UINode shape. The role vocabulary in
  *    schema/target.ts was chosen to map onto all three platforms.
  *
- *  - Anchoring. The legacy-web problem recurs verbatim: Win32/Swing dialogs
- *    routinely expose unlabelled edit controls whose only identity is the
- *    static text to their left. `inSameRowAs` becomes geometric adjacency
- *    (nearest static text within the same horizontal band) instead of a table
- *    walk — same descriptor, different resolver.
+ *  - Anchoring. Win32/Swing dialogs often have unlabelled edit controls
+ *    identified only by the static text to their left. `inSameRowAs` becomes
+ *    geometric adjacency (nearest static text in the same horizontal band).
  *
- *  - Process boundary. Node has no credible AX bindings, so this would run
- *    out-of-process: a small Python (pyobjc) or C# (UIAutomation) driver
- *    speaking newline-delimited JSON-RPC over stdio. That boundary is the
- *    reason `Surface` is coarse-grained and fully async — every method here
- *    is already one round trip.
+ *  - Process boundary. Node has no good AX bindings, so a small Python
+ *    (pyobjc) or C# (UIAutomation) driver would speak JSON-RPC over stdio.
+ *    This is why `Surface` methods are coarse-grained and async.
  *
- *  - Handoff. Strictly simpler than the web case: the window is already on
- *    the operator's screen, so `startStream` is a screencapture loop and
- *    control transfer is "stop synthesising events" rather than a proxy.
+ *  - Handoff. The window is already on the operator's screen, so
+ *    `startStream` is a screen-capture loop and control transfer just stops
+ *    synthesising events.
  *
- * Cut deliberately: it needs an OS-specific driver plus an accessibility
- * permission grant, which buys reviewer friction rather than insight. The
- * brief states desktop support is not expected.
+ * Not built because it needs an OS-specific driver and an accessibility
+ * permission grant, and the brief does not require desktop support.
  */
 export class DesktopSurface implements Surface {
   readonly kind: SurfaceKind = 'desktop';
@@ -46,7 +39,7 @@ export class DesktopSurface implements Surface {
   private notImplemented(method: string): never {
     throw new Error(
       `DesktopSurface.${method}() is not implemented (target: ${this.opts.app}). ` +
-        `The surface abstraction is real; the OS driver is a documented cut — see REPORT.md §4.`,
+        `Desktop surface is not implemented; see REPORT.md §4.`,
     );
   }
 

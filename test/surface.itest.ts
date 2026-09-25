@@ -5,9 +5,8 @@ import { PlaywrightSurface } from '../src/surface/playwright.js';
 import { TargetDescriptor } from '../src/schema/target.js';
 
 /**
- * End-to-end proof for Phase 2: observe -> resolve -> act against the real
- * legacy surface, driven ONLY by anchor relations. No CSS, no XPath, no test
- * ids, and for the L2 tenant not even a named button.
+ * observe -> resolve -> act against the target app using only anchor relations
+ * (for the L2 tenant, not even a named button).
  */
 const PORT = 8719;
 const BASE = `http://localhost:${PORT}`;
@@ -26,7 +25,7 @@ before(async () => {
 
 after(async () => { await s?.close(); server?.kill('SIGKILL'); });
 
-test('the legacy field is genuinely anonymous in the accessibility tree', async () => {
+test('the legacy field has no accessible name in the accessibility tree', async () => {
   await s.navigate(`${BASE}/?tenant=meridian`);
   const o = await s.observe();
   const box = o.nodes.find((n) => n.role === 'textbox');
@@ -66,8 +65,7 @@ test('drives the L2 tenant where the SUBMIT BUTTON is also anonymous (harbor)', 
   await s.navigate(`${BASE}/?tenant=harbor`);
   let o = await s.observe();
 
-  // Harbor renames the field, so the anchor text differs — this is exactly the
-  // per-tenant drift that a shared artifact must be specialised for.
+  // Harbor renames the field, so the anchor text differs per tenant.
   const field = TargetDescriptor.parse({
     role: 'textbox', scope: { frame: 'main' },
     anchor: { relation: 'inSameRowAs', text: 'Account Number' },
@@ -77,9 +75,8 @@ test('drives the L2 tenant where the SUBMIT BUTTON is also anonymous (harbor)', 
   await s.act(o, (rf as any).node, { kind: 'type', text: '67890' });
 
   o = await s.observe();
-  // The author gave this image input no alt text -- Chrome SYNTHESISES the
-  // name "Submit". Depending on that string is false confidence: it is a
-  // browser default, not app content. The anchor is the durable identity.
+  // The image input has no alt text; Chrome synthesises "Submit". The anchor is
+  // the reliable identity.
   const btn = o.nodes.find((n) => n.role === 'button');
   assert.ok(btn, 'expected a submit control');
   assert.equal(btn.name, 'Submit', 'browser-synthesised name, not author content');

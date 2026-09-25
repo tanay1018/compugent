@@ -1,10 +1,8 @@
 // Desktop shell for the automation runner.
 //
-// The app owns the lifecycle: it starts the target app if the goal points at
-// localhost, spawns a discovery run, waits for that run's operator console to
-// come up, and then shows it. The console itself is unchanged -- it is the
-// same client an operator would attach to a containerised session with, which
-// is why this shell can stay thin.
+// Starts the target app if the goal points at localhost, spawns a discovery
+// run, waits for its operator console to come up, and shows it. The console is
+// the same client a remote operator would use.
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
@@ -18,17 +16,12 @@ let child = null;
 let targetApp = null;
 
 /**
- * How a runner is invoked, which differs entirely between the two ways this
- * app runs.
+ * How a runner script is invoked.
  *
- * From source there is a source tree, so `npx tsx scripts/foo.ts` is the
- * honest thing to run -- edit a script, restart, see the change.
- *
- * Packaged there is no npx, no tsx and no TypeScript. The scripts are bundled
- * to single .mjs files at build time and run by Electron's OWN node, which is
- * already on disk: ELECTRON_RUN_AS_NODE turns the same binary into a plain
- * node. That avoids shipping a second runtime, and it is why the bundles are
- * ESM -- several scripts use top-level await, which CJS cannot express.
+ * From source: `npx tsx scripts/<name>.ts`.
+ * Packaged: scripts are pre-bundled to ESM .mjs files (some use top-level
+ * await) and run with Electron's own binary via ELECTRON_RUN_AS_NODE, so no
+ * second Node runtime is shipped.
  */
 const RUNNERS = path.join(ROOT, 'runners');
 function runnerCommand(script, args) {
@@ -41,13 +34,8 @@ function runnerCommand(script, args) {
 }
 
 /**
- * Settings live in the OS application-support directory, never in the repo.
- *
- * The API key is the whole reason this file exists: a packaged app has no
- * .env beside it, and asking someone to create one inside an .app bundle is
- * not a thing to ask. It is written here, passed to runners through the
- * environment, and never sent anywhere else -- there is no server in this
- * product that could receive it.
+ * Settings (mainly the API key) live in the OS app-data directory, since a
+ * packaged app has no .env. The key is passed to runners via the environment.
  */
 const SETTINGS = path.join(app.getPath('userData'), 'settings.json');
 function readSettings() {
@@ -67,8 +55,7 @@ function runnerEnv() {
   if (s.apiKey) out.AI_GATEWAY_API_KEY = s.apiKey;
   if (s.discoveryModel) out.DISCOVERY_MODEL = s.discoveryModel;
   if (s.compileModel) out.COMPILE_MODEL = s.compileModel;
-  // Browsers are downloaded into userData rather than a shared cache, so the
-  // app never depends on the machine having run `playwright install`.
+  // Download browsers into userData so the app does not depend on `playwright install`.
   out.PLAYWRIGHT_BROWSERS_PATH = path.join(app.getPath('userData'), 'browsers');
   // Artifacts and evidence must be writable; inside an .app bundle they are not.
   out.DATA_DIR = app.isPackaged ? app.getPath('userData') : ROOT;
@@ -109,16 +96,10 @@ function send(channel, payload) {
 }
 
 /**
- * Kill the whole process GROUP, not the pid we happen to hold.
- *
- * We spawn through `npx`, which execs node as a grandchild. Signalling the npx
- * pid kills the wrapper and orphans everything underneath it: the runner keeps
- * running, its console keeps holding a port, and its browser keeps running.
- * The visible symptom is a "New run" that appears to hang on the previous
- * run's page, because the previous run never actually stopped.
- *
+ * Kill the whole process group. Runs are spawned via `npx`, so signalling only
+ * our pid would orphan the runner, its console port and its browser.
  * `detached: true` makes each child a group leader so a negative pid reaches
- * the entire tree.
+ * the tree.
  */
 function killTree(proc) {
   if (!proc) return;
@@ -139,8 +120,7 @@ function settle(ms = 350) {
 /** The bundled target app, started on demand so a local goal just works. */
 async function ensureTargetApp() {
   if (await portUp(8710)) return;
-  // The bundled demo app is a development convenience and is not shipped, so
-  // a packaged build simply reports it rather than failing to spawn tsx.
+  // The target app is not included in packaged builds.
   if (app.isPackaged) {
     send('run:log', '· the bundled demo app ships only with the source checkout — point this at a real URL instead\n');
     return;
@@ -150,16 +130,9 @@ async function ensureTargetApp() {
 }
 
 /**
- * Seed the catalogue on first run.
- *
- * A packaged app opens with an empty rail and a key prompt, which is a poor
- * first thing to meet: the most convincing part of this system is replay, and
- * replay needs no key at all. The approved capabilities ship with the app and
- * are copied in once, so someone can drive live Wikipedia in the first minute
- * and decide afterwards whether to paste a key and record their own.
- *
- * Copied, never linked, and only when the catalogue is empty -- so a user's
- * own artifacts are never overwritten by an update.
+ * Seed the catalogue on first run with the bundled artifacts, so replay can be
+ * tried without an API key. Only runs when the catalogue is empty, so user
+ * artifacts are never overwritten.
  */
 function seedArtifacts() {
   const dest = path.join(app.getPath('userData'), 'artifacts');
@@ -178,9 +151,7 @@ function seedArtifacts() {
 
 ipcMain.handle('settings:get', () => {
   const s = readSettings();
-  // The key itself is never sent to the renderer. The window only needs to
-  // know whether one is set and roughly which, so a page that is trivially
-  // inspectable never holds the secret.
+  // The renderer only gets a masked hint, never the key.
   return {
     hasKey: Boolean(s.apiKey),
     keyHint: s.apiKey ? `${s.apiKey.slice(0, 7)}…${s.apiKey.slice(-4)}` : '',
@@ -203,10 +174,8 @@ ipcMain.handle('settings:set', (_e, next) => {
 ipcMain.handle('settings:openDataDir', () => { shell.openPath(app.getPath('userData')); return { ok: true }; });
 
 /**
- * Playwright needs a browser binary, and a packaged app cannot assume the
- * machine has ever run `playwright install`. It is fetched once, into
- * userData, and the download is reported to the window because it is ~150MB
- * and silence for two minutes reads as a hang.
+ * Download Chromium into userData on first use. Progress is reported to the
+ * window because the download is ~150MB.
  */
 let installing = null;
 function ensureBrowser() {
@@ -255,8 +224,7 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
     cwd: ROOT,
     // Own process group, so stopRun() can reach the whole tree.
     detached: true,
-    // RUNNER_PARENT_PID lets the run notice if this app dies abnormally and
-    // shut itself down, instead of orphaning a browser and holding a port.
+    // Lets the runner exit if this app dies, instead of orphaning its browser.
     env: { ...process.env, ...runnerEnv(), ...run.env,
            CONSOLE_PORT: String(port), RUNNER_PARENT_PID: String(process.pid) },
   });
@@ -268,20 +236,14 @@ ipcMain.handle('run:start', async (_e, { url, task }) => {
   const ok = await waitFor(port);
   if (!ok) { stopRun(); return { ok: false, error: 'the run did not start — open the raw log for the reason' }; }
   attachSession(port);
-  // The port is deliberately NOT returned: the renderer has no business
-  // holding a handle to the control channel.
+  // The port is not returned to the renderer; all session traffic goes through main.
   return { ok: true };
 });
 
 /**
- * Session channel proxy.
- *
- * The renderer is a file:// page and the session channel is http://localhost,
- * so the two are cross-origin. The alternative -- opening CORS on the channel
- * -- would let any page on this machine drive an operator session that is
- * mid-flight inside a bank application. Everything is relayed through the main
- * process instead: the renderer never learns the port and never issues a
- * cross-origin request.
+ * Session channel proxy. The renderer (file://) and the session channel
+ * (http://localhost) are cross-origin. Rather than enabling CORS, which would
+ * let any local page drive the session, requests are relayed through main.
  */
 let sessionStream = null;
 
@@ -332,15 +294,8 @@ ipcMain.handle('session:input', (_e, body) => relay('/input', body));
 ipcMain.handle('run:stop', () => { stopRun(); detachSession(); return { ok: true }; });
 
 /**
- * The capability catalog: what has been recorded and can now be invoked
- * without a model. Read straight off disk — artifacts are files, one per
- * version, and the newest version of each id is what a caller gets.
- */
-/**
- * Markers the runner prints on stdout. Scraping formatted output would break
- * the moment a heading changed; these are the runner telling us things it
- * knows and the UI cannot infer -- which run directory this was, what plan a
- * replay is about to follow.
+ * Machine-readable markers the runner prints on stdout (run directory, replay
+ * plan), so the app does not have to parse formatted output.
  */
 const MARKERS = {
   __RUN_DONE__: 'run:done',
@@ -361,12 +316,8 @@ function pipeChildOutput(text) {
 }
 
 /**
- * Replay a capability ON THE STAGE rather than headlessly.
- *
- * Replay is the whole point of the system and it was the one thing you could
- * not watch: you pressed Run and a JSON result appeared. Hosting the same
- * operator channel a discovery run uses makes an artifact retracing its
- * recorded path something you can see happen.
+ * Replay a capability visibly, using the same operator channel as a discovery
+ * run, so the stage shows each step.
  */
 ipcMain.handle('caps:runLive', async (_e, { id, inputs, url }) => {
   stopRun();
@@ -395,9 +346,7 @@ ipcMain.handle('caps:runLive', async (_e, { id, inputs, url }) => {
 });
 
 ipcMain.handle('caps:list', () => {
-  // Read from wherever runs actually WRITE. Reading ROOT meant a packaged
-  // build listed the (read-only, empty) bundle while every run saved into
-  // userData, so a capability you had just recorded never appeared.
+  // Read from where runs write (userData when packaged), not the app bundle.
   const root = path.join(runnerEnv().DATA_DIR, 'artifacts');
   if (!fs.existsSync(root)) return [];
   const out = [];
@@ -408,10 +357,7 @@ ipcMain.handle('caps:list', () => {
       .map((f) => /^v(\d+)\.json$/.exec(f)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b);
     if (!versions.length) continue;
 
-    // Show the version a caller would actually GET, which is the highest
-    // APPROVED one — not simply the highest. Listing a later draft here while
-    // Run executes an approved predecessor would be the catalog lying about
-    // what the button does.
+    // Show the version replay will actually load: the highest approved one.
     const read = (n) => JSON.parse(fs.readFileSync(path.join(dir, `v${n}.json`), 'utf8'));
     let v = versions.at(-1);
     for (const n of versions) {
@@ -433,7 +379,7 @@ ipcMain.handle('caps:list', () => {
   return out;
 });
 
-/** Replay a capability. No model is involved — this is the production path. */
+/** Replay a capability (no model involved). */
 ipcMain.handle('caps:run', async (_e, { id, inputs, url }) => {
   if (/localhost:8710|127\.0\.0\.1:8710/.test(url || '')) await ensureTargetApp();
   const extra = [id, '--json'];
@@ -461,7 +407,7 @@ ipcMain.handle('caps:compile', async (_e, opts) => {
   // `--partial` saves a run that never finished as an `incomplete` artifact:
   // the steps that did work are kept, but it is not invocable.
   const extra = [];
-  // Save the run the user actually watched, not whatever happens to be newest.
+  // Compile the run the user watched, not simply the newest.
   if (opts && opts.runDir) extra.push(opts.runDir);
   if (opts && opts.partial) extra.push('--partial');
   const run = runnerCommand('compile', extra);
@@ -480,8 +426,7 @@ ipcMain.handle('caps:compile', async (_e, opts) => {
           incomplete: /\[incomplete\]/.test(out),
         });
       }
-      // Distinguish "this run did not finish" from a genuine failure, so the
-      // UI can offer to keep it rather than just reporting an error.
+      // Distinguish an unfinished run from a failure, so the UI can offer --partial.
       const partialAvailable = /allowPartial|--partial/.test(out);
       // Prefer our own one-line reason over whatever Node dumped after it.
       const clean = /cannot (?:compile|save): (.+)/.exec(out);

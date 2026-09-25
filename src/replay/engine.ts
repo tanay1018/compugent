@@ -8,18 +8,14 @@ import type { RunLog } from '../run/log.js';
 import type { ReplayResult, StepReport, ReplayFailure } from './result.js';
 
 /**
- * Deterministic replay — the production execution path.
+ * Deterministic replay of a capability artifact.
  *
- * NO MODEL IS INVOKED HERE. This file imports nothing from `ai` or the gateway,
- * and a test asserts that stays true. Everything the model figured out during
- * discovery is already in the artifact; re-deriving it per call would be slow,
- * expensive and non-deterministic, which is the entire reason the artifact
- * exists.
+ * No model is invoked here; test/replay-purity.test.ts checks that nothing
+ * reachable from this file imports a model SDK.
  *
- * The interesting part is not executing steps — it is deciding what a
- * departure from the happy path MEANS. Replay never treats an unexpected
- * screen as a generic failure until it has asked whether the artifact declares
- * that screen as a known outcome.
+ * When a screen does not match what a step expects, replay first checks
+ * whether the artifact declares it as a known outcome before reporting a
+ * failure.
  */
 
 export interface ReplayOptions {
@@ -28,17 +24,12 @@ export interface ReplayOptions {
   surface: PlaywrightSurface;
   policy: PolicyConfig;
   log: RunLog;
-  /** Tenant origin. The artifact stores a route pattern, not a host, so one
-   *  capability can serve many institutions on the same vendor product. */
+  /** Tenant origin. The artifact stores only a route pattern. */
   baseUrl: string;
   /** Unattended callers may not run a draft artifact. */
   unattended?: boolean;
   stepTimeoutMs?: number;
-  /**
-   * Resume an interrupted run at this step, rather than starting over.
-   * Supplied by re-localisation after a human handed control back — never
-   * chosen by the caller, because only observed state can say where we are.
-   */
+  /** Resume at this step. Set by re-localisation after an operator hands back. */
   resumeFrom?: number;
   /** The session is already positioned; do not navigate and lose its state. */
   skipNavigation?: boolean;
@@ -78,12 +69,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
   const steps: StepReport[] = [];
   const stepTimeout = opts.stepTimeoutMs ?? 15000;
 
-  /**
-   * The CALLER gets real values; the LOG and the evidence file get redacted
-   * ones. Those are different audiences and conflating them is how regulated
-   * data ends up on disk: the agent needs the balance to act on it, the
-   * evidence directory has no business retaining it.
-   */
+  // The caller gets real values; the log and evidence files get redacted ones.
   const redactOutputs = (o: Record<string, unknown>): Record<string, unknown> =>
     Object.fromEntries(
       Object.entries(o).map(([k, v]) => [k, a.outputs.find((s) => s.name === k)?.sensitive ? '[REDACTED]' : v]),
@@ -122,8 +108,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     }
   }
   if (a.approval === 'incomplete' || !a.checkpoint) {
-    // Not a permission gate like the draft check below -- there is genuinely
-    // nothing here that could tell success from failure.
+    // Without a checkpoint there is no way to verify success.
     return fail({
       code: 'not_approved',
       expected: 'a completed capability with a checkpoint',
@@ -171,13 +156,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     const report: StepReport = { index: step.index, id: step.id, kind: step.kind, status: 'ok', ms: 0 };
     if (step.target) report.target = describeTarget(step.target);
 
-    /**
-     * Narration. The engine previously said nothing until after it had acted,
-     * which left the most characteristic thing this system does -- walking a
-     * recorded path and verifying each waypoint before touching anything --
-     * entirely invisible. These events cost nothing and make a replay
-     * watchable, as well as making the evidence trail legible after the fact.
-     */
+    // Log each step before acting, so a replay can be followed live and in the evidence.
     log.append('agent', 'step.begin', {
       step: step.index, of: a.steps.length, kind: step.kind,
       ...(step.target ? { target: describeTarget(step.target, opts.inputs) } : {}),
@@ -189,12 +168,9 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     while (true) {
       attempts += 1;
 
-      // 1. Wait for the state this step expects. Waiting IS the recovery for
-      //    transient slowness -- no separate retry policy needed for a slow load.
-      //
-      //    The wait also aborts the moment the artifact RECOGNISES the screen.
-      //    Without that, a "no such member" lookup would sit through the full
-      //    step timeout before reporting an answer the app rendered instantly.
+      // 1. Wait for the step's waypoint. This also absorbs transient slowness,
+      //    so there is no separate retry policy. The wait ends early if the
+      //    screen matches a declared outcome.
       const settled: Observation | null = step.waypoint
         ? await surface.waitUntil(
             (o) => evaluateAssertion(o, step.waypoint as StateAssertion, opts.inputs).held || matchOutcome(a, o, opts.inputs) !== null,
@@ -206,9 +182,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         settled && (!step.waypoint || evaluateAssertion(settled, step.waypoint, opts.inputs).held) ? settled : null;
 
       if (!obs) {
-        // Did not arrive. Ask the artifact what this screen means BEFORE
-        // calling it a failure -- this is where "no such member" is separated
-        // from "the app is broken".
+        // Waypoint never held. Check declared outcomes before reporting failure.
         const current = settled ?? (await surface.observe());
         const m = matchOutcome(a, current, opts.inputs);
         if (m) {
@@ -234,8 +208,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         });
       }
 
-      // An outcome can also be reached WHILE the waypoint holds -- a permission
-      // banner rendered on the same screen, for instance.
+      // An outcome can also appear while the waypoint holds (e.g. a permission banner).
       const early = matchOutcome(a, obs, opts.inputs);
       if (early) {
         const handled = await handleOutcome(early, obs);
@@ -267,14 +240,12 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         );
       }
       report.resolvedVia = r.via;
-      // WHICH tier matched is the interesting part: a step that resolves by
-      // anchor is one the accessibility tree could not name on its own.
+      // Record which resolution tier matched; tier changes between runs indicate drift.
       log.append('agent', 'step.resolved', {
         step: step.index, via: r.via, target: describeTarget(step.target, opts.inputs),
       });
 
-      // 3a. A value the artifact deliberately does not hold. Nothing here can
-      //     supply it, and guessing is not an option -- hand over to a human.
+      // 3a. Operator-supplied value: escalate to a human.
       if (step.value?.from === 'operator') {
         report.status = 'failed';
         report.ms = Date.now() - sT0;
@@ -291,7 +262,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       // 3b. Policy. The artifact declares the effect; policy only enforces it.
       const value = bindValue(step, opts.inputs);
       const action = { kind: step.kind as never, ...(value !== undefined ? { text: value } : {}) };
-      // Defence in depth: an artifact is a file, and a file can be edited.
+      // Re-check credential fields here too; the artifact file could have been edited.
       const cred = checkCredentialField(policy, action, step.target.anchor?.text ?? step.target.name);
       if (cred.allow === false) {
         report.status = 'failed';
@@ -313,8 +284,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         });
       }
       if (decision.allow === 'needs_approval') {
-        // 4. Irreversible: has it already happened? Without this, a run resumed
-        //    after a human takeover opens a second account.
+        // 4. Irreversible: skip if the probe shows it already happened, else escalate.
         if (step.idempotencyProbe && evaluateAssertion(obs, step.idempotencyProbe, opts.inputs).held) {
           report.status = 'skipped';
           report.note = 'idempotency probe indicates this step already took effect';
@@ -363,11 +333,8 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
 
   // --- Checkpoint ---------------------------------------------------------
   //
-  // Checkpoint verification is a LOOP, not a single check. A recoverable
-  // outcome between the last step and the checkpoint -- an unexpected
-  // interstitial is the classic one -- has to be dismissed and the checkpoint
-  // re-tested. Recovering and then reporting failure anyway would make the
-  // whole recovery mechanism decorative.
+  // Retried in a loop: a recoverable outcome (e.g. an interstitial) is handled
+  // and the checkpoint re-tested.
   let arrived: Observation | null = null;
   let lastSeen: Observation | null = null;
   for (let attempt = 1; attempt <= 3 && !arrived; attempt++) {
@@ -412,8 +379,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       value: spec.sensitive ? '[REDACTED]' : applyTransform(raw, spec.transform),
     });
 
-    // Identity check. Reaching the right screen is not the same as reaching
-    // the right record — see mustMatchParam in schema/artifact.ts.
+    // Identity check: see mustMatchParam in schema/artifact.ts.
     if (spec.mustMatchParam) {
       const expected = String(opts.inputs[spec.mustMatchParam] ?? '');
       if (norm(raw) !== norm(expected)) {
@@ -438,7 +404,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
 
     switch (outcome.classification) {
       case 'business_outcome':
-        // NOT a failure. A real answer the caller asked for.
+        // An answer for the caller, not a failure.
         return done({ status: 'business_outcome', outcome: outcome.name, message: outcome.message } as never);
 
       case 'recoverable': {

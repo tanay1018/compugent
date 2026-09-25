@@ -3,13 +3,8 @@ import { join, isAbsolute } from 'node:path';
 import { redactText } from '../policy/allowlist.js';
 
 /**
- * One log, both actors.
- *
- * Automation events and human events share a shape and differ only by
- * `actor`. That is what makes a run reconstructable across a handoff: the
- * operator's actions are not a side channel, they are the same history. It is
- * also what 3.6 asks for directly — "record what the human did" — and what a
- * regulated environment needs for audit.
+ * Run log shared by automation and operator events, which differ only by
+ * `actor`, so a run can be reconstructed across a handoff.
  */
 export type Actor = 'agent' | 'operator' | 'system';
 
@@ -23,8 +18,7 @@ export interface RunEvent {
   screenshot?: string;
 }
 
-/** Redaction happens on the way IN. Scrubbing a log after the fact is theatre:
- *  the value has already been written to disk. */
+/** Values are redacted before they are written, not afterwards. */
 function scrub(v: unknown): unknown {
   if (typeof v === 'string') return redactText(v);
   if (Array.isArray(v)) return v.map(scrub);
@@ -40,9 +34,7 @@ export class RunLog {
   readonly dir: string;
 
   constructor(baseDir: string, runId: string) {
-    // Same reason as the artifact store: a packaged build cannot write inside
-    // its own bundle, so DATA_DIR relocates evidence to somewhere writable.
-    // An absolute baseDir is taken as given -- a caller that specific means it.
+    // DATA_DIR relocates evidence for the packaged app. An absolute baseDir is used as-is.
     this.dir = isAbsolute(baseDir)
       ? join(baseDir, runId)
       : join(process.env.DATA_DIR ?? '.', baseDir, runId);
@@ -63,8 +55,7 @@ export class RunLog {
     return e;
   }
 
-  /** Richer failure signal (3.5). Cheap enough to keep at every step boundary
-   *  during discovery; replay keeps them at checkpoints and on failure. */
+  /** Screenshot. Taken every step in discovery; in replay at checkpoints and on failure. */
   saveScreenshot(buf: Buffer, label: string): string {
     const rel = join('screenshots', `${String(this.seq).padStart(3, '0')}-${label}.png`);
     writeFileSync(join(this.dir, rel), buf);

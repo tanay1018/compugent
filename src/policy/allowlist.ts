@@ -4,28 +4,21 @@ import type { Action, UINode } from '../surface/types.js';
 /**
  * Safety & policy layer.
  *
- * Two jobs that are deliberately kept apart:
+ *   1. CLASSIFY (compile time): propose an `effect` for each recorded step,
+ *      so a human can review it with the artifact.
+ *   2. ENFORCE (run time): allow or refuse an action based on the artifact's
+ *      declared effect and the active policy. Never re-classifies.
  *
- *   1. CLASSIFY (compile time) — propose an `effect` for each recorded step.
- *      Runs once, when a discovery trace becomes an artifact, where a human
- *      can review the result.
- *   2. ENFORCE (run time)      — allow or refuse an action against the saved
- *      artifact and the active policy. Never re-classifies.
- *
- * Collapsing these is the tempting mistake: it would mean guessing "is this
- * button destructive?" from a control's label in the middle of a production
- * run. Guessing at replay time is exactly where you post a duplicate
- * transaction. Replay enforces a decision that was already reviewed.
+ * Keeping these separate means replay never has to guess from a label whether
+ * a button is destructive.
  */
 
-/** How reversible an action is. Drives BOTH the safety gate and re-entry
- *  after a human takeover — one field, two consumers. */
+/** How reversible an action is. Used by the safety gate and by re-entry after a takeover. */
 export const Effect = z.enum(['read', 'reversible', 'irreversible']);
 export type Effect = z.infer<typeof Effect>;
 
 export const PolicyConfig = z.object({
-  /** Exact origins the agent may operate against. No wildcards: a wildcard in
-   *  a bank allowlist is how you end up driving a production console. */
+  /** Exact origins the agent may operate against. No wildcards. */
   allowedOrigins: z.array(z.string().url()),
   /** Path prefixes permitted within those origins. */
   allowedPathPrefixes: z.array(z.string()).default(['/']),
@@ -34,10 +27,7 @@ export const PolicyConfig = z.object({
   irreversiblePatterns: z.array(z.string()).default([
     'submit', 'confirm', 'post', 'transfer', 'delete', 'remove', 'approve',
     'authorize', 'close account', 'disburse', 'issue', 'send', 'pay',
-    // Creating a thing is as irreversible as destroying one. An earlier list
-    // covered transfers and submits but not account opening, so a run that
-    // lost its place opened a second savings account and classified that as
-    // reversible.
+    // Creation is irreversible too (e.g. opening an account).
     'open new', 'open account', 'create', 'register', 'enroll', 'apply',
   ]),
   /** What ENFORCEMENT does when a step declares itself irreversible. */
@@ -85,26 +75,14 @@ export function checkNavigation(policy: PolicyConfig, url: string): Decision {
   return { allow: true };
 }
 
-/**
- * ENFORCE — run time. `declaredEffect` comes from the artifact, where it was
- * classified and reviewed; it is not re-derived here.
- */
-/**
- * May automation type into this control?
- *
- * Redacting a credential from the log is a consolation prize, not a control:
- * by then the value has been entered into a live system by something that
- * cannot be held accountable for it. So a field whose label reads like a
- * secret is REFUSED, and the run escalates to a human who can type it
- * themselves.
- *
- * This is also what stops a credential reaching an artifact. A step whose
- * value was never captured cannot bake one in, and an artifact is a file that
- * gets committed, diffed and shared.
- */
 /** Input types that hold a secret regardless of how the field is labelled. */
 const SECRET_INPUT_TYPES = new Set(['password']);
 
+/**
+ * May automation type into this control? Credential fields are refused, not
+ * just redacted, so the value is never entered by automation and never
+ * captured in a trace or artifact. The run escalates to a human instead.
+ */
 export function checkCredentialField(
   policy: PolicyConfig,
   action: Action,
@@ -113,9 +91,8 @@ export function checkCredentialField(
 ): Decision {
   if (action.kind !== 'type' && action.kind !== 'select') return { allow: true };
 
-  // Type first. A label can be omitted -- ParaBank's login inputs carry no
-  // accessible name at all -- and a check that only reads labels quietly
-  // permits exactly the fields that matter most. The type cannot be omitted.
+  // Check the input type first: labels can be missing (ParaBank's login
+  // inputs have no accessible name), the type cannot.
   if (inputType && SECRET_INPUT_TYPES.has(inputType.toLowerCase())) {
     return {
       allow: false,
@@ -136,6 +113,10 @@ export function checkCredentialField(
   };
 }
 
+/**
+ * ENFORCE, at run time. `declaredEffect` comes from the reviewed artifact and
+ * is not re-derived here.
+ */
 export function checkAction(policy: PolicyConfig, action: Action, declaredEffect: Effect): Decision {
   if (!policy.allowedActions.includes(action.kind)) {
     return { allow: false, code: 'action', reason: `action "${action.kind}" is not permitted by policy` };
@@ -149,7 +130,7 @@ export function checkAction(policy: PolicyConfig, action: Action, declaredEffect
       case 'block':
         return { allow: false, code: 'irreversible', reason: 'policy blocks irreversible actions' };
       case 'require_approval':
-        // Not a failure — this is the designed route into human escalation.
+        // Routes to human escalation.
         return { allow: 'needs_approval', reason: 'irreversible action requires operator approval' };
       case 'flag':
         return { allow: true };
@@ -159,8 +140,7 @@ export function checkAction(policy: PolicyConfig, action: Action, declaredEffect
 }
 
 // --- Redaction ------------------------------------------------------------
-// Applied at CAPTURE time, never as a cleanup pass. A value that reaches a log
-// unredacted has already been persisted; scrubbing afterwards is theatre.
+// Applied when a value is logged, not as a later cleanup pass.
 
 const VALUE_PATTERNS: Array<[RegExp, string]> = [
   [/\b\d{3}-\d{2}-\d{4}\b/g, '[REDACTED:SSN]'],

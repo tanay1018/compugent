@@ -1,5 +1,5 @@
 /**
- * Replay a capability deterministically. NO MODEL IS INVOKED.
+ * Replay a capability deterministically. No model is invoked.
  *
  *   npm run replay -- member.readSavingsBalance memberId=12345
  *   npm run replay -- member.readSavingsBalance memberId=99999
@@ -31,8 +31,7 @@ function artifactOrigin(): string | undefined {
 const urlFlag = args.indexOf('--url');
 const port = process.env.TARGET_APP_PORT ?? '8710';
 const tenant = process.env.TENANT ?? 'meridian';
-// --url points the SAME artifact at a different host. That is the multi-tenant
-// seam in miniature: the artifact stores a route pattern, never an origin.
+// --url points the same artifact at a different host; artifacts store only a route pattern.
 
 /**
  * Where to replay, in order of authority:
@@ -41,16 +40,8 @@ const tenant = process.env.TENANT ?? 'meridian';
  *   2. the artifact     the origin it was actually recorded against
  *   3. the local app    the development default
  *
- * (2) is the part that was missing. `recordedTenant` holds a tenant NAME for
- * the multi-tenant demo app ("meridian") but a real HOSTNAME for a capability
- * recorded on a public site ("forecast.weather.gov"). Without this, every
- * artifact recorded off-box replayed against localhost and failed its first
- * waypoint on a page that had never heard of it -- a confusing "element not
- * found" for what was really "wrong website".
- *
- * A dot is the discriminator: tenant slugs do not contain one, hostnames do.
- * This keeps the origin swappable, which is the whole point of storing a route
- * pattern rather than a URL -- it just stops defaulting to the wrong origin.
+ * `recordedTenant` is a tenant slug for the bundled app ("meridian") but a
+ * hostname for public sites ("forecast.weather.gov"). A dot tells them apart.
  */
 const recorded = artifactOrigin();
 const baseUrl = urlFlag >= 0 ? args[urlFlag + 1]!
@@ -61,11 +52,7 @@ const asJson = args.includes('--json');
 const repeatFlag = args.indexOf('--repeat');
 const repeat = repeatFlag >= 0 ? Math.max(1, Number(args[repeatFlag + 1] ?? 1)) : 1;
 
-/**
- * Repeat mode answers "is this actually deterministic?" by measuring rather
- * than asserting. Determinism is a claim about REPETITION, and the only
- * evidence for it is repetition.
- */
+/** --repeat: run N times and compare statuses, outputs and resolution tiers. */
 if (repeat > 1) {
   const runs: Array<{ status: string; outputs: string; tiers: string; ms: number }> = [];
   for (let i = 0; i < repeat; i++) {
@@ -77,8 +64,7 @@ if (repeat > 1) {
       runs.push({
         status: r.status,
         outputs: r.status === 'success' ? JSON.stringify(r.outputs) : (r as { outcome?: string }).outcome ?? '',
-        // The tier each step resolved through: a step that sometimes matches by
-        // name and sometimes by anchor is a descriptor drifting under you.
+        // Resolution tier per step; a step switching tiers suggests UI drift.
         tiers: r.steps.map((x) => `${x.index}:${x.resolvedVia ?? x.status}`).join(' '),
         ms: r.ms,
       });
@@ -93,10 +79,8 @@ if (repeat > 1) {
     console.log(`  ${String(i + 1).padStart(2)}. ${r.status.padEnd(18)} ${String(r.ms).padStart(6)}ms  ${r.outputs.slice(0, 60)}`);
   }
   const consistent = distinct('status') === 1 && distinct('outputs') === 1 && distinct('tiers') === 1;
-  // Consistency alone is not the good news it looks like: three identical
-  // FAILURES are perfectly consistent, and printing a green STABLE for them
-  // (and exiting 0) would let a broken capability pass a CI gate built on
-  // --repeat. Determinism is only worth reporting about a run that worked.
+  // Only report STABLE (and exit 0) if the runs succeeded; identical failures
+  // are consistent but not a pass.
   const working = runs.every((r) => r.status === 'success' || r.status === 'business_outcome');
   const stable = consistent && working;
   console.log(`\n  distinct statuses      ${distinct('status')}`);
@@ -115,12 +99,7 @@ const runId = `replay-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const log = new RunLog('evidence', runId);
 const surface = await PlaywrightSurface.launch();
 
-/**
- * `--watch` hosts the same operator channel a discovery run uses, so a replay
- * can be watched rather than reported. The most characteristic thing this
- * system does -- retrace a recorded path, checking each waypoint before it
- * touches anything -- was previously invisible behind a JSON result.
- */
+/** --watch: host the operator channel so the replay can be watched live. */
 const watch = args.includes('--watch');
 let session: HandoffSession | undefined;
 let consoleSrv: OperatorConsole | undefined;
@@ -130,8 +109,7 @@ if (watch) {
   consoleSrv = new OperatorConsole(session, log, Number(process.env.CONSOLE_PORT ?? 8790));
   const url = await consoleSrv.start();
   console.log(`  watching at ${url}`);
-  // The artifact's plan, up front: the point is that replay follows THIS and
-  // nothing else, so the steps are announced before any of them run.
+  // Announce the plan before running it.
   console.log('__PLAN__' + JSON.stringify({
     id: artifact.id, version: artifact.version, approval: artifact.approval,
     steps: artifact.steps.map((s) => ({
@@ -152,7 +130,7 @@ try {
   });
 
   if (asJson) {
-    // Last line is the whole result, for programmatic callers (the desktop app).
+    // Last line is the JSON result, for the desktop app.
     console.log('__RESULT__' + JSON.stringify(result));
     process.exitCode = result.status === 'failed' ? 1 : 0;
   } else {

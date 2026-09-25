@@ -5,10 +5,8 @@ import { TargetDescriptor } from '../src/schema/target.js';
 import type { Observation, UINode } from '../src/surface/types.js';
 
 /**
- * Resolution is pure, so the subtlest logic in the system is tested against
- * fixtures — no browser, no target app, no network. These fixtures mirror what
- * the real observer actually emits for the bundled legacy screen: an
- * ANONYMOUS textbox whose only identity is the adjacent cell text.
+ * Fixture-based resolver tests. The fixtures mirror what the observer emits
+ * for the target app: a textbox with no name, identified by the adjacent cell.
  */
 
 let n = 0;
@@ -52,8 +50,7 @@ test('resolves an ANONYMOUS control by anchor relation — the legacy case', () 
 });
 
 test('anchor matching relaxes the relation but never the text', () => {
-  // A tenant that upgrades to a real <label> changes the RELATION but not the
-  // label text. Replay should survive that; it should not survive a rename.
+  // A changed relation with the same text should resolve; a renamed label should not.
   const o = obs([node({ role: 'textbox', anchorText: 'Member ID', anchorRelation: 'labelledBy' })]);
   const ok = resolveTarget(o, target({ role: 'textbox', anchor: { relation: 'inSameRowAs', text: 'Member ID' } }));
   assert.equal(ok.ok, true);
@@ -90,7 +87,7 @@ test('scope confines resolution to a named frame', () => {
     node({ role: 'button', name: 'Search', frame: 'hdr' }),
     node({ role: 'button', name: 'Search', frame: 'main' }),
   ]);
-  // Unscoped, the same name in two frames is genuinely ambiguous.
+  // Unscoped, the same name in two frames is ambiguous.
   assert.equal(resolveTarget(o, target({ role: 'button', name: 'Search' })).ok, false);
   const r = resolveTarget(o, target({ role: 'button', name: 'Search', scope: { frame: 'main' } }));
   assert.equal(r.ok, true);
@@ -115,8 +112,7 @@ test('reports which tiers were tried when nothing matches', () => {
 });
 
 test('descriptors interpolate {{param}} so a TARGET can be parameterised', () => {
-  // "click the row for member 12345" — the pattern every back-office result
-  // grid uses. Without this, such a step is pinned to the recorded record.
+  // Parameterised target, e.g. "click the row for member {{memberId}}".
   const o = obs([
     node({ role: 'link', name: 'Sarah Chen' }),
     node({ role: 'link', name: 'Marcus Webb' }),
@@ -139,8 +135,7 @@ test('interpolation reaches anchor text too', () => {
 });
 
 test('an anchor made of run data is distinguishable from a label', () => {
-  // The live failure: a results table where `wins` was anchored to "1990" and
-  // `losses` to "44". Correct for that run, resolvable for no other input.
+  // Regression: `wins` anchored to "1990" and `losses` to "44" (data, not labels).
   const isData = (a: string) =>
     a !== '' && (/^[^A-Za-z]*$/.test(a) || /^[$£€]?[\d,.]+%?$/.test(a.trim()));
 

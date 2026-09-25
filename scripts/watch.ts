@@ -1,14 +1,13 @@
 /**
- * Give the agent any goal and WATCH it work, with the option to take over.
+ * Run discovery for any goal with the operator console open.
  *
  *   npm run watch -- "look up member 67890 and read their checking balance"
  *   npm run watch -- "<goal>" --url "https://books.toscrape.com/"
  *   npm run watch -- "<goal>" --keep-open      # leave the console up afterwards
  *
- * Opens the operator console first, then runs discovery against the live
- * surface. You see every step as it happens and can click "Take control" at
- * any point — the agent yields at the next step boundary, you drive, and it
- * picks up from wherever you leave it.
+ * Opens the console first, then runs discovery. "Take control" pauses the
+ * agent at the next step boundary; handing back resumes from wherever you left
+ * the session.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { PlaywrightSurface } from '../src/surface/playwright.js';
@@ -48,19 +47,12 @@ const surface = await PlaywrightSurface.launch();
 const session = new HandoffSession(surface, log);
 const consoleSrv = new OperatorConsole(session, log, Number(process.env.CONSOLE_PORT ?? 8790));
 
-// Hand control back to the agent as soon as the operator releases it. During
-// discovery there is no artifact to re-localise against — the model simply
-// observes wherever it has been left. Plans are what create that problem.
+// During discovery, hand back immediately; there is no plan to re-localise against.
 session.control.onChange((e) => { if (e.to === 'resume_requested') session.resumeDiscovery(); });
 
-// A run spawned by the desktop app must not outlive it -- an orphan keeps a
-// browser and a console port alive forever, which is exactly how a stale
-// console blocks the next launch.
-//
-// Watching stdin for EOF looks like the obvious way to detect a dead parent
-// and is wrong: under `nohup` (or any `< /dev/null`) stdin reports EOF
-// immediately and the run exits before it starts. Poll the parent pid
-// explicitly instead, and only when the parent asked us to.
+// Exit if the desktop app that spawned us dies, so we do not leave a browser
+// and console port behind. Polls the parent pid; stdin EOF is unreliable
+// (it fires immediately under nohup or < /dev/null).
 const parentPid = Number(process.env.RUNNER_PARENT_PID ?? 0);
 if (parentPid > 0) {
   setInterval(() => {
@@ -126,9 +118,7 @@ console.log(`  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'
   const humanSteps = log.events.filter((e) => e.actor === 'operator' && e.kind.startsWith('manual.')).length;
   if (humanSteps) console.log(`\n  ${humanSteps} operator action(s) recorded in the same log.`);
   console.log(`\n  evidence: ${log.dir}`);
-  // Machine-readable, for the desktop app: it needs to know the run finished
-  // and WHICH run to save, rather than scraping formatted output or guessing
-  // that "latest" is still the one you just watched.
+  // Machine-readable marker for the desktop app: which run directory to save.
   console.log('__RUN_DONE__' + JSON.stringify({
     outcome: trace.outcome, steps: trace.steps.length, runDir: log.dir,
     hasCheckpoint: Boolean(trace.checkpoint),

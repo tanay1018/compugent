@@ -6,11 +6,8 @@ import { resolveTarget, interpolate, norm } from '../surface/resolve.js';
 /**
  * A condition on observable state.
  *
- * One vocabulary, four jobs — which is deliberate, and came out of watching a
- * discovery run: asked for a checkpoint, the model volunteered "the row
- * labelled Savings shows $4,182.55", i.e. it described a *state* using the
- * same anchor relation it uses to describe a *target*. Fighting that by
- * inventing a second vocabulary would have been working against the grain.
+ * One vocabulary for four uses (the model naturally describes states with the
+ * same anchor relations it uses for targets):
  *
  *   checkpoint        did we arrive where we intended?
  *   waypoint          is this the state this step expects? (re-localisation)
@@ -30,8 +27,7 @@ export const AtomicAssertion = z.discriminatedUnion('kind', [
 ]);
 export type AtomicAssertion = z.infer<typeof AtomicAssertion>;
 
-/** Conjunction is one level deep on purpose: recursive assertions would be
- *  harder to review, and no real checkpoint has needed nesting. */
+/** Conjunction is one level deep; nesting has not been needed and is harder to review. */
 export const StateAssertion = z.union([
   AtomicAssertion,
   z.object({ kind: z.literal('all'), of: z.array(AtomicAssertion).min(1), description: z.string().optional() }),
@@ -44,11 +40,7 @@ export interface AssertionResult {
   detail: string;
 }
 
-/**
- * Pure evaluator — same reasoning as the resolver. A checkpoint that cannot be
- * tested offline against a captured observation is a checkpoint nobody can
- * debug after the fact.
- */
+/** Pure evaluator, testable against captured observations. */
 export function evaluateAssertion(
   o: Observation,
   a: StateAssertion,
@@ -92,9 +84,7 @@ export function evaluateAssertion(
     case 'locationMatches': {
       let re: RegExp;
       try { re = new RegExp(a.pattern); } catch { return { held: false, detail: `invalid pattern ${a.pattern}` }; }
-      // A frameset's TOP url never changes -- only the content frame navigates.
-      // Testing page.url() alone would make every location assertion vacuously
-      // true on exactly the legacy apps this system exists for.
+      // Check every frame: in a frameset only the content frame's URL changes.
       const candidates = [o.location, ...o.frames.map((f) => f.url).filter((u): u is string => !!u)];
       const paths = candidates.map((u) => { try { return new URL(u).pathname + new URL(u).search; } catch { return u; } });
       return paths.some((p) => re.test(p))

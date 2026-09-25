@@ -2,26 +2,14 @@ import type { Observation } from '../surface/types.js';
 import { redactText } from '../policy/allowlist.js';
 
 /**
- * Render an observation for the model.
+ * Render an observation for the model, in place of HTML.
  *
- * The model never sees HTML. It sees this. Two consequences worth stating:
+ * Much smaller than markup, and it uses the same targeting vocabulary as the
+ * resolver: when the model picks "the textbox anchored to Member ID", that is
+ * already a TargetDescriptor.
  *
- *  - It costs roughly an order of magnitude fewer tokens than raw markup and is
- *    stable against the cosmetic churn that dominates a real DOM diff.
- *  - It teaches the model the SAME targeting vocabulary the replay resolver
- *    uses. When the model picks "the textbox anchored to Member ID", that is
- *    already a TargetDescriptor — so compilation is mechanical rather than an
- *    exercise in parsing a transcript back into intent.
- */
-/**
- * Upper bound on how much of a screen is worth describing.
- *
- * A content-heavy page can expose hundreds of nodes -- books.toscrape.com
- * renders 402, Wikipedia 1393 -- and at roughly 15 tokens a line that is
- * thousands of tokens per observation, resent on every step. Controls and
- * labelled content come first; the tail of a long list rarely decides
- * anything, and the model is told when it has been cut so it can scroll or
- * narrow rather than assume it saw everything.
+ * Output is capped at MAX_OBSERVATION_NODES (large pages expose 400-1400
+ * nodes, resent every step). The model is told when the list was cut.
  */
 const MAX_NODES = Number(process.env.MAX_OBSERVATION_NODES ?? 140);
 
@@ -32,41 +20,18 @@ export function renderObservation(o: Observation): string {
     const ns = o.nodes.filter((n) => n.frame === f.name);
     if (!ns.length) continue;
     out.push(`\nframe "${f.name}"`);
-    /**
-     * What survives truncation.
-     *
-     * Ranking controls first and letting everything else fall off the end was
-     * wrong: OUTPUTS are text and cells, so on a large page the cap discarded
-     * precisely the content worth extracting. A Wikipedia infobox -- clean
-     * label/value rows, exactly the structure this system targets -- never
-     * reached the model, while three hundred navigation links did.
-     *
-     * Rank is: controls, then ANCHORED content (something names it, so it is
-     * addressable and probably an output), then bare prose, which is never a
-     * target and never an output.
-     */
+    // Rank for truncation: controls, then anchored content (likely outputs),
+    // then bare prose.
     const actionable = new Set(['button', 'link', 'textbox', 'combobox', 'listbox', 'checkbox', 'radio', 'tab', 'menuitem']);
     const isControl = (n: typeof ns[number]) => actionable.has(n.role);
     const isData    = (n: typeof ns[number]) => !isControl(n) && !!n.anchorText;
 
     /**
-     * Strict ranking still starved one class, it just changed which one.
-     *
-     * Ranking controls above anchored data means a page with two thousand
-     * links spends the whole budget before reaching the first label/value
-     * row. On the Bank of America article that is literally what happened:
-     * the 39 anchored infobox cells never rendered, and the model -- unable
-     * to see ISIN or Industry anywhere on screen -- went looking for them in
-     * the EDIT view, clicking into the source editor of a live encyclopedia
-     * to read values that were sitting in the page it was already on.
-     *
-     * So neither class gets to starve the other. Each is guaranteed a share,
-     * and whatever one class does not use the other may have. Controls get
-     * the larger share because you cannot act on what you cannot see, and
-     * being unable to act ends the run; missing one output does not.
-     *
-     * Within data, cells outrank loose prose: a cell is half of a label/value
-     * pair, which is the shape an extractable output actually has.
+     * Controls and data each get a reserved share of the budget, and either
+     * may use what the other leaves. With strict ranking, the ~2000 links on
+     * the Bank of America article used the whole budget and no infobox cell
+     * was rendered. Controls get the larger share, since not being able to act
+     * ends the run. Within data, cells rank above loose prose.
      */
     const controls = ns.filter(isControl);
     const data     = ns.filter(isData).sort((a, b) => (a.role === 'cell' ? 0 : 1) - (b.role === 'cell' ? 0 : 1));

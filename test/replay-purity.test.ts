@@ -3,12 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-/**
- * The central claim of the whole system is that replay runs WITHOUT a model in
- * the decision loop. That claim is worth more as a build-time guarantee than as
- * a sentence in a README, so it is asserted structurally: nothing reachable
- * from the replay engine may import an LLM SDK.
- */
+/** Replay must not use a model: nothing reachable from the engine may import an LLM SDK. */
 const MODEL_IMPORTS = [/from ['"]ai['"]/, /@ai-sdk/, /gateway\(/, /generateText|generateObject/];
 
 function walk(dir: string): string[] {

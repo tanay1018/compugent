@@ -3,18 +3,13 @@ import type { ModelMessage } from 'ai';
 /**
  * Keep only the most recent observation in full.
  *
- * The agent loop resends the entire conversation on every step, and each step
- * appends a complete rendering of the screen. Input therefore grows
- * quadratically: a five-step run spends ~18K input tokens, most of it
- * re-reading screens that have since been navigated away from.
+ * The loop resends the whole conversation each step, and each step adds a
+ * full screen rendering, so input grows quadratically (~18K tokens for five
+ * steps). Earlier observations are replaced with a one-line note of where the
+ * run was, making cost roughly linear in steps.
  *
- * Only the latest observation is decidable-on. Earlier ones are replaced with
- * a one-line note of where the run was, which preserves the narrative — "I was
- * on the lookup screen, then the detail screen" — without paying to re-read
- * either. Cost becomes roughly linear in steps rather than quadratic.
- *
- * This is a bigger lever than model choice: it applies whichever model you
- * point at it, and it compounds with prompt caching rather than competing.
+ * Because history is rewritten every step, this prevents prompt caching of
+ * anything beyond the system prompt.
  */
 const OBSERVATION_MARKER = 'location: ';
 
@@ -60,8 +55,7 @@ export function compactObservations(messages: ModelMessage[]): ModelMessage[] {
     }
 
     if (m.role === 'user') {
-      // The opening prompt carries the goal AND the first screen. Keep the
-      // goal — it is the whole task — and drop only the screen under it.
+      // The first message has the goal and the first screen; keep the goal.
       const text = typeof m.content === 'string' ? m.content : '';
       if (text) {
         const cut = text.indexOf('\nCurrent observation:');

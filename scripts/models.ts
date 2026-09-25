@@ -4,8 +4,7 @@
  *   npm run models              # cheapest 25 that support tool use
  *   npm run models -- anthropic # filter by substring
  *
- * The requirement is tool-use: the discovery loop IS tool calls. Cost is
- * estimated against a typical run of ~20K input / 1.2K output tokens.
+ * Tool use is required. Cost assumes a run of ~20K input / 1.2K output tokens.
  */
 const filter = process.argv[2]?.toLowerCase();
 const res = await fetch('https://ai-gateway.vercel.sh/v1/models');

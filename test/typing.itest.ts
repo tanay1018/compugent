@@ -4,13 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { PlaywrightSurface } from '../src/surface/playwright.js';
 import { TargetDescriptor } from '../src/schema/target.js';
 
-/**
- * Typing into a field that already holds a value must REPLACE it.
- *
- * Hidden for the whole project because every input in the bundled app starts
- * empty. A real site's search box retains its query, and the run burned its
- * entire budget trying to undo "wireless mousewireless mouse".
- */
+/** Typing into a prefilled field must replace its value, not append to it. */
 const PORT = 8721;
 let server: ChildProcess;
 let s: PlaywrightSurface;

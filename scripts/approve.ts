@@ -3,8 +3,7 @@
  *
  *   npm run approve -- member.readSavingsBalance 2
  *
- * The only route to `approved`, which is what unattended replay requires — and
- * what stops a later, worse draft from shadowing a working capability.
+ * `verify --approve` is the other route. Unattended replay requires `approved`.
  */
 import { ArtifactStore } from '../src/store/artifacts.js';
 

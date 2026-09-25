@@ -3,21 +3,11 @@ import { join } from 'node:path';
 import { CapabilityArtifact } from '../schema/artifact.js';
 
 /**
- * Artifacts on disk, versioned by file.
- *
- * Deliberately not a database. Artifacts are reviewable objects that belong in
- * version control next to the code that consumes them — a diff between v1 and
- * v2 of a capability is exactly what a reviewer wants to look at, and that is
- * a thing git already does well. Swapping this for a real store later touches
- * one file.
+ * Artifacts on disk, one JSON file per version. Files rather than a database
+ * so versions can be reviewed and diffed in git.
  */
 export class ArtifactStore {
-  /**
-   * DATA_DIR relocates the whole store. A packaged desktop build cannot write
-   * inside its own application bundle, so the app points this at the user's
-   * application-support directory; from a source checkout it is unset and the
-   * store stays in the repo where it is easy to inspect and commit.
-   */
+  /** DATA_DIR relocates the store (the packaged app cannot write inside its bundle). */
   constructor(private readonly root = join(process.env.DATA_DIR ?? '.', 'artifacts')) {
     mkdirSync(this.root, { recursive: true });
   }
@@ -37,14 +27,7 @@ export class ArtifactStore {
     return path;
   }
 
-  /**
-   * The next free version for an id.
-   *
-   * Re-recording an existing capability is the normal case, not an error --
-   * a flow changed, or a run was redone on a different tenant. The store still
-   * refuses to OVERWRITE a reviewed artifact; what it should not do is make
-   * re-recording feel like a failure.
-   */
+  /** The next free version number for an id. */
   nextVersion(id: string): number {
     return (this.versions(id).at(-1) ?? 0) + 1;
   }
@@ -62,21 +45,14 @@ export class ArtifactStore {
   /** Read one specific version, without any preference logic. */
   private read(id: string, v: number): CapabilityArtifact {
     const raw = readFileSync(join(this.dirFor(id), `v${v}.json`), 'utf8');
-    // Parsed, not cast: a stored artifact is untrusted input like any other.
+    // Parse rather than cast: stored files are untrusted input.
     return CapabilityArtifact.parse(JSON.parse(raw));
   }
 
   /**
-   * Which version a caller gets.
-   *
-   * NOT simply the highest. An approved artifact outranks any later draft,
-   * because re-recording is how a capability gets worse as well as better:
-   * a fresh run on a cheaper model produced a flow that clicked Search before
-   * typing anything, compiled cleanly as the next version, and would have
-   * silently replaced a working capability for every caller.
-   *
-   * Highest approved if one exists; otherwise highest overall, so a
-   * never-reviewed capability still works.
+   * The version a caller gets: the highest approved one, else the highest
+   * overall. This stops a newer, unreviewed draft from replacing a working
+   * capability.
    */
   load(id: string, version?: number): CapabilityArtifact {
     const all = this.versions(id);

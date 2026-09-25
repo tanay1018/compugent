@@ -1,24 +1,15 @@
 /**
- * Prove a capability generalises before anyone is allowed to trust it.
+ * Check that a capability works for inputs it was not recorded with.
  *
- *   npm run verify -- company.readWikipediaInfobox \
+ *   npm run verify -- wikipedia.readCompanyInfobox \
  *     --case "companyName=Bank of America" --case "companyName=Microsoft"
  *
- * A capability that only works for the value it was recorded against is not a
- * capability, it is a recording. The difference is invisible from a single
- * green run -- the recorded case passes by construction -- so the only honest
- * evidence is a run against a value the artifact has never seen.
+ * A single passing replay of the recorded input cannot show this. Neither the
+ * model nor the compiler can tell, from one trace, whether a checkpoint or
+ * anchor is specific to that run (e.g. a maintenance banner on one Wikipedia
+ * article, or the current weather text).
  *
- * This is the gate that catches what neither the model nor the compiler can.
- * A discovery agent picks a checkpoint from what is on the screen in front of
- * it, and cannot know that Wikipedia's "discuss this issue" banner is a
- * maintenance notice on one article rather than part of every article. The
- * compiler cannot know either; it only sees one trace. Running a second value
- * settles it in seconds, and the failure is specific: the capability walked to
- * the right page and then could not prove it had arrived.
- *
- * With --approve, promotion is CONDITIONAL on that evidence, which is what
- * makes `approved` mean something stronger than `draft` rather than just older.
+ * With --approve, the capability is promoted only if an unseen case passes.
  */
 import { ArtifactStore } from '../src/store/artifacts.js';
 import { replay } from '../src/replay/engine.js';
@@ -85,12 +76,9 @@ for (const inputs of cases) {
     await surface.navigate(baseUrl);
     const log = new RunLog('evidence', `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`);
     const r = await replay({ artifact, inputs, surface, log, baseUrl,
-                             // Attended: unattended replay requires `approved`, and approval is
-                             // what this script exists to earn. Verifying a draft is the point.
+                             // Attended, so drafts can be verified before approval.
                              policy: defaultPolicy(new URL(baseUrl).origin), unattended: false });
-    // A `business_outcome` is the surface answering the question -- "no such
-    // company" -- not the capability breaking. It counts as completing: the
-    // artifact drove the screen correctly and read a determinate answer.
+    // A business_outcome (e.g. "no such company") counts as completing.
     const ok = r.status === 'success' || r.status === 'business_outcome';
     const detail =
       r.status === 'success'          ? JSON.stringify(r.outputs)
@@ -115,8 +103,7 @@ for (const r of results) {
 const passedNovel = results.filter((r) => r.ok && r.novel).length;
 const failed = results.filter((r) => !r.ok);
 
-// Passing only the value it was recorded on is exactly the failure mode this
-// script exists to catch, so it is reported as such rather than as a pass.
+// Passing only on the recorded value is reported as PINNED, not a pass.
 const generalises = failed.length === 0 && passedNovel > 0;
 
 console.log('─'.repeat(66));

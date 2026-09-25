@@ -4,10 +4,9 @@
  *   npm run handoff                  # opens a real console and waits for you
  *   npm run handoff -- --simulate    # a scripted operator, for reproducible evidence
  *
- * Scenario: the member lookup dies mid-run because the session expired.
- * Automation is not permitted to handle credentials, so it cannot recover —
- * it escalates. A human signs in on THE SAME live session and hands back.
- * Replay then works out where it is and finishes the job.
+ * Scenario: the lookup hits an expired session. Automation may not enter
+ * credentials, so it escalates. A human signs in on the same session and hands
+ * back, and replay re-localises and finishes.
  */
 import { PlaywrightSurface } from '../src/surface/playwright.js';
 import { ArtifactStore } from '../src/store/artifacts.js';
@@ -52,9 +51,8 @@ try {
 
   rule('3. TAKEOVER — a human drives THE SAME session');
   if (simulate) {
-    // The scripted operator goes through exactly the same gated path a real
-    // one would: the control token, then forwarded raw input. Nothing here
-    // bypasses the mechanism under test.
+    // The scripted operator uses the same path as a real one: control token,
+    // then forwarded raw input.
     // Escalating already raised the request, so only ask if it has not been.
     if (session.control.state === 'agent') session.control.requestPause('scripted operator taking control');
     session.yield();
@@ -63,8 +61,7 @@ try {
     const ACTIONABLE = new Set(['textbox', 'button', 'link', 'combobox']);
     const click = async (label: string) => {
       const o = await surface.observe();
-      // Prefer a CONTROL over a label: the text "Operator ID" and the field it
-      // names both carry that string, and clicking the text does nothing.
+      // Prefer the control over its label text; both carry "Operator ID".
       const n = o.nodes.find((x) => ACTIONABLE.has(x.role) && (x.name === label || x.anchorText === label));
       if (!n) throw new Error(`operator could not find a control for "${label}" at ${o.location}`);
       const b = await surface.boundsOf(n);

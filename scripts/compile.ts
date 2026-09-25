@@ -20,14 +20,10 @@ for (const f of ['.env', '.env.local', '.env.txt']) {
 }
 
 const arg = process.argv[2];
-// Both prefixes: `watch-` runs come from the desktop app and are exactly the
-// ones a user is most likely to want compiled straight after recording.
+// `watch-` runs come from the desktop app; `discovery-` from the CLI.
 const runs = readdirSync('evidence')
   .filter((d) => d.startsWith('discovery-') || d.startsWith('watch-'))
-  // By mtime, not by name: run directories are prefixed with how they were
-  // produced ("discovery-", "watch-"), so sorting by name ranked every watch
-  // run above every discovery run no matter which actually ran last, and
-  // `npm run compile` kept reaching for a stale trace.
+  // Sort by mtime, not name: the prefixes would otherwise decide the order.
   .sort((a, b) => statSync(join('evidence', a)).mtimeMs - statSync(join('evidence', b)).mtimeMs);
 const latest = runs.at(-1);
 if (!arg && !latest) { console.error('no discovery runs in evidence/'); process.exit(1); }
@@ -49,16 +45,9 @@ try {
     const a = new ArtifactStore().load(c.id);
     return { id: a.id, description: a.description };
   }),
-    /**
-     * The local demo app's name was the unconditional default, so it was
-     * stamped onto every artifact -- a weather.gov capability and a Wikipedia
-     * capability both claimed to be "Corelink MemberDesk 7.2". That is not
-     * cosmetic: the Electron shell reads vendorProduct to decide where Run
-     * Live should point, and sent both to localhost.
-     *
-     * The demo app is identified by a tenant query parameter; anything else is
-     * a real site and names itself by its host.
-     */
+    // The bundled app is identified by its tenant query parameter; any other
+    // site uses its host. (The desktop app uses vendorProduct to pick where
+    // to replay.)
     vendorProduct: process.env.VENDOR_PRODUCT ?? (
       new URL(trace.entryUrl).searchParams.get('tenant')
         ? 'Corelink MemberDesk 7.2'
@@ -67,7 +56,7 @@ try {
     tenant: new URL(trace.entryUrl).searchParams.get('tenant') ?? new URL(trace.entryUrl).hostname,
   });
 } catch (e) {
-  // A stack trace tells the operator nothing they can act on.
+  // Print the message rather than a stack trace.
   console.error(`\ncannot compile: ${e instanceof Error ? e.message : String(e)}\n`);
   process.exit(1);
 }
@@ -115,7 +104,7 @@ if (!artifact.checkpoint) {
 } else {
   console.log(`  ${artifact.checkpoint.kind}`);
 }
-console.log(`\nOUTCOMES  ${artifact.outcomes.length === 0 ? '(none yet — learned in Phase 5 from runs that produce them)' : ''}`);
+console.log(`\nOUTCOMES  ${artifact.outcomes.length === 0 ? '(none yet — run `npm run learn-outcomes`)' : ''}`);
 if (warnings.length) { console.log(`\nWARNINGS`); for (const w of warnings) console.log(`  - ${w}`); }
 console.log(`\nsaved: ${path}`);
 console.log(`\n--- as an agent-callable tool ---`);

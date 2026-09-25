@@ -1,16 +1,12 @@
 /**
- * Who is driving?
+ * Control token: who is driving the session.
  *
- * The brief asks for a way to know who is (or should be) in control. That is
- * this file, and its central property is that THERE IS NO "BOTH" STATE. Input
- * is gated on the token: while automation holds it, operator input does not
- * leak through — it raises a pause request instead. While the operator holds
- * it, the executor is hard-blocked.
+ * There is no state where both can act. While automation holds the token,
+ * operator input raises a pause request instead of reaching the page; while
+ * the operator holds it, the executor is blocked.
  *
- * Barge-in is atomic at STEP boundaries. You cannot yank control out of a
- * half-finished click; a pause lands either during a wait (interruptible) or
- * after the in-flight action completes (atomic). That is what keeps the event
- * log honest: every event has an unambiguous actor.
+ * Barge-in happens at step boundaries: a pause lands during a wait or after
+ * the in-flight action completes, so every logged event has one actor.
  */
 export type ControlState =
   | 'agent'            // automation drives
@@ -44,7 +40,7 @@ export class ControlToken {
 
   get state(): ControlState { return this._state; }
 
-  /** Nobody holds the token mid-transfer. Acting then is a bug, not a race. */
+  /** Nobody holds the token mid-transfer. */
   get holder(): Holder {
     switch (this._state) {
       case 'agent': return 'agent';
@@ -84,8 +80,7 @@ export class ControlToken {
   /** The request was withdrawn before a boundary was reached. */
   cancelPause(reason = 'pause withdrawn'): void { this.go('agent', 'system', reason); }
 
-  /** The human is done. Control does NOT return to the agent yet — the app
-   *  could be anywhere now, so re-localisation comes first. */
+  /** The human is done. Control returns to the agent only after re-localisation. */
   requestResume(reason = 'operator handed control back'): void { this.go('resume_requested', 'operator', reason); }
 
   beginRelocalize(): void { this.go('relocalizing', 'system', 'establishing where the operator left the session'); }

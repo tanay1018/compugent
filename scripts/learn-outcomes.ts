@@ -4,9 +4,7 @@
  *
  *   npm run learn-outcomes -- member.readSavingsBalance
  *
- * The classifications below are AUTHORED — deciding that "not authorized" is a
- * legitimate answer while "error 0x5F" is a fault is a product judgement. Only
- * the wording is discovered.
+ * The classifications below are written by hand; only the wording is learned.
  */
 import { PlaywrightSurface } from '../src/surface/playwright.js';
 import { ArtifactStore } from '../src/store/artifacts.js';

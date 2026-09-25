@@ -2,13 +2,11 @@ import type { TargetDescriptor, ResolutionTier } from '../schema/target.js';
 import type { Observation, ResolveResult, UINode } from './types.js';
 
 /**
- * Target resolution — the single most safety-critical function in the system,
- * and deliberately a PURE one. It reads an Observation and returns a verdict;
- * it never touches a live surface. That makes every branch below testable
- * against fixtures with no browser and no target app.
+ * Target resolution. A pure function of an Observation and a descriptor, so
+ * every branch is testable against fixtures without a browser.
  */
 
-/** Legacy screens label fields "Member ID:" — the colon is presentation. */
+/** Normalise labels for comparison ("Member ID:" matches "Member ID"). */
 export const norm = (s: string): string =>
   s.toLowerCase().replace(/\s+/g, ' ').replace(/[:：]\s*$/, '').trim();
 
@@ -31,13 +29,8 @@ function inScope(node: UINode, target: TargetDescriptor): boolean {
 }
 
 /**
- * Reduce a candidate set to a verdict.
- *
- * The rule that matters: more than one match with no `ordinal` is AMBIGUOUS,
- * never "take the first". A descriptor matching three controls is an
- * under-specified descriptor — an artifact defect worth surfacing, not a
- * runtime coin flip. In a back-office app, silently taking the first match is
- * how you act on the wrong member's row.
+ * Reduce a candidate set to a verdict. More than one match without an
+ * `ordinal` is `ambiguous`, never the first match.
  */
 function verdict(cands: UINode[], target: TargetDescriptor, via: ResolutionTier, tried: ResolutionTier[]): ResolveResult | null {
   if (cands.length === 0) return null;
@@ -50,14 +43,7 @@ function verdict(cands: UINode[], target: TargetDescriptor, via: ResolutionTier,
   return { ok: false, reason: 'ambiguous', candidates: cands };
 }
 
-/**
- * Interpolate `{{param}}` placeholders into a descriptor.
- *
- * Parameterising a step's VALUE is not enough. "Click the row for member
- * 12345" parameterises the TARGET itself, and that pattern is everywhere in
- * back-office software — result grids, account lists, transaction rows.
- * Without this, such a flow could only ever be recorded for one record.
- */
+/** Interpolate `{{param}}` placeholders into a descriptor (e.g. "the row for {{memberId}}"). */
 export function interpolate(t: TargetDescriptor, params: Record<string, unknown>): TargetDescriptor {
   const sub = (v: string): string =>
     v.replace(/\{\{(\w+)\}\}/g, (m, k: string) => (params[k] === undefined ? m : String(params[k])));
@@ -84,9 +70,7 @@ export function resolveTarget(
     if (v) return v;
   }
 
-  // Tier 2 — anchor relation. On legacy surfaces this is usually the ONLY
-  // tier that works: the control has no accessible name and its identity is
-  // the text sitting beside it.
+  // Tier 2 — anchor relation. Often the only option on legacy screens.
   if (target.anchor) {
     tried.push('anchor');
     const wantText = norm(target.anchor.text);
@@ -98,16 +82,14 @@ export function resolveTarget(
     const v1 = verdict(strict, target, 'anchor', tried);
     if (v1) return v1;
 
-    // Relaxed: same anchoring text, different relation. A tenant that moves a
-    // label from the adjacent cell to a real <label> should not break replay
-    // — the control is still the one next to that text.
+    // Relaxed: same anchoring text, any relation (e.g. a label moved from an
+    // adjacent cell into a real <label>).
     const relaxed = pool.filter((n) => n.anchorText !== undefined && norm(n.anchorText) === wantText);
     const v2 = verdict(relaxed, target, 'anchor', tried);
     if (v2) return v2;
   }
 
-  // Tier 3 — recorded fallbacks. Lower confidence by construction; a replay
-  // that only succeeded here is one whose artifact deserves review.
+  // Tier 3 — recorded fallbacks. Lower confidence; worth reviewing if used.
   for (const fb of target.fallbacks) {
     if (fb.kind === 'text') {
       tried.push('fallback');

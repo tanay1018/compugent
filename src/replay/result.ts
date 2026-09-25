@@ -1,19 +1,16 @@
 /**
  * The replay result contract.
  *
- * This is what an AI agent gets back, and its shape is the single most
- * important thing in the system after the artifact schema. The brief names the
- * failure mode directly: conflating "no such member" with a crash is the most
- * common design mistake here. So the contract makes them different variants,
- * not different values of an `error` string.
+ * What a calling agent gets back. Business outcomes such as "no such member"
+ * are a separate variant from failures, not an error string.
  *
  *   success           the capability ran and produced its declared outputs
- *   business_outcome  a legitimate answer the caller must handle. NOT an error
- *   failed            something broke; carries what step, expected, observed
+ *   business_outcome  a legitimate answer the caller must handle; not an error
+ *   failed            something broke; carries step, expected, observed
  *   escalated         automation cannot safely proceed; a human is needed
  *
- * A caller that only handles `success` and `failed` will be forced by the type
- * system to notice that `business_outcome` exists.
+ * Using a discriminated union means a caller handling only `success` and
+ * `failed` gets a type error.
  */
 
 export type FailureCode =
@@ -35,8 +32,7 @@ export interface StepReport {
   target?: string;
   status: 'ok' | 'recovered' | 'failed' | 'skipped';
   ms: number;
-  /** Which resolution tier actually found the control. A step that only ever
-   *  succeeds via a fallback is a step whose descriptor needs review. */
+  /** Which resolution tier found the control. Steps that rely on fallbacks need review. */
   resolvedVia?: string;
   note?: string;
 }
@@ -45,7 +41,7 @@ export interface ReplayFailure {
   code: FailureCode;
   stepIndex?: number;
   stepId?: string;
-  /** Phrased for whoever is debugging this at 2am, months later. */
+  /** Human-readable, for debugging. */
   expected: string;
   observed: string;
   screenshot?: string;
@@ -57,8 +53,7 @@ export type ReplayResult =
   | { status: 'failed'; runId: string; failure: ReplayFailure; steps: StepReport[]; ms: number }
   | {
       status: 'escalated'; runId: string; reason: string; atStep?: number;
-      /** Everything a human needs to pick this up: where it stopped, why, and
-       *  what the screen looked like. */
+      /** Where it stopped and a screenshot, for the human picking it up. */
       context: { location: string; screenshot?: string; expected?: string };
       steps: StepReport[]; ms: number;
     };

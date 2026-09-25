@@ -7,26 +7,19 @@ import type { PlaywrightSurface } from '../surface/playwright.js';
 import { norm } from '../surface/resolve.js';
 
 /**
- * Learn outcome signatures by DIFFING observations.
+ * Learn outcome signatures by diffing observations.
  *
- * An outcome signature is a claim about wording — "No member found matching
- * that ID." Guessing that wording from a happy-path run means writing an
- * assertion nobody has ever seen hold, and wording is precisely what drifts
- * between tenants and versions. So it is discovered instead:
+ *   run the happy path   -> baseline text
+ *   run a probe input    -> probe text
+ *   new text             -> the signature
  *
- *   run the happy path      -> baseline text
- *   run a probe input       -> probe text
- *   whatever is NEW         -> the signature
- *
- * The split that matters: the WORDING is learned, the CLASSIFICATION is
- * authored. No amount of diffing can tell you that "not authorized" is a
- * legitimate business answer while "error 0x5F" is a fault — that is a product
- * judgement, and it is exactly the judgement the brief says teams get wrong.
+ * The wording is learned; the classification (answer, recoverable, fault,
+ * escalate) is supplied by a human, since diffing cannot decide it.
  */
 
 export interface OutcomeProbe {
   name: string;
-  /** Authored. This is a human decision, not an inference. */
+  /** Supplied by a human, not inferred. */
   classification: OutcomeClass;
   inputs: Record<string, string>;
   message: string;
@@ -34,8 +27,7 @@ export interface OutcomeProbe {
   recoverBy?: 'dismissNewControl' | 'wait' | 'retryStep';
 }
 
-/** Run an artifact's steps with outcome handling DISABLED, so we observe the
- *  raw state a probe input produces rather than a handled one. */
+/** Run an artifact's steps with outcome handling disabled, to see the raw state a probe produces. */
 export async function executeRaw(
   a: CapabilityArtifact,
   inputs: Record<string, string>,
@@ -79,8 +71,7 @@ export async function learnOutcomes(
     const obs = await executeRaw(a, p.inputs, surface, baseUrl);
     const novel = [...textOf(obs)].filter((t) => !baseline.has(t));
 
-    // Longest novel string: the most specific thing this state says that the
-    // happy path never says. Short fragments risk matching by accident.
+    // Use the longest new string; short fragments could match by accident.
     const signature = novel.sort((x, y) => y.length - x.length)[0];
     if (!signature) {
       onProgress?.(`  ${p.name}: SKIPPED — produced no text the happy path does not also produce`);
@@ -94,7 +85,7 @@ export async function learnOutcomes(
     if (p.recoverBy === 'wait') recovery = { kind: 'wait', timeoutMs: 12000 };
     else if (p.recoverBy === 'retryStep') recovery = { kind: 'retryStep', maxAttempts: 2 };
     else if (p.recoverBy === 'dismissNewControl') {
-      // The control that appears alongside an interstitial IS the way out of it.
+      // The new control on an interstitial is used as its dismiss target.
       const control = obs.nodes.find(
         (n) => (n.role === 'link' || n.role === 'button') && n.name !== '' && !baseline.has(norm(n.name)),
       );
@@ -114,8 +105,7 @@ export async function learnOutcomes(
         detect: { kind: 'textPresent', text: original, description: `observed for inputs ${JSON.stringify(p.inputs)}` },
         message: p.message,
         ...(recovery ? { recovery } : {}),
-        // True because a run actually produced this state, not because someone
-        // believed it would.
+        // A run actually produced this state.
         verified: true,
       }),
     );

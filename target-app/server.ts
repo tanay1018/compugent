@@ -1,11 +1,10 @@
 /**
  * MemberDesk 7.2 — the local target surface.
  *
- * Intentionally hostile in the way real back-office software is hostile:
- * frameset shell, nested-table layout, <font> tags, no ids, no test ids, no
- * <label for>. Label text sits in an adjacent cell, so the accessibility tree
- * exposes the inputs with NO accessible name. That is the point — it is what
- * forces anchor-relation targeting rather than rewarding a clean selector.
+ * Built like older back-office software: frameset shell, nested tables,
+ * <font> tags, no ids or test ids, no <label for>. Label text sits in an
+ * adjacent cell, so inputs have no accessible name and must be targeted by
+ * anchor.
  *
  * Run: npm run app     (then http://localhost:8710/?tenant=meridian)
  */
@@ -38,11 +37,9 @@ function header(t: TenantConfig) {
 }
 
 function lookup(t: TenantConfig) {
-  // L2 replaces the named submit with an unlabelled image input. Note the
-  // browser then SYNTHESISES the accessible name "Submit" — author-provided
-  // nothing, Chrome-provided default. Targeting that name looks safe and is
-  // not: it is a browser-version artefact, not app content. L2 therefore also
-  // gives the control a labelled cell so the anchor can carry it instead.
+  // L2 replaces the named submit with an unlabelled image input. Chrome then
+  // synthesises the name "Submit", which is a browser default rather than app
+  // content, so the control also gets a labelled cell to anchor to.
   const submit =
     t.hostility === 'L2'
       ? `<input type="image" src="/img/go.svg" name="go" width="64" height="22">`
@@ -115,10 +112,8 @@ createServer(async (req, res) => {
 
     case '/hdr':   return send(200, header(t));
 
-    // Re-authentication exists so the escalation demo has a real resolution:
-    // automation is not permitted to handle credentials, so a human must do
-    // this. The password field is here to exercise redaction -- its value must
-    // never reach the event log.
+    // Sign-in page for the escalation scenario: automation may not enter
+    // credentials, so a human does. Also exercises password redaction.
     case '/login':
       return send(200, shell(t, `
 <table cellpadding="6" cellspacing="1" bgcolor="#808080"><tr><td bgcolor="${t.theme.face}">
@@ -142,8 +137,7 @@ createServer(async (req, res) => {
       return send(200, lookup(t));
 
     case '/img/go.svg':
-      // No alt text is available on an <input type="image">'s SVG source, so
-      // this control is anonymous in the a11y tree by construction.
+      // No alt text, so this control has no author-provided accessible name.
       return send(200, `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="22">
         <rect width="64" height="22" fill="#c0c0c0" stroke="#000"/>
         <text x="32" y="15" font-size="11" text-anchor="middle" font-family="sans-serif">${t.labels.submit}</text></svg>`,

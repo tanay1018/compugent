@@ -5,10 +5,9 @@ import { resolveTarget } from '../surface/resolve.js';
 /**
  * Turn an observed node into a persistable TargetDescriptor.
  *
- * This is the hinge between discovery and replay. The model picks a node by an
- * ephemeral ref; that ref is meaningless five seconds later, so before a step
- * is recorded it must be re-expressed as a description that can find the same
- * control again on a fresh page.
+ * The model picks a node by an ephemeral ref, so before a step is recorded it
+ * is re-expressed as a description that can find the same control on a fresh
+ * page.
  */
 
 export type Purpose = 'action' | 'extraction';
@@ -20,14 +19,9 @@ export interface Described {
 }
 
 /**
- * Descriptors are synthesised and then IMMEDIATELY VERIFIED against the
- * observation they came from: does this description resolve back to exactly
- * the node we meant?
- *
- * Catching an under-specified descriptor here — at record time, with the page
- * still in front of us — is far cheaper than discovering at replay that it
- * matches three controls. A recorder that skips this check produces artifacts
- * that fail in production for reasons nobody can reconstruct.
+ * Each descriptor is verified against the observation it came from: it must
+ * resolve back to exactly the intended node. Catching this at record time is
+ * much cheaper than at replay.
  */
 export function describeNode(observation: Observation, node: UINode, purpose: Purpose = 'action'): Described {
   const base = {
@@ -42,12 +36,8 @@ export function describeNode(observation: Observation, node: UINode, purpose: Pu
 
   const attempts: TargetDescriptor[] = [];
 
-  /**
-   * For an EXTRACTION target the accessible name is the data we came to read —
-   * "$4,182.55" is this member's balance, not the field's identity. Recording
-   * it would pin the artifact to one member. Extraction targets are therefore
-   * anchor-only, by construction.
-   */
+  // Extraction targets are anchor-only: the node's name is the value being
+  // read ("$4,182.55"), not its identity.
   if (purpose === 'extraction') {
     if (anchor) attempts.push(TargetDescriptor.parse({ ...base, anchor }));
   } else {
@@ -60,16 +50,9 @@ export function describeNode(observation: Observation, node: UINode, purpose: Pu
     const r = resolveTarget(observation, d);
     if (r.ok && r.node.ref === node.ref) return { descriptor: d, verified: true };
 
-    // Ambiguous is recoverable at RECORD time in a way it never is at replay
-    // time: we can see which of the candidates the model actually meant.
-    //
-    // The ordinal must index the MATCHING CANDIDATES, not all same-role nodes
-    // in the frame — that is the population resolveTarget applies it to. An
-    // earlier version counted siblings, so the ordinal never verified and
-    // descriptors shipped ambiguous. The failure surfaced on a product grid
-    // where every tile carries two identically-named links (thumbnail and
-    // title), which is the norm on real listings and never happened on a
-    // hand-built form.
+    // At record time an ambiguous match can be fixed with an ordinal, since we
+    // know which candidate was meant. The ordinal indexes the matching
+    // candidates (what resolveTarget applies it to), not all same-role nodes.
     if (!r.ok && r.reason === 'ambiguous') {
       const idx = r.candidates.findIndex((c) => c.ref === node.ref);
       if (idx >= 0) {
@@ -79,8 +62,7 @@ export function describeNode(observation: Observation, node: UINode, purpose: Pu
           return {
             descriptor: withOrdinal,
             verified: true,
-            // Positional, so it is fragile if the page ever reorders. Flagged
-            // rather than hidden: the step carries this into review.
+            // Positional, so fragile if the page reorders; flagged for review.
             problem: `not unique — disambiguated by ordinal ${idx} of ${r.candidates.length} matching ${node.role} nodes`,
           };
         }

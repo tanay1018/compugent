@@ -1,6 +1,6 @@
 /**
- * Print what the system perceives at a URL — the exact normalised graph a
- * model or the replay resolver sees. No HTML, no selectors.
+ * Print the normalised accessibility graph for a URL, as the model and the
+ * resolver see it.
  *
  *   npx tsx scripts/observe.ts http://localhost:8710/?tenant=harbor
  */

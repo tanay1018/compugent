@@ -6,12 +6,8 @@ import { compactObservations } from '../src/discovery/compact.js';
 import type { ModelMessage } from 'ai';
 
 /**
- * Does a `messages` override from prepareStep actually reach the model?
- *
- * compactObservations is unit-tested in isolation, but that proves nothing
- * about the wiring — and the gateway's request log showed 40K-token inputs,
- * which is what an UNcompacted multi-step run looks like. A mock model settles
- * it for free.
+ * Checks that the compacted `messages` from prepareStep actually reach the
+ * model, using a mock model. compact.test.ts covers the function itself.
  */
 function spy() {
   const seen: string[] = [];
