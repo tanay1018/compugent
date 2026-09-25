@@ -318,10 +318,11 @@ document.addEventListener('keydown', (ev) => {
  */
 const REPO = 'tanay1018/compugent';
 
+// Browsers do not reliably report Apple Silicon vs Intel, so the main Mac
+// button is the arm64 build and the Intel build gets its own link.
 function pickAsset(assets, platform) {
-  const want = platform === 'mac' ? /\.(dmg|zip)$/i
-             : platform === 'win' ? /\.exe$/i
-             : /\.(AppImage|deb)$/i;
+  if (platform === 'mac') return assets.find((a) => /arm64\.dmg$/i.test(a.name)) ?? assets.find((a) => /\.dmg$/i.test(a.name));
+  const want = platform === 'win' ? /\.exe$/i : /\.(AppImage|deb)$/i;
   return assets.find((a) => want.test(a.name));
 }
 
@@ -341,9 +342,17 @@ fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
     if (!main) return;
     if (asset) {
       main.href = asset.browser_download_url;
-      main.textContent = `Download ${rel.tag_name} for ${{ mac: 'macOS', win: 'Windows', linux: 'Linux' }[plat]}`;
+      main.textContent = plat === 'mac'
+        ? `Download ${rel.tag_name} for macOS (Apple Silicon)`
+        : `Download ${rel.tag_name} for ${{ win: 'Windows', linux: 'Linux' }[plat]}`;
       const size = el('span', 'note', ` ${(asset.size / 1048576).toFixed(0)} MB`);
       main.after(size);
+      const intel = plat === 'mac' && (rel.assets || []).find((a) => /x64\.dmg$/i.test(a.name));
+      if (intel) {
+        const link = el('a', 'note', ' · Intel Mac');
+        link.href = intel.browser_download_url;
+        size.after(link);
+      }
     } else {
       main.href = rel.html_url;
       main.textContent = `Release ${rel.tag_name} on GitHub`;
@@ -352,7 +361,7 @@ fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
   .catch(() => {
     const main = $('dl-main');
     if (!main) return;
-    main.href = `https://github.com/${REPO}#running-it`;
+    main.href = `https://github.com/${REPO}#setup`;
     main.textContent = 'Build and run from source';
     const n = $('dl')?.parentElement?.querySelector('.note');
     if (n) n.textContent = 'No packaged build is published yet. See the repository to run it from source.';

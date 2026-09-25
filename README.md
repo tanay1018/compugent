@@ -278,6 +278,12 @@ to you, and handing back resumes the run. A finished run can be saved as a
 capability, and the **Capabilities** view replays any saved artifact with new
 inputs.
 
+Prebuilt macOS builds (Apple Silicon and Intel) are on the
+[releases page](https://github.com/tanay1018/compugent/releases/latest). They
+are not signed or notarized yet, so on first launch macOS blocks the app; allow
+it under **System Settings → Privacy & Security → Open Anyway**. The API key is
+entered in the app's Settings and stored locally.
+
 The app is a thin shell over `npm run watch` and the same operator console a
 remote operator would use. `npm run build:app` produces installers via
 electron-builder. The UI spec is in [DESIGN.md](DESIGN.md).
