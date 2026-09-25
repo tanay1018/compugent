@@ -62,7 +62,7 @@ npm run replay -- member.readSavingsBalance memberId=12345
 | `npm run app` | Start the bundled target app (MemberDesk 7.2) on port 8710 |
 | `npm run observe -- <url>` | Print the normalised accessibility graph the model sees |
 | `npm run discover -- "<goal>" [--url <url>]` | LLM discovery run; writes `evidence/discovery-*` |
-| `npm run watch -- "<goal>" [--url <url>] [--keep-open]` | Discovery with the operator console at `localhost:8790` |
+| `npm run watch -- "<goal>" [--url <url>] [--keep-open]` | Discovery with the operator console at `127.0.0.1:8790` |
 | `npm run compile [-- <run> --partial]` | Compile a discovery run into an artifact |
 | `npm run learn-outcomes` | Learn outcome signatures from the fault inputs |
 | `npm run replay -- <id> k=v ... [--repeat N] [--unattended] [--url <origin>]` | Deterministic replay |
@@ -182,7 +182,7 @@ holds it; the executor is blocked while the operator holds it. Handover happens
 at step boundaries.
 
 ```bash
-npm run handoff                 # real operator console at localhost:8790
+npm run handoff                 # real operator console at 127.0.0.1:8790
 npm run handoff -- --simulate   # scripted operator, reproducible
 ```
 
@@ -263,7 +263,7 @@ inside a target rather than as typed text, e.g. "click the link for
 
 In general this works on pages a screen reader can use. It does not work on
 canvas or WebGL content, pages behind bot protection, or values with no nearby
-label. See [REPORT.md §7](REPORT.md#7-cuts) for measured limits.
+label. See [REPORT.md §7.1](REPORT.md#71-known-limits-on-real-sites) for measured limits.
 
 ## Desktop app
 
