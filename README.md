@@ -11,7 +11,8 @@ no API.
 3. **Replay.** The artifact runs deterministically with no model in the loop.
    This is the path a calling agent uses in production.
 
-The design write-up is in [REPORT.md](REPORT.md). Recorded runs are indexed in
+The design write-up is [REPORT.md](REPORT.md), with a longer version in
+[docs/detailed-report.md](docs/detailed-report.md). Recorded runs are indexed in
 [evidence/README.md](evidence/README.md).
 
 ## Setup
@@ -24,18 +25,40 @@ npx playwright install chromium
 cp .env.example .env      # set AI_GATEWAY_API_KEY
 ```
 
-Only discovery and compilation call a model (via the Vercel AI Gateway). Replay
-needs no key and no network beyond the target app.
+Only discovery and compilation call a model (via the Vercel AI Gateway). The
+target app runs locally, and replay needs no key, so everything except
+discovery and compilation works offline.
 
-## Quick start
+## Demo path
 
-The repo ships with approved artifacts, so replay works without a key:
+Start the bundled target app in one terminal:
 
 ```bash
-npm run app                                                    # terminal 1: target app on :8710
+npm run app
+```
+
+**1. Run the agent on a goal, then replay what it learned** (needs `AI_GATEWAY_API_KEY`):
+
+```bash
+npm run discover -- "look up member 12345 and read their current savings balance"
+npm run compile                                                          # prints the capability id and version (a draft)
+npm run replay -- member.readSavingsBalance memberId=67890 --latest      # replay the new draft with a different member
+```
+
+`compile` reuses the id of an existing capability for the same task, so the new
+run is saved as the next version. `--latest` replays that version; without it,
+replay uses the highest approved version.
+
+**2. Replay without a key.** The repo ships approved artifacts with learned
+outcomes, so the error handling can be exercised directly:
+
+```bash
 npm run replay -- member.readSavingsBalance memberId=12345     # success
 npm run replay -- member.readSavingsBalance memberId=99999     # business outcome: member_not_found
+npm run replay -- member.readSavingsBalance memberId=ABC12     # business outcome: invalid_member_id (validation)
+npm run replay -- member.readSavingsBalance memberId=40007     # success after accepting a native alert
 npm run replay -- member.readSavingsBalance memberId=40004     # failed: app_error
+npm run replay -- member.readSavingsBalance memberId=40005     # escalated: session expired
 ```
 
 ```
@@ -46,14 +69,16 @@ STEPS
   ✓ 2. click   button  named "Search"             240ms  via:name
 ```
 
-To record a new capability end to end (needs a key):
+**3. Escalate to a human and hand back** (scripted operator; drop `--simulate`
+to do it yourself in the console at `http://127.0.0.1:8790`):
 
 ```bash
-npm run discover -- "look up member 12345 and read their current savings balance"
-npm run compile            # newest discovery run -> artifacts/<id>/vN.json (draft)
-npm run learn-outcomes     # probe the fault inputs and add verified outcomes
-npm run replay -- member.readSavingsBalance memberId=12345
+npm run handoff -- --simulate                            # session expired: a human signs in
+npm run handoff -- --scenario irreversible --simulate    # "Open Account" needs a human to approve it
 ```
+
+Restart `npm run app` between runs that use `40005`: it expires the target
+app's session.
 
 ## Commands
 
@@ -65,10 +90,10 @@ npm run replay -- member.readSavingsBalance memberId=12345
 | `npm run watch -- "<goal>" [--url <url>] [--keep-open]` | Discovery with the operator console at `127.0.0.1:8790` |
 | `npm run compile [-- <run> --partial]` | Compile a discovery run into an artifact |
 | `npm run learn-outcomes` | Learn outcome signatures from the fault inputs |
-| `npm run replay -- <id> k=v ... [--repeat N] [--unattended] [--url <origin>]` | Deterministic replay |
+| `npm run replay -- <id> k=v ... [--latest \| --version N] [--repeat N] [--unattended] [--url <origin>]` | Deterministic replay of the highest approved version, or the one given |
 | `npm run verify -- <id> --case "k=v" ... [--approve]` | Replay against unseen inputs; optionally approve on success |
 | `npm run approve [-- <id> <version>]` | List versions and their approval state, or approve one |
-| `npm run handoff [-- --simulate]` | Session-expiry escalation, human takeover, and resume |
+| `npm run handoff [-- --scenario session-expired\|irreversible] [--simulate]` | Escalation, human takeover of the live session, and resume |
 | `npm run models [-- <filter>]` | List gateway models with tool use, cheapest first |
 | `npm run desktop` | Electron app wrapping all of the above |
 
@@ -144,6 +169,11 @@ Outcome signatures are learned by running inputs that produce them and diffing
 the screens. Whether an outcome is an answer, recoverable, a fault or an
 escalation is declared in the artifact.
 
+Native browser dialogs (`alert`, `confirm`) block the page, so while one is open
+the observation is the dialog itself: its message plus **OK** / **Cancel**
+buttons. Learning, outcome detection and recovery then handle it like any other
+screen.
+
 `--repeat N` reports distinct statuses, outputs, and which resolution tier each
 step matched through. A step that switches tiers between runs is an early sign
 of UI drift.
@@ -182,15 +212,25 @@ holds it; the executor is blocked while the operator holds it. Handover happens
 at step boundaries.
 
 ```bash
-npm run handoff                 # real operator console at 127.0.0.1:8790
-npm run handoff -- --simulate   # scripted operator, reproducible
+npm run handoff -- --simulate                            # scripted operator
+npm run handoff -- --scenario irreversible --simulate
+npm run handoff                                          # do it yourself at http://127.0.0.1:8790
 ```
 
-The scenario: replay hits an expired session, escalates, a human signs in on
-the same browser session and hands back. Replay then **re-localises**: it
-observes the screen, finds which waypoints hold, and resumes from there (even
-if that is an earlier step). If the position is ambiguous around an
-irreversible step, or matches no waypoint, control stays with the human.
+Two scenarios:
+
+- **`session-expired`**: replay hits an expired session and escalates; a human
+  signs in on the same browser session and hands back.
+- **`irreversible`**: replay of `member.openMoneyMarketSubAccount` stops before
+  **Open Account**, which policy says needs a human. The human reviews the form
+  and submits it, then hands back.
+
+Replay then **re-localises**: it observes the screen, finds which waypoints (or
+the checkpoint) hold, and resumes from there, even if that is an earlier step.
+In the second scenario the confirmation is already showing, so replay reads the
+new account number without submitting again. If the position is ambiguous
+around an irreversible step, or matches no waypoint, control stays with the
+human.
 
 Operator actions are logged semantically ("typed into Member ID") in the same
 actor-tagged log as the agent's. Password values are never captured.
@@ -204,17 +244,21 @@ actor-tagged log as the agent's. Password values are never captured.
   ask for, and replay escalates to a human at that step.
 - **Irreversible steps** (classified at compile time from the control's label,
   reviewed with the artifact) stop replay and escalate unless an idempotency
-  probe shows the effect has already happened.
-- **Allowlist.** Origins and path prefixes are checked before the browser
-  navigates.
+  probe shows the effect has already happened. The compiler uses the success
+  checkpoint as the default probe.
+- **Allowlist.** [`policy.json`](policy.json) lists the permitted origins, path
+  prefixes and action types. The entry URL is checked before navigating and the
+  current page before every action, in discovery and replay.
 - **Redaction.** SSNs, card numbers, account numbers and emails are redacted in
   run logs. Callers receive real values; the evidence directory does not.
 
 ## The target app
 
-`npm run app` serves MemberDesk 7.2, a fictional legacy member-lookup app:
-framesets, nested tables, no test ids and no `<label for>`. Two tenants run the
-same product with different configuration:
+`npm run app` serves MemberDesk 7.2, a fictional legacy member-servicing app:
+framesets, nested tables, no test ids and no `<label for>`. It has a member
+lookup, and an **Open Sub-Account** form whose submit is irreversible (each
+submit opens another account). Two tenants run the same product with different
+configuration:
 
 | tenant | field label | submit control |
 |---|---|---|
@@ -233,6 +277,8 @@ Faults are keyed on the input so every run is reproducible:
 | `40004` | HTTP 500 | `failed` (`app_error`) |
 | `40005` | session expired | `escalated` |
 | `40006` | detail page for the wrong member | `failed` (`output_mismatch`) |
+| `40007` | native `alert()` before the detail page | `success` (alert accepted, checkpoint re-checked) |
+| anything not 5 digits, e.g. `ABC12` | form validation error | `business_outcome` (`invalid_member_id`) |
 
 ## Real sites
 
@@ -263,7 +309,7 @@ inside a target rather than as typed text, e.g. "click the link for
 
 In general this works on pages a screen reader can use. It does not work on
 canvas or WebGL content, pages behind bot protection, or values with no nearby
-label. See [REPORT.md §7.1](REPORT.md#71-known-limits-on-real-sites) for measured limits.
+label. See [docs/detailed-report.md §7.1](docs/detailed-report.md#71-known-limits-on-real-sites) for measured limits.
 
 ## Desktop app
 
@@ -286,7 +332,7 @@ entered in the app's Settings and stored locally.
 
 The app is a thin shell over `npm run watch` and the same operator console a
 remote operator would use. `npm run build:app` produces installers via
-electron-builder. The UI spec is in [DESIGN.md](DESIGN.md).
+electron-builder. The UI spec is in [docs/operator-console-ui.md](docs/operator-console-ui.md).
 
 ## Configuration
 
@@ -300,6 +346,21 @@ Set in `.env` (see [.env.example](.env.example)):
 | `REASONING_EFFORT` | `low` | Reasoning effort per discovery step |
 | `MAX_OBSERVATION_NODES` | `140` | Cap on nodes rendered per screen |
 | `TARGET_APP_PORT` | `8710` | Port for the bundled target app |
+| `POLICY_FILE` | `./policy.json` | Allowlist file; without one, only the entry URL's origin is allowed |
+
+The allowlist is [`policy.json`](policy.json). It is validated on load, and a
+malformed file stops the run:
+
+```json
+{
+  "allowedOrigins": ["http://localhost:8710", "https://en.wikipedia.org", "..."],
+  "allowedPathPrefixes": ["/"],
+  "allowedActions": ["click", "type", "select", "press", "navigate", "read"],
+  "onIrreversible": "require_approval"
+}
+```
+
+To run discovery against another site, add its origin first.
 
 Discovery input is kept small by replacing earlier screens in the history with
 a one-line summary (about 74% fewer input characters on a sample run) and
@@ -314,14 +375,16 @@ src/discovery/  LLM discovery loop and observation rendering
 src/compile/    trace -> artifact compiler
 src/replay/     deterministic replay engine, outcome learning, result types
 src/hitl/       control token, operator console, handoff session, re-localisation
-src/policy/     allowlist, effect classification, credential checks, redaction
+src/policy/     allowlist and policy loading, effect classification, credential checks, redaction
 src/store/      versioned artifact storage
 scripts/        CLI entry points for the npm scripts above
 target-app/     MemberDesk 7.2
 electron/       desktop app
 site/           static case-study site, generated from evidence/
 artifacts/      compiled capabilities
-evidence/       recorded discovery, replay and verify runs
+evidence/       recorded discovery, replay, handoff and verify runs
+docs/           detailed design report, operator console UI spec
+policy.json     the allowlist
 ```
 
 `src/schema` never imports from `src/surface`, so no browser-specific detail
@@ -330,7 +393,7 @@ can end up in a saved artifact.
 ## Tests
 
 ```bash
-npm test                   # 60 unit tests, no browser
+npm test                   # 64 unit tests, no browser
 npm run test:integration   # real browser against the target app
 npm run typecheck
 ```

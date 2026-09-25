@@ -1,6 +1,6 @@
-# Design Report
+# Detailed design report
 
-Design write-up for the computer-use automation take-home. `README.md` has setup and usage; `evidence/README.md` indexes the recorded runs.
+The long version of [REPORT.md](../REPORT.md), with the same seven sections plus the examples, measurements and rejected alternatives behind each decision. [README.md](../README.md) has setup and usage; [evidence/README.md](../evidence/README.md) indexes the recorded runs.
 
 The core split: a model is used to discover a flow once, the result is compiled into a versioned artifact, and replay executes that artifact without calling a model.
 
@@ -228,6 +228,7 @@ Four variants, not one status field: a caller that handles only success and fail
 ### 3.5 Outcomes are learned, classifications are authored
 
 * `learn-outcomes` runs the happy path, then each probe input with handling disabled, and diffs the text. The longest novel string is the signature. For an interstitial, the new link is the dismiss target.
+* A signature already used by another outcome is rejected. It happened once: the session-expiry probe left the app's session expired, and the probes after it all "learned" the expiry notice. That probe now runs last.
 * Wording drifts between tenants and versions, so it is learned. Whether "not authorized" is an answer or a fault cannot be learned, so it is declared.
 * `verified` is true only because a run produced the state.
 
@@ -240,14 +241,22 @@ Four variants, not one status field: a caller that handles only success and fail
 | `40004` | HTTP 500 | `failed · app_error` |
 | `40005` | session expired | `escalated` |
 | `40006` | wrong record | `failed · output_mismatch` |
+| `ABC12` | fails form validation | `business_outcome` (`invalid_member_id`) |
+| `40007` | native `alert()` before the detail screen | `success`, alert accepted, checkpoint retested |
 
-### 3.6 Measured, not asserted
+### 3.6 Native dialogs
+
+`alert`, `confirm` and `prompt` block the page's scripts, so the accessibility tree cannot be read while one is open. The surface keeps the dialog open (Playwright would otherwise dismiss it silently) and reports it as the observation: a `dialog` node and a `text` node with its message, and `OK` / `Cancel` buttons. Clicking them accepts or dismisses the real dialog.
+
+Nothing above the surface special-cases dialogs. `learn-outcomes` diffed the `40007` alert like any other screen and picked `OK` as its dismiss control; replay matched it, clicked `OK`, and re-tested the checkpoint. Screenshots cannot be taken while a dialog blocks the page, so the surface renders the dialog's type and message on a blank page for the evidence instead.
+
+### 3.7 Measured, not asserted
 
 `--repeat N` reports distinct statuses, outputs and resolution paths. The third column is the early warning: a step alternating between name and anchor is a descriptor drifting under a healthy-looking result.
 
 Consistency is reported separately from working, because three identical failures are perfectly consistent. An earlier version printed `STABLE` for them and exited 0, which would have let a broken capability pass any CI gate built on `--repeat`.
 
-### 3.7 Determinism is not generalisation
+### 3.8 Determinism is not generalisation
 
 A capability that works only for the value it was recorded on is a recording, and repetition cannot tell the difference: the recorded case passes by construction, identically, every time. `--repeat` would call it STABLE and be right.
 
@@ -268,7 +277,7 @@ This makes `approved` mean more than "a later draft". Example: a weather.gov cap
 
 The rule: **an anchor must be a label, not a value.** `inSameRowAs "ISIN"` holds because every company article has an ISIN row. `precededBy "Overcast"` holds until the weather changes.
 
-### 3.8 UI drift
+### 3.9 UI drift
 
 1. name and anchor both recorded
 2. relation relaxed before failing
@@ -323,7 +332,7 @@ Designed: an overlay keyed by `(vendorProduct, tenant)` mapping step ids to repl
 3. an outcome verified on another product version
 4. a waypoint holding only through a fallback tier
 
-Known class: the model relied on a dropdown default. A tenant with a different default would search by SSN. The compiler should assert implicit defaults as waypoints.
+Known class: the model relied on a dropdown default. A tenant with a different default would search by SSN. The sub-account recording did the same, accepting the Account Type default of Money Market. The compiler should assert implicit defaults as waypoints.
 
 ## 5. Escalation & handoff
 
@@ -335,7 +344,7 @@ Known class: the model relied on a dropdown default. A tenant with a different d
 | discovery | credential field, repeated irreversible action | refused; model told to `giveUp` |
 | replay | outcome classified `escalate` | `escalated` |
 | replay | `operator` value source | `escalated` |
-| replay | irreversible step, probe does not hold | `escalated` |
+| replay | irreversible step, probe does not hold | `escalated`; the human reviews and performs it (`npm run handoff -- --scenario irreversible`) |
 | replay | waypoint or checkpoint never holds | `failed`, not escalated |
 
 Escalation is for states a human can complete. A broken app is reported to the caller.
@@ -403,6 +412,8 @@ sequenceDiagram
 
 For every irreversible step from the resume point: probe holds, skip; probe does not hold, operator decides; no probe, refuse. This is what prevents a second sub-account after the operator already submitted.
 
+Two scripted handoffs are in the evidence. In `session-expired`, the human signs in and re-localisation resumes at step 1 (both of the lookup screen's steps are safe to redo). In `irreversible`, replay stops before "Open Account"; the human reviews the form and submits it, re-localisation finds the checkpoint already holds, and replay reads the new account number without submitting again. Exactly one sub-account is opened.
+
 Discovery handback has no relocalisation. There is no plan to be lost against; the model re-observes and the interrupted tool call is explicitly not performed.
 
 ## 6. Safety
@@ -418,7 +429,9 @@ onIrreversible        block | require_approval | flag      default require_appro
 sensitiveFieldPatterns password pin ssn card number account number dob ...
 ```
 
-The entry URL is checked before the browser moves.
+Loaded from `policy.json` (or `POLICY_FILE`) and validated; a malformed file stops the run. Without a file, only the entry origin is allowed, which is what the packaged desktop app uses.
+
+The entry URL is checked before the browser moves, and the current page is checked before every action in discovery and replay, so a click that lands on another site cannot be followed by another action there. Only the top-level document is checked, so third-party iframes do not block a run.
 
 ### 6.2 Classify once, enforce always
 
@@ -430,7 +443,7 @@ The entry URL is checked before the browser moves.
 
 1. discovery refuses to repeat one in a run
 2. replay stops before it, saves a screenshot, returns `escalated`
-3. reentry requires a probe
+3. reentry requires a probe. The compiler sets it to the run's success checkpoint by default. That is safe because replay never performs the step itself: the probe only chooses between skipping and escalating, so a probe that misses escalates again
 
 `require_approval` over `block`: a capability that can never submit is not useful. Over `flag`: a flag is read after the money has moved.
 
@@ -449,15 +462,15 @@ The entry URL is checked before the browser moves.
 
 ### 6.6 Limits
 
-1. allowlist is origin and path, not per control
+1. allowlist is origin and path, not per control; only the top-level page is checked
 2. classification is label based; an unlabelled destructive control reads as reversible until review
 3. redaction is heuristic and over broad: the compiler marked `memberId` sensitive, so evidence cannot show which member a run queried
 4. screenshots are not redacted (§7)
 5. the console has no authentication; it binds to `127.0.0.1`, so any local process can drive it
 
-## 7. Not built
+## 7. Cuts
 
-What is missing, what already exists for it, and what building it would involve.
+What was left out, what already exists for it, and what building it would involve.
 
 | gap | what exists | to build it |
 |---|---|---|
@@ -465,12 +478,13 @@ What is missing, what already exists for it, and what building it would involve.
 | **Visual / OCR tier** | the schema accepts `fallbacks[].kind = "visual"` | a screenshot + OCR resolver for canvas and Citrix surfaces, which expose no accessibility tree |
 | **CSS / XPath fallbacks** | the schema accepts them; the resolver only executes `text` fallbacks | executing them in `PlaywrightSurface`. They are web-only, so they would stay fallbacks, never the primary locator |
 | **Tenant overlays** | the target app has two tenants; artifacts record `recordedTenant` | per-tenant name and anchor overrides merged at load (§4.4). Today a `meridian` artifact does not resolve on `harbor` |
-| **Compiler-generated probes and `produces`** | the schema requires a probe on irreversible steps; replay and re-entry enforce it | derive a `nodeExists` probe from the confirmation screen the recorded run saw after the step. Until then, a trace with an irreversible step does not compile until a probe is added by hand |
+| **Specific idempotency probes and `produces`** | irreversible steps get the success checkpoint as a default probe; the schema requires a probe and replay and re-entry enforce it | derive a narrower probe, such as the new record appearing in the list the form shows, so re-entry can also skip a step the operator performed and then navigated away from |
 | **Default-state assertions** | waypoints can already express them | have the compiler assert values the run relied on but never set, such as the search-type dropdown default (§4.5) |
 | **Assisted recovery on replay failure** | escalation, and the draft / approved gate | a bounded, single-step model call when replay fails, with any fix saved as a new draft rather than applied in place |
 | **Catalog endpoint** | `toToolSchema()`; the desktop app lists and runs capabilities | an HTTP or MCP endpoint so an external agent can list and invoke capabilities |
 | **Screenshot redaction** | text in `run.jsonl` and `result.json` is redacted; screenshots are saved unmodified, so a balance or name on screen appears in the PNG | black out the boxes of sensitive nodes, which the observation already identifies, before each screenshot is written |
 | **Console authentication** | the console binds to `127.0.0.1`, so only local processes can reach it | a per-session token on every request, needed before the console can be exposed beyond the local machine |
+| **Native dialogs in the console** | the surface reports and handles native dialogs | the screencast does not show them, so an operator cannot see or answer one; the console would need to show the message with OK / Cancel wired to the same handle |
 
 ### 7.1 Known limits on real sites
 
@@ -479,7 +493,7 @@ Each row is a real page the system handles badly.
 | limit | what happens | cause and what would address it |
 |---|---|---|
 | **Bot walls** | amazon.com returns 6 accessibility nodes: the CDN block page | the site serves a block page instead of the app. Getting past bot protection is out of scope; the run detects a page with nothing to operate and warns before spending a model call |
-| **Values with no label** | weather.gov puts nothing label-like beside the temperature (`Current conditions at / STATION / Fair / 79°F`) | there is no label to anchor to. `verify` caught this (§3.7) and the capability was never approved |
+| **Values with no label** | weather.gov puts nothing label-like beside the temperature (`Current conditions at / STATION / Fair / 79°F`) | there is no label to anchor to. `verify` caught this (§3.8) and the capability was never approved |
 | **Definition-list layouts** | openlibrary.org yields 133 nodes and **zero** anchored | anchoring looks for a table row or preceding text, and a `<dl>` has neither. Needs a `describedBy` relation |
 | **JSON in text nodes** | finance.yahoo.com anchored a control to `[{"fullExchangeName":"Nasd…` | embedded JSON looks like any other text in the accessibility tree. Needs a filter that rejects JSON-shaped anchor candidates |
 | **No prompt caching** | `cached=0` on every model call | compaction rewrites history every step, and the remaining stable prefix (~450 token system prompt) is below Anthropic's 1024 token minimum. Affects cost only |
@@ -491,5 +505,5 @@ Next, in order:
 1. prompt prefix caching, which needs a stable prefix long enough to cache
 2. a `describedBy` anchor relation for definition lists
 3. tenant overlay plus default-state assertions from the compiler
-4. compiler-generated idempotency probes: a `nodeExists` on the confirmation the recorded run saw after the step
+4. narrower idempotency probes than the default checkpoint, e.g. the new record appearing in the list the form shows
 5. bounded single-step recovery on replay failure, gated by the existing draft rule
