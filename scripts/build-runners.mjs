@@ -10,7 +10,7 @@
  * (electron-builder unpacks it from the asar for the same reason).
  */
 import { build } from 'esbuild';
-import { rmSync } from 'node:fs';
+import { copyFileSync, rmSync } from 'node:fs';
 
 rmSync('build/runners', { recursive: true, force: true });
 
@@ -28,5 +28,9 @@ await build({
   banner: { js: "import{createRequire as __cr}from'module';const require=__cr(import.meta.url);" },
   logLevel: 'warning',
 });
+
+// The operator console reads its page from next to the bundled script
+// (import.meta.url), so it has to ship beside the runners.
+copyFileSync('src/hitl/console.html', 'build/runners/console.html');
 
 console.log('runners bundled → build/runners');

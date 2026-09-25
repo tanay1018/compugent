@@ -19,15 +19,23 @@ for (const f of ['.env', '.env.local', '.env.txt']) {
   }
 }
 
-const arg = process.argv[2];
-// `watch-` runs come from the desktop app; `discovery-` from the CLI.
-const runs = readdirSync('evidence')
-  .filter((d) => d.startsWith('discovery-') || d.startsWith('watch-'))
+const arg = process.argv.slice(2).find((a) => !a.startsWith('--'));
+
+/** Newest discovery run under DATA_DIR/evidence (the packaged app sets DATA_DIR). */
+function latestRun(): string | undefined {
+  const root = join(process.env.DATA_DIR ?? '.', 'evidence');
+  if (!existsSync(root)) return undefined;
+  // `watch-` runs come from the desktop app; `discovery-` from the CLI.
   // Sort by mtime, not name: the prefixes would otherwise decide the order.
-  .sort((a, b) => statSync(join('evidence', a)).mtimeMs - statSync(join('evidence', b)).mtimeMs);
-const latest = runs.at(-1);
-if (!arg && !latest) { console.error('no discovery runs in evidence/'); process.exit(1); }
-const runDir = arg ?? join('evidence', latest!);
+  const latest = readdirSync(root)
+    .filter((d) => d.startsWith('discovery-') || d.startsWith('watch-'))
+    .sort((a, b) => statSync(join(root, a)).mtimeMs - statSync(join(root, b)).mtimeMs)
+    .at(-1);
+  return latest ? join(root, latest) : undefined;
+}
+
+const runDir = arg ?? latestRun();
+if (!runDir) { console.error('no discovery runs in evidence/'); process.exit(1); }
 console.log(`compiling ${runDir}`);
 const trace = JSON.parse(readFileSync(join(runDir, 'trace.json'), 'utf8'));
 
