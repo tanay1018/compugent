@@ -1,0 +1,50 @@
+{
+  "status": "escalated",
+  "reason": "irreversible action requires operator approval",
+  "atStep": 4,
+  "context": {
+    "location": "http://localhost:8710/?tenant=meridian",
+    "screenshot": "screenshots/017-approval.png",
+    "expected": "button named \"Open Account\" follows \"Account Type\" in frame \"main\""
+  },
+  "runId": "replay-2026-09-25T18-44-24-542Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "ok",
+      "ms": 453,
+      "target": "textbox inSameRowAs \"Member ID\" in frame \"main\"",
+      "resolvedVia": "anchor"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "ok",
+      "ms": 452,
+      "target": "button named \"Search\" follows \"Search Type\" in frame \"main\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 3,
+      "id": "s3",
+      "kind": "click",
+      "status": "ok",
+      "ms": 416,
+      "target": "link named \"Open Sub-Account\" precededBy \"New Search\" in frame \"main\"",
+      "resolvedVia": "name"
+    },
+    {
+      "index": 4,
+      "id": "s4",
+      "kind": "click",
+      "status": "escalated",
+      "ms": 25,
+      "target": "button named \"Open Account\" follows \"Account Type\" in frame \"main\"",
+      "resolvedVia": "name"
+    }
+  ],
+  "ms": 1768
+}

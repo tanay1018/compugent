@@ -1,0 +1,33 @@
+{"seq":1,"ts":"2026-09-25T18:42:05.427Z","actor":"system","kind":"replay.start","detail":{"capability":"member.openMoneyMarketSubAccount v1","approval":"draft","inputs":{"memberId":"12345"}}}
+{"seq":2,"ts":"2026-09-25T18:42:05.824Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
+{"seq":3,"ts":"2026-09-25T18:42:05.825Z","actor":"agent","kind":"step.begin","detail":{"step":1,"of":4,"kind":"type","target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","effect":"reversible"}}
+{"seq":4,"ts":"2026-09-25T18:42:05.851Z","actor":"agent","kind":"step.waypoint","detail":{"step":1,"held":true,"expected":"textbox inSameRowAs \"Member ID\" in frame \"main\" present"}}
+{"seq":5,"ts":"2026-09-25T18:42:05.852Z","actor":"agent","kind":"step.resolved","detail":{"step":1,"via":"anchor","target":"textbox inSameRowAs \"Member ID\" in frame \"main\""}}
+{"seq":6,"ts":"2026-09-25T18:42:06.282Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"12345"}}
+{"seq":7,"ts":"2026-09-25T18:42:06.283Z","actor":"agent","kind":"step.begin","detail":{"step":2,"of":4,"kind":"click","target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","effect":"reversible"}}
+{"seq":8,"ts":"2026-09-25T18:42:06.301Z","actor":"agent","kind":"step.waypoint","detail":{"step":2,"held":true,"expected":"button named \"Search\" follows \"Search Type\" in frame \"main\" present"}}
+{"seq":9,"ts":"2026-09-25T18:42:06.301Z","actor":"agent","kind":"step.resolved","detail":{"step":2,"via":"name","target":"button named \"Search\" follows \"Search Type\" in frame \"main\""}}
+{"seq":10,"ts":"2026-09-25T18:42:06.689Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
+{"seq":11,"ts":"2026-09-25T18:42:06.689Z","actor":"agent","kind":"step.begin","detail":{"step":3,"of":4,"kind":"click","target":"link named \"Open Sub-Account\" precededBy \"New Search\" in frame \"main\"","effect":"reversible"}}
+{"seq":12,"ts":"2026-09-25T18:42:06.709Z","actor":"agent","kind":"step.waypoint","detail":{"step":3,"held":true,"expected":"link named \"Open Sub-Account\" precededBy \"New Search\" in frame \"main\" present"}}
+{"seq":13,"ts":"2026-09-25T18:42:06.709Z","actor":"agent","kind":"step.resolved","detail":{"step":3,"via":"name","target":"link named \"Open Sub-Account\" precededBy \"New Search\" in frame \"main\""}}
+{"seq":14,"ts":"2026-09-25T18:42:07.097Z","actor":"agent","kind":"step.click","detail":{"step":3,"target":"link named \"Open Sub-Account\" precededBy \"New Search\" in frame \"main\"","via":"name"}}
+{"seq":15,"ts":"2026-09-25T18:42:07.097Z","actor":"agent","kind":"step.begin","detail":{"step":4,"of":4,"kind":"click","target":"button named \"Open Account\" follows \"Account Type\" in frame \"main\"","effect":"irreversible"}}
+{"seq":16,"ts":"2026-09-25T18:42:07.122Z","actor":"agent","kind":"step.waypoint","detail":{"step":4,"held":true,"expected":"button named \"Open Account\" follows \"Account Type\" in frame \"main\" present"}}
+{"seq":17,"ts":"2026-09-25T18:42:07.122Z","actor":"agent","kind":"step.resolved","detail":{"step":4,"via":"name","target":"button named \"Open Account\" follows \"Account Type\" in frame \"main\""}}
+{"seq":18,"ts":"2026-09-25T18:42:07.143Z","actor":"system","kind":"replay.escalated","detail":{"status":"escalated","reason":"irreversible action requires operator approval","atStep":4,"context":{"location":"http://localhost:8710/?tenant=meridian","screenshot":"screenshots/017-approval.png","expected":"button named \"Open Account\" follows \"Account Type\" in frame \"main\""},"runId":"handoff-2026-09-25T18-42-05-098Z","ms":1716}}
+{"seq":19,"ts":"2026-09-25T18:42:07.166Z","actor":"system","kind":"control.transition","detail":{"from":"agent","to":"pause_requested","reason":"irreversible action requires operator approval"}}
+{"seq":20,"ts":"2026-09-25T18:42:07.166Z","actor":"system","kind":"escalation.raised","detail":{"reason":"irreversible action requires operator approval","capability":"member.openMoneyMarketSubAccount v1","atStep":4,"location":"http://localhost:8710/?tenant=meridian","screenshot":"screenshots/018-escalation.png"}}
+{"seq":21,"ts":"2026-09-25T18:42:07.170Z","actor":"agent","kind":"control.transition","detail":{"from":"pause_requested","to":"operator","reason":"automation paused at a step boundary"}}
+{"seq":22,"ts":"2026-09-25T18:42:07.182Z","actor":"operator","kind":"manual.click","detail":{"control":"Open Account"}}
+{"seq":23,"ts":"2026-09-25T18:42:07.182Z","actor":"operator","kind":"manual.submit","detail":{"control":"form"}}
+{"seq":24,"ts":"2026-09-25T18:42:07.560Z","actor":"operator","kind":"control.transition","detail":{"from":"operator","to":"resume_requested","reason":"scripted operator handing back"}}
+{"seq":25,"ts":"2026-09-25T18:42:07.560Z","actor":"system","kind":"control.transition","detail":{"from":"resume_requested","to":"relocalizing","reason":"establishing where the operator left the session"}}
+{"seq":26,"ts":"2026-09-25T18:42:07.578Z","actor":"system","kind":"control.transition","detail":{"from":"relocalizing","to":"agent","reason":"re-localised: checkpoint holds (found text)"}}
+{"seq":27,"ts":"2026-09-25T18:42:07.579Z","actor":"system","kind":"replay.start","detail":{"capability":"member.openMoneyMarketSubAccount v1","approval":"draft","inputs":{"memberId":"12345"}}}
+{"seq":28,"ts":"2026-09-25T18:42:07.579Z","actor":"system","kind":"replay.resume","detail":{"fromStep":5,"note":"continuing in the existing session"}}
+{"seq":29,"ts":"2026-09-25T18:42:07.593Z","actor":"agent","kind":"checkpoint.verified","detail":{"assertion":"text named \"Sub-Account Opened\" in frame \"main\" present"}}
+{"seq":30,"ts":"2026-09-25T18:42:07.618Z","actor":"agent","kind":"output.read","detail":{"name":"newAccountNumber","via":"anchor","from":"text inSameRowAs \"New Account\" in frame \"main\"","value":"[REDACTED]"}}
+{"seq":31,"ts":"2026-09-25T18:42:07.618Z","actor":"agent","kind":"outputs","detail":{"outputs":{"newAccountNumber":"[REDACTED]"}}}
+{"seq":32,"ts":"2026-09-25T18:42:07.618Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"newAccountNumber":"[REDACTED]"},"runId":"handoff-2026-09-25T18-42-05-098Z","ms":39}}
+{"seq":33,"ts":"2026-09-25T18:42:07.619Z","actor":"system","kind":"control.transition","detail":{"from":"agent","to":"closed","reason":"session ended"}}

@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "id": "member.openMoneyMarketSubAccount",
+  "version": 1,
+  "name": "Open Money Market Sub-Account for Member",
+  "description": "Looks up a credit union member by member number, opens a new Money Market sub-account for them (accepting the default account type), and reads the newly created sub-account number from the confirmation screen. Use this when an agent needs to create a Money Market sub-account for an existing member and retrieve its account number.",
+  "app": {
+    "vendorProduct": "Corelink MemberDesk 7.2",
+    "recordedTenant": "meridian",
+    "surfaceKind": "web",
+    "entryPathPattern": "^/(\\?|$)",
+    "entryPath": "/"
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "The member number to look up before opening the new sub-account.",
+      "example": "67890",
+      "sensitive": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "newAccountNumber",
+      "type": "string",
+      "description": "The newly created Money Market sub-account number shown on the Sub-Account Opened confirmation screen.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "New Account"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-25T18:40:50.779Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": true
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "s1",
+      "index": 1,
+      "kind": "type",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-25T18:40:36.359Z"
+        }
+      },
+      "value": {
+        "from": "param",
+        "param": "memberId"
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "textbox",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "inSameRowAs",
+            "text": "Member ID"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-25T18:40:36.359Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Enter the requested member ID in the Member ID field to look up member 67890."
+    },
+    {
+      "id": "s2",
+      "index": 2,
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-25T18:40:39.000Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "button",
+          "name": "Search",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Search Type"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-25T18:40:39.000Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Click the Search button to look up member 67890 by member number."
+    },
+    {
+      "id": "s3",
+      "index": 3,
+      "kind": "click",
+      "target": {
+        "role": "link",
+        "name": "Open Sub-Account",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "precededBy",
+          "text": "New Search"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-25T18:40:42.686Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "link",
+          "name": "Open Sub-Account",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "precededBy",
+            "text": "New Search"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-25T18:40:42.686Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Click Open Sub-Account to create a new sub-account for member 67890."
+    },
+    {
+      "id": "s4",
+      "index": 4,
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Open Account",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Account Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-09-25T18:40:46.234Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "button",
+          "name": "Open Account",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Account Type"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-25T18:40:46.234Z"
+          }
+        }
+      },
+      "effect": "irreversible",
+      "idempotencyProbe": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "text",
+          "name": "Sub-Account Opened",
+          "nameMatch": "normalized",
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-25T18:40:54.868Z"
+          }
+        },
+        "description": "Looked up member 67890 (Marcus Webb, Active) by member number, selected Open Sub-Account, and opened a Money Market sub-account (Account Type already defaulted to Money Market). Read the new account number from the \"Sub-Account Opened\" confirmation screen: extracted newAccountNumber = S-67890-01."
+      },
+      "rationale": "Account Type already defaults to \"Money Market\" as desired; click Open Account to create the new Money Market sub-account."
+    }
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "Sub-Account Opened",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "main"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-09-25T18:40:54.868Z"
+      }
+    },
+    "description": "Looked up member 67890 (Marcus Webb, Active) by member number, selected Open Sub-Account, and opened a Money Market sub-account (Account Type already defaulted to Money Market). Read the new account number from the \"Sub-Account Opened\" confirmation screen: extracted newAccountNumber = S-67890-01."
+  },
+  "approval": "draft",
+  "provenance": {
+    "recordedAt": "2026-09-25T18:40:57.326Z",
+    "discoveryRunId": "discovery-2026-09-25T18-40-30-434Z",
+    "model": "deepseek/deepseek-v4-flash",
+    "goal": "Look up member 67890, open a new Money Market sub-account for them, and read the new account number from the confirmation screen",
+    "warnings": [
+      "step 4 is irreversible: replay will escalate for approval before it. Its idempotency probe defaults to the success checkpoint; replace it if the confirmation is not shown after the step."
+    ]
+  }
+}

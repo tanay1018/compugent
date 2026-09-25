@@ -1,0 +1,324 @@
+{
+  "schemaVersion": 1,
+  "id": "member.readSavingsBalance",
+  "version": 4,
+  "name": "Read Member Savings Balance",
+  "description": "Looks up a credit union member by member number and reads their current savings account balance, returning the balance along with the member ID and name for verification. Use this when an agent needs a specific member's savings balance.",
+  "app": {
+    "vendorProduct": "Corelink MemberDesk 7.2",
+    "recordedTenant": "meridian",
+    "surfaceKind": "web",
+    "entryPathPattern": "^/(\\?|$)",
+    "entryPath": "/"
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "The member number to look up in the Member ID search field.",
+      "example": "12345",
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savingsBalance",
+      "type": "number",
+      "description": "Current balance of the member's Savings account.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Savings"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:41:01.035Z"
+        }
+      },
+      "transform": "currency",
+      "sensitive": true
+    },
+    {
+      "name": "memberId",
+      "type": "string",
+      "description": "Member ID shown on the detail screen, used to confirm the correct member was loaded.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:41:01.036Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": true,
+      "mustMatchParam": "memberId"
+    },
+    {
+      "name": "memberName",
+      "type": "string",
+      "description": "Name of the member whose balance was read.",
+      "from": {
+        "role": "text",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Name"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:41:01.036Z"
+        }
+      },
+      "transform": "text",
+      "sensitive": true
+    }
+  ],
+  "outcomes": [
+    {
+      "name": "member_not_found",
+      "classification": "business_outcome",
+      "detect": {
+        "kind": "textPresent",
+        "text": "No member found matching that ID.",
+        "description": "observed for inputs {\"memberId\":\"99999\"}"
+      },
+      "message": "No member matches that identifier.",
+      "verified": true
+    },
+    {
+      "name": "permission_denied",
+      "classification": "business_outcome",
+      "detect": {
+        "kind": "textPresent",
+        "text": "You are not authorized to view this member record.",
+        "description": "observed for inputs {\"memberId\":\"40003\"}"
+      },
+      "message": "The operator is not authorised to view this member record.",
+      "verified": true
+    },
+    {
+      "name": "maintenance_notice",
+      "classification": "recoverable",
+      "detect": {
+        "kind": "textPresent",
+        "text": "Scheduled maintenance begins at 23:00 ET.",
+        "description": "observed for inputs {\"memberId\":\"40002\"}"
+      },
+      "message": "A scheduled-maintenance interstitial was dismissed.",
+      "recovery": {
+        "kind": "dismiss",
+        "target": {
+          "role": "link",
+          "name": "Continue",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Scheduled maintenance begins at 23:00 ET."
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-25T18:43:21.670Z"
+          }
+        },
+        "maxAttempts": 1
+      },
+      "verified": true
+    },
+    {
+      "name": "application_error",
+      "classification": "hard_failure",
+      "detect": {
+        "kind": "textPresent",
+        "text": "MemberDesk error 0x5F: unable to complete request.",
+        "description": "observed for inputs {\"memberId\":\"40004\"}"
+      },
+      "message": "The application returned an internal error.",
+      "verified": true
+    },
+    {
+      "name": "invalid_member_id",
+      "classification": "business_outcome",
+      "detect": {
+        "kind": "textPresent",
+        "text": "Member ID must be exactly 5 digits.",
+        "description": "observed for inputs {\"memberId\":\"ABC12\"}"
+      },
+      "message": "The member ID failed the form's validation: it must be exactly 5 digits.",
+      "verified": true
+    },
+    {
+      "name": "compliance_alert",
+      "classification": "recoverable",
+      "detect": {
+        "kind": "textPresent",
+        "text": "This member record is flagged for compliance review. Balances are as of the prior business day.",
+        "description": "observed for inputs {\"memberId\":\"40007\"}"
+      },
+      "message": "A native compliance alert was acknowledged before the detail screen.",
+      "recovery": {
+        "kind": "dismiss",
+        "target": {
+          "role": "button",
+          "name": "OK",
+          "nameMatch": "normalized",
+          "scope": {
+            "frame": "dialog"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-09-25T18:43:24.960Z"
+          }
+        },
+        "maxAttempts": 1
+      },
+      "verified": true
+    },
+    {
+      "name": "session_expired",
+      "classification": "escalate",
+      "detect": {
+        "kind": "textPresent",
+        "text": "Your session has expired. Please sign in again.",
+        "description": "observed for inputs {\"memberId\":\"40005\"}"
+      },
+      "message": "The session expired. Automation cannot re-authenticate; a human must sign in.",
+      "verified": true
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "index": 1,
+      "kind": "type",
+      "target": {
+        "role": "textbox",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "inSameRowAs",
+          "text": "Member ID"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:40:50.439Z"
+        }
+      },
+      "value": {
+        "from": "param",
+        "param": "memberId"
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "textbox",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "inSameRowAs",
+            "text": "Member ID"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-29T21:40:50.439Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "The Member ID field is the search input; entering the member number 12345 to look up the member."
+    },
+    {
+      "id": "s2",
+      "index": 2,
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "nameMatch": "normalized",
+        "anchor": {
+          "relation": "follows",
+          "text": "Search Type"
+        },
+        "scope": {
+          "frame": "main"
+        },
+        "fallbacks": [],
+        "provenance": {
+          "discoveredAt": "2026-08-29T21:40:54.626Z"
+        }
+      },
+      "waypoint": {
+        "kind": "nodeExists",
+        "target": {
+          "role": "button",
+          "name": "Search",
+          "nameMatch": "normalized",
+          "anchor": {
+            "relation": "follows",
+            "text": "Search Type"
+          },
+          "scope": {
+            "frame": "main"
+          },
+          "fallbacks": [],
+          "provenance": {
+            "discoveredAt": "2026-08-29T21:40:54.626Z"
+          }
+        }
+      },
+      "effect": "reversible",
+      "rationale": "Submit the inquiry with Search Type = \"Member Number\", which matches looking up by member ID."
+    }
+  ],
+  "checkpoint": {
+    "kind": "nodeExists",
+    "target": {
+      "role": "text",
+      "name": "Member Detail",
+      "nameMatch": "normalized",
+      "scope": {
+        "frame": "main"
+      },
+      "fallbacks": [],
+      "provenance": {
+        "discoveredAt": "2026-08-29T21:41:05.173Z"
+      }
+    },
+    "description": "Searched Member ID 12345 by Member Number and landed on the Member Detail screen for Sarah Chen (ID 12345, Active). Recorded the savings balance $4,182.55 from the \"Savings\" row of the Account/Balance table, plus member ID and name as verification."
+  },
+  "approval": "approved",
+  "provenance": {
+    "recordedAt": "2026-08-29T21:41:08.908Z",
+    "discoveryRunId": "watch-2026-08-29T21-40-47-229Z",
+    "model": "anthropic/claude-opus-5",
+    "goal": "look up member 12345 and read their current savings balance",
+    "warnings": [
+      "output \"memberId\" echoes the \"memberId\" input; replay will now assert they match",
+      "v2: 5 outcome signatures learned from probe runs",
+      "v4: 7 outcome signatures learned from probe runs (based on v2)"
+    ]
+  }
+}
