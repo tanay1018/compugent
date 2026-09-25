@@ -1,0 +1,18 @@
+{"seq":1,"ts":"2026-09-25T18:43:43.824Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v4","approval":"draft","inputs":{"memberId":"[REDACTED]"}}}
+{"seq":2,"ts":"2026-09-25T18:43:44.219Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
+{"seq":3,"ts":"2026-09-25T18:43:44.220Z","actor":"agent","kind":"step.begin","detail":{"step":1,"of":2,"kind":"type","target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","effect":"reversible"}}
+{"seq":4,"ts":"2026-09-25T18:43:44.245Z","actor":"agent","kind":"step.waypoint","detail":{"step":1,"held":true,"expected":"textbox inSameRowAs \"Member ID\" in frame \"main\" present"}}
+{"seq":5,"ts":"2026-09-25T18:43:44.245Z","actor":"agent","kind":"step.resolved","detail":{"step":1,"via":"anchor","target":"textbox inSameRowAs \"Member ID\" in frame \"main\""}}
+{"seq":6,"ts":"2026-09-25T18:43:44.667Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
+{"seq":7,"ts":"2026-09-25T18:43:44.667Z","actor":"agent","kind":"step.begin","detail":{"step":2,"of":2,"kind":"click","target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","effect":"reversible"}}
+{"seq":8,"ts":"2026-09-25T18:43:44.689Z","actor":"agent","kind":"step.waypoint","detail":{"step":2,"held":true,"expected":"button named \"Search\" follows \"Search Type\" in frame \"main\" present"}}
+{"seq":9,"ts":"2026-09-25T18:43:44.690Z","actor":"agent","kind":"step.resolved","detail":{"step":2,"via":"name","target":"button named \"Search\" follows \"Search Type\" in frame \"main\""}}
+{"seq":10,"ts":"2026-09-25T18:43:44.734Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
+{"seq":11,"ts":"2026-09-25T18:43:44.790Z","actor":"system","kind":"outcome.matched","detail":{"name":"compliance_alert","classification":"recoverable","detail":"text \"This member record is flagged for compliance review. Balances are as of the prior business day.\" present","location":"http://localhost:8710/?tenant=meridian"},"screenshot":"screenshots/010-outcome-compliance_alert.png"}
+{"seq":12,"ts":"2026-09-25T18:43:45.204Z","actor":"system","kind":"outcome.recovered","detail":{"name":"compliance_alert","via":"dismiss"}}
+{"seq":13,"ts":"2026-09-25T18:43:45.232Z","actor":"agent","kind":"checkpoint.verified","detail":{"assertion":"text named \"Member Detail\" in frame \"main\" present"}}
+{"seq":14,"ts":"2026-09-25T18:43:45.249Z","actor":"agent","kind":"output.read","detail":{"name":"savingsBalance","via":"anchor","from":"text inSameRowAs \"Savings\" in frame \"main\"","value":"[REDACTED]"}}
+{"seq":15,"ts":"2026-09-25T18:43:45.250Z","actor":"agent","kind":"output.read","detail":{"name":"memberId","via":"anchor","from":"text inSameRowAs \"Member ID\" in frame \"main\"","value":"[REDACTED]"}}
+{"seq":16,"ts":"2026-09-25T18:43:45.250Z","actor":"agent","kind":"output.read","detail":{"name":"memberName","via":"anchor","from":"text inSameRowAs \"Name\" in frame \"main\"","value":"[REDACTED]"}}
+{"seq":17,"ts":"2026-09-25T18:43:45.250Z","actor":"agent","kind":"outputs","detail":{"outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"}}}
+{"seq":18,"ts":"2026-09-25T18:43:45.250Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"},"runId":"replay-2026-09-25T18-43-43-717Z","ms":1426}}

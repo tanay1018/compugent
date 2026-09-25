@@ -105,3 +105,30 @@ test('a descriptor matching nothing fails loudly with the tiers it tried', async
   assert.equal(r.ok, false);
   assert.equal(!r.ok && r.reason, 'not_found');
 });
+
+test('a native alert is observed as a dialog with an OK button, and clicking OK accepts it', async () => {
+  // 40007 raises alert() while rendering the detail screen.
+  await s.navigate(`${BASE}/detail?tenant=meridian&q1=40007`);
+  await s.waitForStable();
+  const o = await s.observe();
+  const dialog = o.nodes.find((n) => n.role === 'dialog');
+  assert.ok(dialog, 'the open alert is reported as a dialog node');
+  assert.match(dialog!.name, /compliance review/);
+  const ok = o.nodes.find((n) => n.role === 'button' && n.name === 'OK');
+  assert.ok(ok);
+  assert.ok((await s.screenshot()).length > 0, 'a screenshot is still produced while the dialog blocks the page');
+
+  await s.act(o, ok!, { kind: 'click' });
+  await s.waitForStable();
+  const after = await s.observe();
+  assert.ok(!after.nodes.some((n) => n.role === 'dialog'), 'the dialog is gone');
+  assert.ok(after.nodes.some((n) => n.name === 'Member Detail'), 'the page underneath finished rendering');
+});
+
+test('an invalid member ID fails form validation instead of reaching the detail screen', async () => {
+  await s.navigate(`${BASE}/detail?tenant=meridian&q1=ABC12`);
+  await s.waitForStable();
+  const o = await s.observe();
+  assert.ok(o.nodes.some((n) => n.name === 'Member ID must be exactly 5 digits.'));
+});
+

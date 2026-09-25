@@ -30,7 +30,7 @@ export interface StepReport {
   id: string;
   kind: string;
   target?: string;
-  status: 'ok' | 'recovered' | 'failed' | 'skipped';
+  status: 'ok' | 'recovered' | 'failed' | 'skipped' | 'escalated';
   ms: number;
   /** Which resolution tier found the control. Steps that rely on fallbacks need review. */
   resolvedVia?: string;

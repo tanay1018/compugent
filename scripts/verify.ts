@@ -14,7 +14,7 @@
 import { ArtifactStore } from '../src/store/artifacts.js';
 import { replay } from '../src/replay/engine.js';
 import { PlaywrightSurface } from '../src/surface/playwright.js';
-import { defaultPolicy } from '../src/policy/allowlist.js';
+import { loadPolicy } from '../src/policy/load.js';
 import { RunLog } from '../src/run/log.js';
 import { readFileSync, existsSync } from 'node:fs';
 
@@ -77,7 +77,7 @@ for (const inputs of cases) {
     const log = new RunLog('evidence', `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`);
     const r = await replay({ artifact, inputs, surface, log, baseUrl,
                              // Attended, so drafts can be verified before approval.
-                             policy: defaultPolicy(new URL(baseUrl).origin), unattended: false });
+                             policy: loadPolicy(baseUrl).policy, unattended: false });
     // A business_outcome (e.g. "no such company") counts as completing.
     const ok = r.status === 'success' || r.status === 'business_outcome';
     const detail =

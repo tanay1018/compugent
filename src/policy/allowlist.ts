@@ -75,6 +75,19 @@ export function checkNavigation(policy: PolicyConfig, url: string): Decision {
   return { allow: true };
 }
 
+/**
+ * Is the page we are about to act on inside the allowlist? The entry URL is
+ * checked before navigating, but a click can land on another site; this is
+ * checked before every action. Only the top-level document is checked, so
+ * third-party iframes on real sites do not block a run.
+ */
+export function checkLocation(policy: PolicyConfig, location: string): Decision {
+  if (!/^https?:/.test(location)) return { allow: true };   // about:blank between loads
+  const d = checkNavigation(policy, location);
+  return d.allow === true ? d
+    : { ...d, reason: `the current page (${location}) is outside the allowlist: ${(d as { reason: string }).reason}` } as Decision;
+}
+
 /** Input types that hold a secret regardless of how the field is labelled. */
 const SECRET_INPUT_TYPES = new Set(['password']);
 
@@ -168,7 +181,7 @@ export function redactText(text: string): string {
   return out;
 }
 
-/** Default policy for the bundled target app. */
+/** Policy used when no policy file is configured: the entry origin only. */
 export const defaultPolicy = (origin: string): PolicyConfig =>
   PolicyConfig.parse({
     allowedOrigins: [origin],

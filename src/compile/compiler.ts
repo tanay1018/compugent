@@ -336,6 +336,15 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     );
   }
 
+  /**
+   * Default idempotency probe for irreversible steps: the run's own success
+   * checkpoint. Replay never performs an irreversible step itself; the probe
+   * only decides between "already done, skip" and "escalate to a human", so a
+   * probe that misses just escalates again. A reviewer can replace it with a
+   * more specific check (e.g. the new record appearing in a list).
+   */
+  const defaultProbe = trace.checkpoint ? parameteriseAssertion(trace.checkpoint) : undefined;
+
   const steps: Step[] = [];
   let index = 0;
   for (const s of kept) {
@@ -358,9 +367,19 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       // literal would only ever hold for the run that recorded it.
       ...(s.target ? { waypoint: { kind: 'nodeExists' as const, target: parameteriseTarget(s.target) } } : {}),
       effect: s.effect,
+      ...(s.effect === 'irreversible' && defaultProbe ? { idempotencyProbe: defaultProbe } : {}),
       ...(s.rationale ? { rationale: s.rationale } : {}),
       ...(s.targetVerified ? {} : { fragile: s.targetProblem ?? 'descriptor could not be verified at record time' }),
     });
+  }
+
+  for (const s of steps) {
+    if (s.effect === 'irreversible' && s.idempotencyProbe) {
+      warnings.push(
+        `step ${s.index} is irreversible: replay will escalate for approval before it. Its idempotency ` +
+        `probe defaults to the success checkpoint; replace it if the confirmation is not shown after the step.`,
+      );
+    }
   }
 
   const entry = canonicaliseLocation(trace.entryUrl);

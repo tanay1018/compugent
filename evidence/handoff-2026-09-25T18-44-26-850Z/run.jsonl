@@ -1,0 +1,42 @@
+{"seq":1,"ts":"2026-09-25T18:44:26.964Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v4","approval":"approved","inputs":{"memberId":"[REDACTED]"}}}
+{"seq":2,"ts":"2026-09-25T18:44:27.361Z","actor":"agent","kind":"navigate","detail":{"url":"http://localhost:8710/?tenant=meridian"}}
+{"seq":3,"ts":"2026-09-25T18:44:27.362Z","actor":"agent","kind":"step.begin","detail":{"step":1,"of":2,"kind":"type","target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","effect":"reversible"}}
+{"seq":4,"ts":"2026-09-25T18:44:27.387Z","actor":"agent","kind":"step.waypoint","detail":{"step":1,"held":true,"expected":"textbox inSameRowAs \"Member ID\" in frame \"main\" present"}}
+{"seq":5,"ts":"2026-09-25T18:44:27.387Z","actor":"agent","kind":"step.resolved","detail":{"step":1,"via":"anchor","target":"textbox inSameRowAs \"Member ID\" in frame \"main\""}}
+{"seq":6,"ts":"2026-09-25T18:44:27.816Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
+{"seq":7,"ts":"2026-09-25T18:44:27.817Z","actor":"agent","kind":"step.begin","detail":{"step":2,"of":2,"kind":"click","target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","effect":"reversible"}}
+{"seq":8,"ts":"2026-09-25T18:44:27.839Z","actor":"agent","kind":"step.waypoint","detail":{"step":2,"held":true,"expected":"button named \"Search\" follows \"Search Type\" in frame \"main\" present"}}
+{"seq":9,"ts":"2026-09-25T18:44:27.840Z","actor":"agent","kind":"step.resolved","detail":{"step":2,"via":"name","target":"button named \"Search\" follows \"Search Type\" in frame \"main\""}}
+{"seq":10,"ts":"2026-09-25T18:44:28.231Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
+{"seq":11,"ts":"2026-09-25T18:44:28.278Z","actor":"system","kind":"outcome.matched","detail":{"name":"session_expired","classification":"escalate","detail":"text \"Your session has expired. Please sign in again.\" present","location":"http://localhost:8710/?tenant=meridian"},"screenshot":"screenshots/010-outcome-session_expired.png"}
+{"seq":12,"ts":"2026-09-25T18:44:28.304Z","actor":"system","kind":"replay.escalated","detail":{"status":"escalated","reason":"The session expired. Automation cannot re-authenticate; a human must sign in.","context":{"location":"http://localhost:8710/?tenant=meridian","screenshot":"screenshots/011-escalate.png"},"runId":"handoff-2026-09-25T18-44-26-850Z","ms":1340}}
+{"seq":13,"ts":"2026-09-25T18:44:28.327Z","actor":"system","kind":"control.transition","detail":{"from":"agent","to":"pause_requested","reason":"The session expired. Automation cannot re-authenticate; a human must sign in."}}
+{"seq":14,"ts":"2026-09-25T18:44:28.327Z","actor":"system","kind":"escalation.raised","detail":{"reason":"The session expired. Automation cannot re-authenticate; a human must sign in.","capability":"member.readSavingsBalance v4","location":"http://localhost:8710/?tenant=meridian","screenshot":"screenshots/012-escalation.png"}}
+{"seq":15,"ts":"2026-09-25T18:44:28.332Z","actor":"agent","kind":"control.transition","detail":{"from":"pause_requested","to":"operator","reason":"automation paused at a step boundary"}}
+{"seq":16,"ts":"2026-09-25T18:44:28.337Z","actor":"operator","kind":"manual.click","detail":{"control":"Sign In"}}
+{"seq":17,"ts":"2026-09-25T18:44:28.738Z","actor":"operator","kind":"manual.click","detail":{"control":"Operator ID"}}
+{"seq":18,"ts":"2026-09-25T18:44:29.176Z","actor":"operator","kind":"manual.input","detail":{"control":"Operator ID","value":"jchen"}}
+{"seq":19,"ts":"2026-09-25T18:44:29.180Z","actor":"operator","kind":"manual.click","detail":{"control":"Password"}}
+{"seq":20,"ts":"2026-09-25T18:44:29.620Z","actor":"operator","kind":"manual.input","detail":{"control":"Password"}}
+{"seq":21,"ts":"2026-09-25T18:44:29.622Z","actor":"operator","kind":"manual.click","detail":{"control":"Sign In"}}
+{"seq":22,"ts":"2026-09-25T18:44:29.622Z","actor":"operator","kind":"manual.submit","detail":{"control":"form"}}
+{"seq":23,"ts":"2026-09-25T18:44:30.006Z","actor":"operator","kind":"control.transition","detail":{"from":"operator","to":"resume_requested","reason":"scripted operator handing back"}}
+{"seq":24,"ts":"2026-09-25T18:44:30.006Z","actor":"system","kind":"control.transition","detail":{"from":"resume_requested","to":"relocalizing","reason":"establishing where the operator left the session"}}
+{"seq":25,"ts":"2026-09-25T18:44:30.027Z","actor":"system","kind":"control.transition","detail":{"from":"relocalizing","to":"agent","reason":"re-localised: steps 1, 2 share this screen; resuming at the earliest (1) — all are safe to redo"}}
+{"seq":26,"ts":"2026-09-25T18:44:30.028Z","actor":"system","kind":"replay.start","detail":{"capability":"member.readSavingsBalance v4","approval":"approved","inputs":{"memberId":"[REDACTED]"}}}
+{"seq":27,"ts":"2026-09-25T18:44:30.028Z","actor":"system","kind":"replay.resume","detail":{"fromStep":1,"note":"continuing in the existing session"}}
+{"seq":28,"ts":"2026-09-25T18:44:30.028Z","actor":"agent","kind":"step.begin","detail":{"step":1,"of":2,"kind":"type","target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","effect":"reversible"}}
+{"seq":29,"ts":"2026-09-25T18:44:30.038Z","actor":"agent","kind":"step.waypoint","detail":{"step":1,"held":true,"expected":"textbox inSameRowAs \"Member ID\" in frame \"main\" present"}}
+{"seq":30,"ts":"2026-09-25T18:44:30.038Z","actor":"agent","kind":"step.resolved","detail":{"step":1,"via":"anchor","target":"textbox inSameRowAs \"Member ID\" in frame \"main\""}}
+{"seq":31,"ts":"2026-09-25T18:44:30.455Z","actor":"agent","kind":"step.type","detail":{"step":1,"target":"textbox inSameRowAs \"Member ID\" in frame \"main\"","via":"anchor","value":"[REDACTED]"}}
+{"seq":32,"ts":"2026-09-25T18:44:30.455Z","actor":"agent","kind":"step.begin","detail":{"step":2,"of":2,"kind":"click","target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","effect":"reversible"}}
+{"seq":33,"ts":"2026-09-25T18:44:30.475Z","actor":"agent","kind":"step.waypoint","detail":{"step":2,"held":true,"expected":"button named \"Search\" follows \"Search Type\" in frame \"main\" present"}}
+{"seq":34,"ts":"2026-09-25T18:44:30.476Z","actor":"agent","kind":"step.resolved","detail":{"step":2,"via":"name","target":"button named \"Search\" follows \"Search Type\" in frame \"main\""}}
+{"seq":35,"ts":"2026-09-25T18:44:30.864Z","actor":"agent","kind":"step.click","detail":{"step":2,"target":"button named \"Search\" follows \"Search Type\" in frame \"main\"","via":"name"}}
+{"seq":36,"ts":"2026-09-25T18:44:30.890Z","actor":"agent","kind":"checkpoint.verified","detail":{"assertion":"text named \"Member Detail\" in frame \"main\" present"}}
+{"seq":37,"ts":"2026-09-25T18:44:30.908Z","actor":"agent","kind":"output.read","detail":{"name":"savingsBalance","via":"anchor","from":"text inSameRowAs \"Savings\" in frame \"main\"","value":"[REDACTED]"}}
+{"seq":38,"ts":"2026-09-25T18:44:30.908Z","actor":"agent","kind":"output.read","detail":{"name":"memberId","via":"anchor","from":"text inSameRowAs \"Member ID\" in frame \"main\"","value":"[REDACTED]"}}
+{"seq":39,"ts":"2026-09-25T18:44:30.908Z","actor":"agent","kind":"output.read","detail":{"name":"memberName","via":"anchor","from":"text inSameRowAs \"Name\" in frame \"main\"","value":"[REDACTED]"}}
+{"seq":40,"ts":"2026-09-25T18:44:30.909Z","actor":"agent","kind":"outputs","detail":{"outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"}}}
+{"seq":41,"ts":"2026-09-25T18:44:30.909Z","actor":"system","kind":"replay.success","detail":{"status":"success","outputs":{"savingsBalance":"[REDACTED]","memberId":"[REDACTED]","memberName":"[REDACTED]"},"runId":"handoff-2026-09-25T18-44-26-850Z","ms":881}}
+{"seq":42,"ts":"2026-09-25T18:44:30.910Z","actor":"system","kind":"control.transition","detail":{"from":"agent","to":"closed","reason":"session ended"}}

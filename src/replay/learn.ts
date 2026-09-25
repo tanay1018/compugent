@@ -78,6 +78,13 @@ export async function learnOutcomes(
       continue;
     }
 
+    // Two outcomes with the same signature could not be told apart at replay.
+    // This usually means a probe left the app in an earlier probe's state.
+    if (learned.some((o) => o.detect.kind === 'textPresent' && norm(o.detect.text) === signature)) {
+      onProgress?.(`  ${p.name}: SKIPPED — its signature "${signature}" was already learned for another outcome`);
+      continue;
+    }
+
     // The original-cased node, so the stored assertion reads like the app.
     const original = obs.nodes.find((n) => norm(n.name) === signature)?.name ?? signature;
 

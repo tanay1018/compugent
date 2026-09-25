@@ -4,10 +4,12 @@
  *   npm run replay -- member.readSavingsBalance memberId=12345
  *   npm run replay -- member.readSavingsBalance memberId=99999
  *   npm run replay -- member.readSavingsBalance memberId=12345 --unattended
+ *   npm run replay -- member.readSavingsBalance memberId=12345 --latest       # newest version, even a draft
+ *   npm run replay -- member.readSavingsBalance memberId=12345 --version 3
  */
 import { PlaywrightSurface } from '../src/surface/playwright.js';
 import { ArtifactStore } from '../src/store/artifacts.js';
-import { defaultPolicy } from '../src/policy/allowlist.js';
+import { loadPolicy } from '../src/policy/load.js';
 import { RunLog } from '../src/run/log.js';
 import { describeTarget } from '../src/schema/assertion.js';
 import { replay } from '../src/replay/engine.js';
@@ -15,12 +17,21 @@ import { HandoffSession } from '../src/hitl/session.js';
 import { OperatorConsole } from '../src/hitl/console.js';
 
 const args = process.argv.slice(2);
-const id = args.find((a) => !a.includes('=') && !a.startsWith('--')) ?? 'member.readSavingsBalance';
+const VALUE_FLAGS = new Set(['--url', '--repeat', '--version']);
+const positional = args.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.has(args[i - 1] ?? ''));
+const id = positional.find((a) => !a.includes('=')) ?? 'member.readSavingsBalance';
+const versionFlag = args.indexOf('--version');
+const pinned = versionFlag >= 0 ? Number(args[versionFlag + 1]) : undefined;
 const unattended = args.includes('--unattended');
 const inputs: Record<string, string> = {};
-for (const a of args) { const m = /^([A-Za-z0-9_]+)=(.*)$/.exec(a); if (m) inputs[m[1]!] = m[2]!; }
+for (const a of positional) { const m = /^([A-Za-z0-9_]+)=(.*)$/.exec(a); if (m) inputs[m[1]!] = m[2]!; }
 
-const artifact = new ArtifactStore().load(id);
+// By default replay loads the highest approved version (see ArtifactStore.load).
+// --latest and --version pick a specific one, e.g. a draft you just compiled.
+const store = new ArtifactStore();
+const artifact = pinned !== undefined ? store.load(id, pinned)
+  : args.includes('--latest') ? store.load(id, store.versions(id).at(-1))
+  : store.load(id);
 
 function artifactOrigin(): string | undefined {
   const host = artifact?.app?.recordedTenant;
@@ -48,6 +59,8 @@ const baseUrl = urlFlag >= 0 ? args[urlFlag + 1]!
   : recorded ?? `http://localhost:${port}/?tenant=${tenant}`;
 
 const asJson = args.includes('--json');
+const { policy, source: policySource } = loadPolicy(baseUrl);
+if (!asJson) console.log(`policy  ${policySource}`);
 
 const repeatFlag = args.indexOf('--repeat');
 const repeat = repeatFlag >= 0 ? Math.max(1, Number(args[repeatFlag + 1] ?? 1)) : 1;
@@ -59,7 +72,7 @@ if (repeat > 1) {
     const s = await PlaywrightSurface.launch();
     const l = new RunLog('evidence', `stability-${new Date().toISOString().replace(/[:.]/g, '-')}-${i}`);
     try {
-      const r = await replay({ artifact, inputs, surface: s, policy: defaultPolicy(new URL(baseUrl).origin),
+      const r = await replay({ artifact, inputs, surface: s, policy,
                                log: l, baseUrl, unattended });
       runs.push({
         status: r.status,
@@ -125,7 +138,7 @@ if (watch) {
 
 try {
   const result = await replay({
-    artifact, inputs, surface, policy: defaultPolicy(new URL(baseUrl).origin),
+    artifact, inputs, surface, policy,
     log, baseUrl, unattended,
   });
 
@@ -165,7 +178,7 @@ try {
 
   console.log(`\nSTEPS`);
   for (const s of result.steps) {
-    const mark = s.status === 'ok' ? '✓' : s.status === 'recovered' ? '↻' : s.status === 'skipped' ? '·' : '✗';
+    const mark = s.status === 'ok' ? '✓' : s.status === 'recovered' ? '↻' : s.status === 'skipped' ? '·' : s.status === 'escalated' ? '!' : '✗';
     console.log(`  ${mark} ${s.index}. ${s.kind.padEnd(7)} ${(s.target ?? '').slice(0, 46).padEnd(46)} ${String(s.ms).padStart(5)}ms${s.resolvedVia ? `  via:${s.resolvedVia}` : ''}`);
     if (s.note) console.log(`      ${s.note}`);
   }

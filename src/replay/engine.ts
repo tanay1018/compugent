@@ -2,7 +2,7 @@ import type { CapabilityArtifact, OutcomeSpec, Step } from '../schema/artifact.j
 import { evaluateAssertion, describeTarget as describeTargetRaw, type StateAssertion } from '../schema/assertion.js';
 import type { Observation } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
-import { checkAction, checkCredentialField, type PolicyConfig } from '../policy/allowlist.js';
+import { checkAction, checkCredentialField, checkLocation, type PolicyConfig } from '../policy/allowlist.js';
 import { interpolate, norm } from '../surface/resolve.js';
 import type { RunLog } from '../run/log.js';
 import type { ReplayResult, StepReport, ReplayFailure } from './result.js';
@@ -247,7 +247,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
 
       // 3a. Operator-supplied value: escalate to a human.
       if (step.value?.from === 'operator') {
-        report.status = 'failed';
+        report.status = 'escalated';
         report.ms = Date.now() - sT0;
         steps.push(report);
         const shot = log.saveScreenshot(await surface.screenshot(), 'credential');
@@ -274,6 +274,16 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
         });
       }
 
+      const where = checkLocation(policy, obs.location);
+      if (where.allow !== true) {
+        report.status = 'failed';
+        steps.push(report);
+        return fail({
+          code: 'policy_blocked', stepIndex: step.index, stepId: step.id,
+          expected: 'a page inside the allowlist', observed: (where as { reason: string }).reason,
+        });
+      }
+
       const decision = checkAction(policy, action, step.effect);
       if (decision.allow === false) {
         report.status = 'failed';
@@ -293,6 +303,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
           log.append('system', 'step.skipped', { step: step.index, reason: report.note });
           break;
         }
+        report.status = 'escalated';
         report.ms = Date.now() - sT0;
         steps.push(report);
         const shot = log.saveScreenshot(await surface.screenshot(), 'approval');

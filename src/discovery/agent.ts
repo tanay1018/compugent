@@ -7,7 +7,7 @@ import { describeTarget } from '../schema/assertion.js';
 import { contentLocation, type Observation, type UINode } from '../surface/types.js';
 import type { PlaywrightSurface } from '../surface/playwright.js';
 import {
-  classifyEffect, checkAction, checkCredentialField, checkNavigation, isSensitiveField,
+  classifyEffect, checkAction, checkCredentialField, checkLocation, checkNavigation, isSensitiveField,
   type Effect, type PolicyConfig,
 } from '../policy/allowlist.js';
 import type { RunLog } from '../run/log.js';
@@ -238,6 +238,13 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     if (interrupted) return interrupted;
     const node = nodeByRef(ref);
     const described = describeNode(obs, node, 'action');
+
+    const where = checkLocation(policy, obs.location);
+    if (where.allow !== true) {
+      const reason = (where as { reason: string }).reason;
+      log.append('system', 'policy.blocked', { kind, target: describeTarget(described.descriptor), reason });
+      return `BLOCKED BY POLICY: ${reason}. Go back to an allowed page, or call giveUp.`;
+    }
 
     // Checked before acting or logging anything.
     const label = node.anchorText ?? node.name;

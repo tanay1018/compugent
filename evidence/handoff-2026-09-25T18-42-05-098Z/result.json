@@ -1,0 +1,42 @@
+{
+  "status": "success",
+  "outputs": {
+    "newAccountNumber": "[REDACTED]"
+  },
+  "runId": "handoff-2026-09-25T18-42-05-098Z",
+  "steps": [
+    {
+      "index": 1,
+      "id": "s1",
+      "kind": "type",
+      "status": "skipped",
+      "ms": 0,
+      "note": "completed before the handoff"
+    },
+    {
+      "index": 2,
+      "id": "s2",
+      "kind": "click",
+      "status": "skipped",
+      "ms": 0,
+      "note": "completed before the handoff"
+    },
+    {
+      "index": 3,
+      "id": "s3",
+      "kind": "click",
+      "status": "skipped",
+      "ms": 0,
+      "note": "completed before the handoff"
+    },
+    {
+      "index": 4,
+      "id": "s4",
+      "kind": "click",
+      "status": "skipped",
+      "ms": 0,
+      "note": "completed before the handoff"
+    }
+  ],
+  "ms": 39
+}
