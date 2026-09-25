@@ -8,9 +8,7 @@ const node = (name: string): UINode =>
   ({ ref: 1, role: 'button', name, value: '', states: [], frame: 'main', handle: 1 });
 
 test('creating a thing is irreversible, not just destroying one', () => {
-  // The list covered transfers and submits but not account opening, so a run
-  // that lost its place opened a SECOND savings account and the policy called
-  // that reversible.
+  // Regression: account opening was classified as reversible.
   for (const label of ['Open New Account', 'Create Account', 'Register', 'Apply Now', 'Enroll']) {
     assert.equal(classifyEffect(policy, { kind: 'click' }, node(label)), 'irreversible', label);
   }

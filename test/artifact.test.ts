@@ -33,8 +33,7 @@ test('a step may not reference an undeclared parameter', () => {
 });
 
 test('an IRREVERSIBLE step without an idempotency probe is rejected', () => {
-  // The rule that stops a run resumed after a human takeover from opening a
-  // second account. Without the probe, re-entry cannot know it already ran.
+  // Without a probe, re-entry cannot tell whether an irreversible step already ran.
   assert.throws(
     () => CapabilityArtifact.parse({
       ...base,
@@ -78,7 +77,7 @@ test('the artifact projects to an agent-callable tool schema', () => {
   const t = toToolSchema(a);
   assert.equal(t.name, 'member_readSavingsBalance');
   assert.deepEqual((t.input_schema as { required: string[] }).required, ['memberId']);
-  // A caller must be told that "not found" is a legitimate answer, not a crash.
+  // "Not found" is a business outcome, not a failure.
   assert.match(t.description, /business outcomes instead: member_not_found/);
 });
 
@@ -93,9 +92,7 @@ test('locations canonicalise to route patterns, dropping this run data', () => {
 });
 
 test('an output can declare that it must echo an input', () => {
-  // Reaching the right SCREEN is not reaching the right RECORD. A cached page
-  // or a stale session renders a valid detail screen for the wrong member,
-  // and every other assertion still holds.
+  // A valid detail screen for the wrong member passes every other assertion.
   const a = CapabilityArtifact.parse({
     ...base,
     outputs: [{
@@ -109,8 +106,7 @@ test('an output can declare that it must echo an input', () => {
 });
 
 test('a draft artifact without a checkpoint is rejected', () => {
-  // Nothing claiming to be usable may lack the one assertion that proves it
-  // arrived — otherwise replay reports success by simply not failing.
+  // Without a checkpoint, replay could report success just by not failing.
   const { checkpoint, ...noCheckpoint } = base;
   assert.throws(
     () => CapabilityArtifact.parse({
@@ -125,8 +121,7 @@ test('an INCOMPLETE artifact may omit the checkpoint, but must say why', () => {
   const { checkpoint, ...noCheckpoint } = base;
   const steps = [{ id: 's1', index: 1, kind: 'type', target, value: { from: 'param', param: 'memberId' }, effect: 'reversible' }];
 
-  // A blocked run still learned something; discarding it wastes every step
-  // that did work. But it has to declare that it is unfinished.
+  // Incomplete artifacts are allowed, but must say why.
   assert.throws(
     () => CapabilityArtifact.parse({ ...noCheckpoint, approval: 'incomplete', steps }),
     /must record why it is incomplete/,

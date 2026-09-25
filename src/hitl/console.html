@@ -6,7 +6,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 14px;background:#1c
 button{font:inherit;padding:6px 13px;border:1px solid #3a4150;background:#252a33;color:#d7dae0;border-radius:3px;cursor:pointer}
 button:hover:not(:disabled){background:#2f3540} button:disabled{opacity:.35;cursor:not-allowed}
 main{display:grid;grid-template-columns:1fr minmax(220px,300px);gap:10px;padding:10px;align-items:start}
-/* Embedded in a desktop pane the log has to yield — the live view is the point. */
+/* When embedded in the desktop app, give the live view priority over the log. */
 @media(max-width:900px){ main{grid-template-columns:1fr} aside{max-height:200px} }
 #screen{width:100%;border:1px solid #2b2f38;background:#000;display:block;cursor:crosshair}
 #screen.locked{cursor:not-allowed;opacity:.82}
@@ -66,14 +66,11 @@ const post=(p,b)=>fetch(p,{method:'POST',headers:{'content-type':'application/js
 take.onclick=()=>post('/control',{action:'take'});
 give.onclick=()=>post('/control',{action:'handback'});
 
-// Raw coordinates into the live session -- no selectors, exactly what a remote
-// console would send to a containerised browser.
+// Send raw coordinates, as a remote console would.
 const at=(e)=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*(cv.width/r.width),y:(e.clientY-r.top)*(cv.height/r.height)};};
 cv.onmousedown=(e)=>{const p=at(e);post('/input',{type:'mouse',action:'down',x:p.x,y:p.y});};
 cv.onmouseup=(e)=>{const p=at(e);post('/input',{type:'mouse',action:'up',x:p.x,y:p.y});};
-// Keys go to the SESSION, not to this page. Guarded only against the console's
-// own form controls, so focus landing on the canvas (which clicking it does)
-// does not silently swallow every keystroke.
+// Forward keys to the session, except when typing into the console's own controls.
 window.addEventListener('keydown',(e)=>{
   if(holder!=='operator')return;
   const t=e.target&&e.target.tagName;

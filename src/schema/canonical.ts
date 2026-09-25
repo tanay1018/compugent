@@ -1,16 +1,14 @@
 /**
  * Turn a concrete location into a pattern.
  *
- * A recorded run visits `/detail?q1=12345&q2=M`. Storing that verbatim would
- * bake one member into the artifact and make every waypoint fail for everyone
- * else. Canonicalisation is what lets a location be asserted at all:
+ * Storing a visited URL verbatim would tie the artifact to one record, so
+ * identifiers and query values are removed:
  *
  *   /detail?q1=12345&q2=M   ->   ^/detail(\?|$)
  *   /member/12345/accounts  ->   ^/member/[^/]+/accounts$
  *
- * The same normalisation is the first half of cross-tenant reuse: two tenants
- * on one vendor product differ in host and often in a path prefix, never in
- * the shape of the route.
+ * Tenants on the same product differ in host (and sometimes path prefix), not
+ * in route shape, so this also supports reuse across tenants.
  */
 export function canonicaliseLocation(raw: string): { pattern: string; path: string } {
   let path: string;
@@ -30,7 +28,6 @@ export function canonicaliseLocation(raw: string): { pattern: string; path: stri
   });
 
   const normalised = segs.join('/');
-  // Query values are never part of the identity of a screen — only the route
-  // is. Asserting on them would re-introduce the run's data.
+  // Query values are run data, not part of the screen's identity.
   return { pattern: `^${normalised}(\\?|$)`, path };
 }

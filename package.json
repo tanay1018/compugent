@@ -96,6 +96,6 @@
     ]
   },
   "productName": "Compugent",
-  "description": "Record-once, replay-many computer-use automation. The model discovers; the artifact is the capability; replay never calls the model.",
+  "description": "Record-once, replay-many computer-use automation: an LLM discovers a UI flow once, and the compiled artifact replays without a model.",
   "author": "Tanay Agrawal"
 }

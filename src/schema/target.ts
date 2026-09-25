@@ -1,21 +1,16 @@
 import { z } from 'zod';
 
 /**
- * PERSISTED TYPES — these cross the boundary into saved artifacts.
+ * Persisted target types.
  *
- * The seam this file defines: a recorded flow never stores a CSS selector, an
- * XPath, or a pixel coordinate. It stores a *description of intent* — "the
- * textbox in the same row as the text 'Member ID'" — which each Surface
- * implementation resolves in its own way. That is what lets one artifact
- * target a modern web app, a frameset legacy app, or (by design) a desktop
- * window without the schema changing.
+ * A recorded flow stores a description ("the textbox in the same row as
+ * 'Member ID'"), never a CSS selector, XPath or coordinate. Each Surface
+ * resolves descriptions its own way, so the schema is not tied to the web.
  */
 
 /**
- * Normalised control roles. Deliberately a small, surface-agnostic set: each
- * value maps onto web ARIA, macOS AX (AXRole) and Windows UIA (ControlType).
- * Anything a Surface cannot classify becomes `unknown` rather than leaking a
- * platform-specific role into a persisted artifact.
+ * Normalised control roles. Each maps onto web ARIA, macOS AX (AXRole) and
+ * Windows UIA (ControlType). Anything else becomes `unknown`.
  */
 export const Role = z.enum([
   'button', 'link', 'textbox', 'combobox', 'listbox', 'option',
@@ -25,13 +20,9 @@ export const Role = z.enum([
 export type Role = z.infer<typeof Role>;
 
 /**
- * How a control is identified relative to *other* content.
- *
- * This is the load-bearing idea for legacy surfaces. Measured against a
- * table-layout back-office screen, the accessibility tree exposes input
- * fields with NO accessible name at all — the only thing identifying the
- * field is the label text sitting in the adjacent cell. `inSameRowAs` is
- * therefore a primary targeting strategy, not a fallback.
+ * How a control is identified relative to nearby content. On table-layout
+ * screens inputs often have no accessible name, so `inSameRowAs` is a primary
+ * strategy, not a fallback.
  */
 export const AnchorRelation = z.enum([
   'inSameRowAs',   // legacy table layout: label in a sibling <td> / adjacent AX cell
@@ -55,10 +46,7 @@ export type Anchor = z.infer<typeof Anchor>;
 /** How strictly an accessible name must match. */
 export const NameMatch = z.enum(['exact', 'normalized', 'contains', 'regex']);
 
-/**
- * Narrows where resolution may look. `frame` is a *name*, never an index —
- * frame ordering is not stable across app versions, names generally are.
- */
+/** Narrows where resolution may look. `frame` is a name, not an index, since frame order is not stable. */
 export const Scope = z.object({
   frame: z.string().optional(),
   withinRole: Role.optional(),
@@ -66,17 +54,14 @@ export const Scope = z.object({
 });
 
 /**
- * Lower-confidence strategies, tried only after the semantic descriptor
- * fails. Ordered most- to least-trustworthy. Every use is recorded in the run
- * log, because a replay that succeeded only via `visual` is a replay whose
- * artifact needs review.
+ * Lower-confidence strategies, tried in order after the descriptor fails.
+ * Every use is logged, since an artifact that relies on them needs review.
  */
 export const Fallback = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('css'), value: z.string() }),
   z.object({ kind: z.literal('xpath'), value: z.string() }),
   z.object({ kind: z.literal('text'), value: z.string() }),
-  /** Last resort for surfaces with no accessibility layer at all (Citrix/VDI,
-   *  green-screen terminals). Designed, not built — see REPORT.md §4. */
+  /** For surfaces with no accessibility layer (Citrix/VDI, terminals). Not implemented; see REPORT.md §4. */
   z.object({
     kind: z.literal('visual'),
     ocrText: z.string().optional(),
@@ -88,28 +73,18 @@ export const ResolutionTier = z.enum(['name', 'anchor', 'fallback', 'visual']);
 export type ResolutionTier = z.infer<typeof ResolutionTier>;
 
 /**
- * How a single control is located at replay time.
- *
- * Invariant: a descriptor must carry either an accessible `name` or an
- * `anchor`. A bare role ("some button somewhere") is never a valid target —
- * it is precisely the kind of under-specified locator that produces a replay
- * which silently clicks the wrong thing.
+ * How a single control is located at replay time. Must have a `name` or an
+ * `anchor`; a bare role is too under-specified to target safely.
  */
 export const TargetDescriptor = z
   .object({
     role: Role,
-    /** May contain `{{param}}` placeholders, substituted at replay time. That
-     *  is what makes "click the row for member {{memberId}}" expressible —
-     *  a pattern back-office result grids use constantly. */
+    /** May contain `{{param}}` placeholders, substituted at replay time. */
     name: z.string().optional(),
     nameMatch: NameMatch.default('normalized'),
     anchor: Anchor.optional(),
     scope: Scope.optional(),
-    /**
-     * Disambiguates a *legitimately* repeating control (row 3 of a results
-     * table). Absent means "exactly one match is required" — see the
-     * ambiguity rule in surface/types.ts.
-     */
+    /** Picks one of several matches (e.g. row 3). Absent means exactly one match is required. */
     ordinal: z.number().int().nonnegative().optional(),
     fallbacks: z.array(Fallback).default([]),
     provenance: z

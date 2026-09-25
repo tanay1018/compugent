@@ -18,7 +18,7 @@ const FEATURED = [
   { id: 'discovery-2026-09-18T03-11-18-420Z', title: 'weather.gov — a real form', kind: 'discovery',
     blurb: 'Type a ZIP, submit, read the result page. The capability this produced was later refused promotion.' },
   { id: 'discovery-2026-08-28T03-14-28-947Z', title: 'A deliberately hostile app', kind: 'discovery',
-    blurb: 'Frameset, unlabelled inputs, async tables — built to force the anchor path that real legacy software produces by accident.' },
+    blurb: 'Frameset, unlabelled inputs, async tables: the bundled target app, built to need anchor-based targeting.' },
 ];
 
 rmSync(OUT, { recursive: true, force: true });

@@ -4,23 +4,16 @@ import { StateAssertion } from './assertion.js';
 import { Effect } from '../policy/allowlist.js';
 
 /**
- * THE CAPABILITY ARTIFACT.
+ * The capability artifact: a contract for what can be invoked, plus the script
+ * that fulfils it.
  *
- * Not a recording of what happened — a CONTRACT for what can be invoked. The
- * distinction drives every choice below. A calling agent needs to know what
- * this capability needs, what it returns, and what can legitimately come back
- * other than success. A human reviewer needs to see what it will do to the
- * system before approving it. Neither audience is served by a step list.
+ *   1. contract       inputs / outputs / outcomes      (read by the calling agent)
+ *   2. script         steps / targets / checkpoint     (read by replay)
+ *   3. safety         effect / idempotency probes      (read by policy and re-entry)
+ *   4. re-entry map   waypoints                        (read by re-localisation)
  *
- * Four jobs the schema carries at once:
- *   1. an invocable contract  (inputs / outputs / outcomes)
- *   2. a deterministic script (steps / targets / checkpoint)
- *   3. a safety classification (effect / idempotency probes)
- *   4. a re-entry map        (waypoints, for resuming after a human takeover)
- *
- * Job 4 is why steps carry waypoints rather than relying on their index. After
- * an operator takes control, the step index is meaningless — the app could be
- * anywhere, including finished. The plan is a map, not a program counter.
+ * Steps carry waypoints because after an operator takeover the step index is
+ * meaningless; replay has to work out where it is from the screen.
  */
 
 /** Where a step's value comes from at replay time. */
@@ -28,13 +21,8 @@ export const ValueSource = z.discriminatedUnion('from', [
   z.object({ from: z.literal('param'), param: z.string() }),
   z.object({ from: z.literal('literal'), value: z.string() }),
   /**
-   * Supplied by a human at run time and never stored.
-   *
-   * This is how a flow behind a login is expressible at all. The artifact
-   * records that a credential is needed HERE, and what to ask for — but the
-   * value is not a parameter (a caller would have to hold it), not a literal
-   * (a file would hold it), and not something automation may type. Replay
-   * escalates when it reaches one.
+   * Supplied by a human at run time and never stored. Used for credentials:
+   * the artifact records what to ask for, and replay escalates at this step.
    */
   z.object({ from: z.literal('operator'), prompt: z.string() }),
 ]);
@@ -57,42 +45,25 @@ export const OutputSpec = z.object({
   name: z.string().regex(/^[a-z][A-Za-z0-9]*$/, 'camelCase'),
   type: ParamType,
   description: z.string(),
-  /**
-   * How to RE-READ this value on a page nobody has seen yet. Anchor-only by
-   * construction: the text of an output node is the payload, so using it as
-   * the locator would pin the artifact to the run that recorded it.
-   */
+  /** Where to read the value. Anchor-based, since the node's text is the value itself. */
   from: TargetDescriptor,
   /** Light normalisation so a caller gets `4182.55`, not `"$4,182.55"`. */
   transform: z.enum(['text', 'number', 'currency']).default('text'),
   sensitive: z.boolean().default(false),
 
   /**
-   * This output must equal the named input parameter.
-   *
-   * The checkpoint proves you reached the right SCREEN; it says nothing about
-   * whether the screen is about the right RECORD. A cached page, a stale
-   * session, or an app that silently falls back to a default will render a
-   * perfectly valid detail screen for the wrong member — every assertion
-   * holds, every output extracts, and replay reports success while returning
-   * somebody else's balance.
-   *
-   * Tying an echoed identifier back to the input closes that. In a bank it is
-   * the difference between "read a balance" and "read the RIGHT person's
-   * balance".
+   * This output must equal the named input parameter. The checkpoint only
+   * proves the right screen was reached; this catches a valid detail screen
+   * for the wrong record (cached page, stale session, silent default).
    */
   mustMatchParam: z.string().optional(),
 });
 export type OutputSpec = z.infer<typeof OutputSpec>;
 
 /**
- * The error taxonomy, IN THE SCHEMA rather than in the replay engine.
- *
- * This is the brief's most-repeated point and its named "most common design
- * mistake": "no such member" is a legitimate answer the caller needs, not a
- * crash. Putting the classification in the engine would mean every capability
- * shared one hardcoded notion of what counts as failure. Putting it here means
- * each capability declares its own, reviewably.
+ * Outcome classification lives in each artifact rather than in the replay
+ * engine, because whether a state is an answer or a fault depends on the
+ * capability ("not authorized" is an answer for a lookup, a fault for a batch job).
  */
 export const OutcomeClass = z.enum([
   'business_outcome', // a real answer the caller must handle: "no such member"
@@ -113,12 +84,11 @@ export const OutcomeSpec = z.object({
   classification: OutcomeClass,
   /** How replay recognises this state. Evaluated against an observation. */
   detect: StateAssertion,
-  /** Returned to the caller. Must not contain run data — it is a label. */
+  /** Returned to the caller. A fixed label; must not contain run data. */
   message: z.string(),
   /** Only meaningful for `recoverable`. */
   recovery: RecoveryAction.optional(),
-  /** False until a run has actually produced this state. An unverified
-   *  outcome is a guess about wording, and wording is exactly what drifts. */
+  /** True only once a run has actually produced this state. */
   verified: z.boolean().default(false),
 });
 export type OutcomeSpec = z.infer<typeof OutcomeSpec>;
@@ -131,25 +101,18 @@ export const Step = z.object({
   value: ValueSource.optional(),
 
   /**
-   * The state this step EXPECTS before acting.
-   *
-   * Doubles as the re-localisation key. After a human takeover, replay
-   * evaluates every waypoint and asks "where am I?" — exactly one match means
-   * resume there, zero means off-plan, more than one means the waypoints are
-   * not discriminating enough. All three are answers; guessing is not.
+   * The state this step expects before acting. Also used by re-localisation
+   * after a takeover: replay checks every waypoint to find where it is.
    */
   waypoint: StateAssertion.optional(),
   /** The state acting should produce. Verified before advancing. */
   produces: StateAssertion.optional(),
 
-  /** Safety class AND re-entry class — one field, two consumers. */
+  /** Used by both policy and re-entry. */
   effect: Effect,
   /**
-   * Read-only check answering "has this already happened?".
-   *
-   * Required for irreversible steps, because re-entry after a takeover must
-   * never blindly re-run one. If an operator already submitted the form,
-   * resuming without this probe opens a second account.
+   * Read-only check for "has this already happened?". Required for
+   * irreversible steps so resuming after a takeover does not repeat one.
    */
   idempotencyProbe: StateAssertion.optional(),
 
@@ -162,11 +125,10 @@ export type Step = z.infer<typeof Step>;
 
 export const AppBinding = z.object({
   vendorProduct: z.string(),
-  /** The tenant this was RECORDED against — not the only one it may run on. */
+  /** The tenant this was recorded against; it may run on others. */
   recordedTenant: z.string(),
   surfaceKind: z.enum(['web', 'desktop']),
-  /** Entry route as a pattern, with the origin supplied per tenant at call
-   *  time. This is the seam that lets one artifact serve many institutions. */
+  /** Entry route pattern. The origin is supplied per tenant at call time. */
   entryPathPattern: z.string(),
   entryPath: z.string(),
 });
@@ -179,7 +141,7 @@ export const CapabilityArtifact = z
     /** Bumped whenever steps, contract or targeting change. */
     version: z.number().int().positive(),
     name: z.string(),
-    /** Written for the CALLING AGENT: what it does and when to reach for it. */
+    /** For the calling agent: what it does and when to use it. */
     description: z.string(),
 
     app: AppBinding,
@@ -189,29 +151,15 @@ export const CapabilityArtifact = z
     outcomes: z.array(OutcomeSpec),
 
     steps: z.array(Step).min(1),
-    /**
-     * Proof of arrival. Asserted before outputs are read.
-     *
-     * Optional ONLY for an incomplete artifact — a run that was blocked before
-     * it could establish what success looks like has, by definition, nothing
-     * to assert.
-     */
+    /** Asserted before outputs are read. Optional only for incomplete artifacts. */
     checkpoint: StateAssertion.optional(),
 
     /**
-     * A three-rung ladder, not a boolean.
-     *
-     *   incomplete  the run never finished. There is no checkpoint, so nothing
-     *               can verify success. NOT invocable at all — it exists as a
-     *               record of what was learned before the blocker, and as a
-     *               starting point for finishing the job.
-     *   draft       complete and replayable, but executed exactly once, by a
-     *               model, on one tenant. Attended use only.
+     *   incomplete  the run never finished and has no checkpoint. Not
+     *               invocable; kept so the steps that worked are not lost.
+     *   draft       complete, but produced by one model run on one tenant.
+     *               Attended use only.
      *   approved    reviewed. Unattended replay permitted.
-     *
-     * The middle rung is the one people skip; the bottom one is the one this
-     * design was missing. Discarding a blocked run throws away every step that
-     * did work, and in a long back-office flow that is most of the run.
      */
     approval: z.enum(['incomplete', 'draft', 'approved']).default('draft'),
     /** Why it is incomplete, phrased for whoever picks it up. */
@@ -227,7 +175,7 @@ export const CapabilityArtifact = z
     }),
   })
   .superRefine((a, ctx) => {
-    // Anything claiming to be usable must be able to prove it arrived.
+    // Draft and approved artifacts need a checkpoint.
     if (a.approval !== 'incomplete' && !a.checkpoint) {
       ctx.addIssue({
         code: 'custom',
@@ -240,14 +188,13 @@ export const CapabilityArtifact = z
     const params = new Set(a.inputs.map((p) => p.name));
     for (const s of a.steps) {
       if (s.value?.from === 'literal' && /^(pw|pass|pin|secret|token)/i.test(s.value.value)) {
-        // Not a real secret detector -- just a floor. A value that looks like a
-        // credential has no business being a stored literal.
+        // A basic check, not a secret detector: reject literals that look like credentials.
         ctx.addIssue({ code: 'custom', message: `step ${s.index} stores a literal that looks like a credential` });
       }
       if (s.value?.from === 'param' && !params.has(s.value.param)) {
         ctx.addIssue({ code: 'custom', message: `step ${s.index} references undeclared parameter "${s.value.param}"` });
       }
-      // The rule that stops a resumed run from opening a second account.
+      // Irreversible steps need an idempotency probe.
       if (s.effect === 'irreversible' && !s.idempotencyProbe) {
         ctx.addIssue({
           code: 'custom',
@@ -259,13 +206,7 @@ export const CapabilityArtifact = z
 
 export type CapabilityArtifact = z.infer<typeof CapabilityArtifact>;
 
-/**
- * The agent-facing view: JSON Schema for this capability's inputs.
- *
- * This is why `inputs` is a typed spec rather than a bag of strings — it drops
- * straight into a tool/function-calling surface, so a saved artifact is
- * directly invocable by an LLM agent without a hand-written wrapper.
- */
+/** Tool definition for a calling agent, with JSON Schema for the inputs. */
 export function toToolSchema(a: CapabilityArtifact): {
   name: string; description: string; input_schema: Record<string, unknown>;
 } {

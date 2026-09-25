@@ -18,10 +18,8 @@ import { compactObservations } from './compact.js';
 /**
  * Discovery: an LLM drives the live surface until the goal is met.
  *
- * The model's action space is EXACTLY the vocabulary a recorded step can
- * express. That is the central constraint of this file — it means a successful
- * run compiles into an artifact mechanically, instead of requiring someone to
- * reverse-engineer intent out of a chat transcript. Anything the model can do
+ * The model's tools map one-to-one onto the step kinds an artifact can hold,
+ * so a successful run compiles mechanically and anything the model can do
  * here, replay can do without it.
  */
 
@@ -34,7 +32,7 @@ export interface TraceStep {
   target: TargetDescriptor;
   targetVerified: boolean;
   targetProblem?: string;
-  /** The literal value used on THIS run. Phase 4 lifts these to typed params. */
+  /** The literal value used on this run. The compiler may lift it to a parameter. */
   literal?: string;
   outputName?: string;
   observedValue?: string;
@@ -66,24 +64,16 @@ export interface DiscoveryOptions {
   policy: PolicyConfig;
   log: RunLog;
   maxSteps?: number;
-  /**
-   * Wall-clock ceiling. Step count alone does not bound a run: a single step
-   * can sit on a slow page for a long time, and an eight-second stall repeated
-   * across twenty steps is minutes of paid-for waiting with nothing to show.
-   */
+  /** Wall-clock limit. Step count alone does not bound a run on slow pages. */
   timeoutMs?: number;
   model?: string;
   /**
-   * Seam for Phase 6. Discovery is a supervised activity, so the default
-   * auto-approves an irreversible action and records that it did. In replay
-   * the same decision routes to a human instead.
+   * Decides whether an irreversible action may proceed. Discovery is
+   * supervised, so the default approves and records it; replay routes the same
+   * decision to a human.
    */
   onApprovalRequired?: (ctx: { action: string; target: string }) => Promise<boolean>;
-  /**
-   * When present, the run is watchable and interruptible: an operator can
-   * barge in from the console at any step boundary, drive the session
-   * themselves, and hand back.
-   */
+  /** Makes the run interruptible: an operator can take over at a step boundary and hand back. */
   session?: {
     control: { pauseRequested: boolean; state: string; canAgentAct: boolean };
     agentActive: boolean;
@@ -120,14 +110,8 @@ Work one step at a time. After each action you receive a fresh observation.`;
 
 export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTrace> {
   const { surface, policy, log } = opts;
-  /**
-   * Discovery is the multi-step loop, so this is where the money goes. The
-   * default is deliberately not the most capable model available: the task is
-   * "read a normalised tree, pick a node, call a tool", and a premium
-   * reasoning model spends most of its budget deliberating over a choice
-   * between a dozen labelled controls. `npm run models` lists cheaper options
-   * -- deepseek-v4-flash lands near $0.003 a run against $0.130 for opus.
-   */
+  // Default is a mid-tier model: the task is picking a node from a labelled
+  // tree. `npm run models` lists cheaper options.
   const modelId = opts.model ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
   const maxSteps = opts.maxSteps ?? 20;
   const timeoutMs = opts.timeoutMs ?? 240_000;
@@ -138,12 +122,9 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   const warnings: string[] = [];
   const stepUsage: Array<{ in: number; out: number; reasoning: number; cached: number }> = [];
   /**
-   * Irreversible actions already performed, by target signature.
-   *
-   * Exploration is fine; repeating something that cannot be undone is not. A
-   * run that lost track of an account it had just opened went back and opened
-   * a second one, then transferred the money twice — each individual step
-   * looked reasonable, and nothing was watching the run as a whole.
+   * Irreversible actions already performed in this run, by target signature.
+   * A ParaBank run once lost track, opened a second account and repeated a
+   * transfer; repeats are now refused.
    */
   const committed = new Map<string, number>();
   let outcome: DiscoveryOutcome = 'max_steps';
@@ -151,7 +132,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   let summary: string | undefined;
   let blockedReason: string | undefined;
 
-  // Allowlist is enforced before the browser ever moves, not after.
+  // Check the allowlist before navigating.
   const nav = checkNavigation(policy, opts.entryUrl);
   if (nav.allow !== true) {
     log.append('system', 'policy.blocked', { url: opts.entryUrl, reason: (nav as { reason: string }).reason });
@@ -174,16 +155,10 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     log.saveScreenshot(await surface.screenshot(), 'entry'));
 
   /**
-   * Is there anything here to operate?
-   *
-   * Node count alone is a bad signal — the bundled legacy app's entry screen is
-   * a perfectly workable 11 nodes, and flagging it was the first thing this
-   * check got wrong. What actually distinguishes a bot wall, a consent gate or
-   * a canvas app is that there is nowhere to put input and almost nothing to
-   * click. Amazon's interstitial is one button and two footer links; a real
-   * form screen has a field.
-   *
-   * Heuristic, and labelled as one: it warns, it does not block.
+   * Warn (not block) when the entry page looks inoperable: no input controls
+   * and almost nothing to click, which usually means a bot wall, consent gate
+   * or canvas app. Node count alone is not a signal; the target app's entry
+   * screen has only 11 nodes.
    */
   {
     const inputs = obs.nodes.filter((n) => n.role === 'textbox' || n.role === 'combobox');
@@ -209,15 +184,12 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     return n;
   };
 
-  /** Shared path for every acting tool: describe -> gate -> act -> re-observe. */
   /**
    * Checked between steps, never mid-action.
    *
-   * When a pause lands, the action the model just asked for is NOT performed —
-   * the world may have changed underneath it while the human was driving, so
-   * re-planning against what is actually on screen is the only safe move. The
-   * message says so explicitly: leaving the model to infer whether its call
-   * took effect is how a run starts flailing.
+   * If a pause lands, the requested action is not performed, since the screen
+   * may have changed while the operator was driving. The model is told this
+   * explicitly and re-plans from a fresh observation.
    */
   const honourBargeIn = async (kind: string): Promise<string | null> => {
     const sess = opts.session;
@@ -238,25 +210,12 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   };
 
   /**
-   * One action per step, enforced.
+   * Allow one action per model step.
    *
-   * A model may emit several tool calls in a single step, and the SDK will run
-   * all of them back to back. For a chat tool that is a throughput win; for a
-   * UI it is incoherent. Every action changes the screen, so the second call in
-   * a step was chosen against a screen that no longer exists by the time it
-   * runs -- it targets a stale node, and nothing re-perceives in between to
-   * notice.
-   *
-   * This was not theoretical. On weather.gov the model emitted click("Go") and
-   * type("10001") together; they executed 48ms apart, so Go was pressed on an
-   * empty form. The submit did nothing, and every later step reasoned about a
-   * failure whose cause had already scrolled out of view: seven more Go clicks
-   * and the run timed out on a form that works first try when driven one
-   * action at a time.
-   *
-   * Refusing the extra call is better than queueing it. The model is told why,
-   * gets a fresh observation, and picks its next action against the screen that
-   * actually exists.
+   * The SDK runs every tool call from a step back to back, but each action
+   * changes the screen, so later calls target stale nodes. On weather.gov the
+   * model sent click("Go") and type("10001") together and submitted an empty
+   * form. Extra calls are refused with an explanation and a fresh observation.
    */
   let actedThisStep = false;
 
@@ -280,8 +239,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     const node = nodeByRef(ref);
     const described = describeNode(obs, node, 'action');
 
-    // Checked before anything is done or written down. A credential that
-    // reaches the log has already been typed into a live system.
+    // Checked before acting or logging anything.
     const label = node.anchorText ?? node.name;
     const cred = checkCredentialField(policy, { kind, ...(text !== undefined ? { text } : {}) }, label, node.inputType);
     if (cred.allow === false) {
@@ -343,8 +301,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       index: steps.length + 1, kind, rationale: why,
       target: described.descriptor, targetVerified: described.verified,
       ...(described.problem ? { targetProblem: described.problem } : {}),
-      // A refused credential never reaches the trace, so it can never reach an
-      // artifact -- which is a file that gets committed, diffed and shared.
+      // A refused credential never reaches the trace, and so never an artifact.
       ...(text !== undefined && !isSensitiveField(policy, label) && node.inputType !== 'password'
         ? { literal: text } : {}),
       effect, locationAfter: contentLocation(obs),
@@ -352,8 +309,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     steps.push(step);
     log.append('agent', `act.${kind}`, {
       target: describeTarget(described.descriptor), why, effect,
-      // Belt and braces: the field was already refused above if it read as a
-      // credential, but the log never takes a value on trust.
+      // Redact anyway, in case the field was not recognised as a credential.
       ...(text !== undefined
         ? { text: isSensitiveField(policy, label) || node.inputType === 'password' ? '[REDACTED]' : text }
         : {}),
@@ -369,16 +325,9 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
   try {
     const result = await generateText({
       model: gateway(modelId),
-      /**
-       * Reasoning depth. Choosing which of a dozen labelled controls to click
-       * is not a task that rewards extended thinking, and every thinking token
-       * is billed on output AND resent as history on the next step. Opus-class
-       * models think adaptively by default, which is how a five-step run ends
-       * up spending more on deliberation than on decisions.
-       *
-       * Provider options are advisory: an unrecognised key is ignored rather
-       * than fatal, so this is safe across the gateway's model catalogue.
-       */
+      // Low reasoning effort by default: reasoning tokens are billed as output
+      // and resent as history each step. Providers ignore unknown options, so
+      // this is safe across models.
       providerOptions: {
         anthropic: { thinking: { type: 'adaptive' }, effort: reasoningEffort },
         gateway: { reasoning: { effort: reasoningEffort } },
@@ -388,18 +337,13 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
       prompt: `GOAL: ${opts.goal}\n\nCurrent observation:\n${renderObservation(obs)}`,
       stopWhen: stepCountIs(maxSteps),
       abortSignal: AbortSignal.timeout(timeoutMs),
-      // Only the current screen is decidable-on; older ones are dead weight
-      // that the loop would otherwise pay to resend on every step.
+      // Replace older screens with short summaries; only the current one is needed.
       prepareStep: ({ messages }) => {
         actedThisStep = false;   // new step, new screen, one action allowed
         return { messages: compactObservations(messages) };
       },
-      /**
-       * Per-step token accounting. Without this, a run reports one aggregate
-       * number and there is no way to tell a big page from a long history from
-       * a chatty model -- which is exactly the confusion a climbing input count
-       * in the provider's dashboard produces.
-       */
+      // Per-call token usage, so cost can be attributed to page size, history
+      // or output.
       onStepFinish: ({ usage }) => {
         const u = usage as { inputTokens?: number; outputTokens?: number; reasoningTokens?: number;
                              cachedInputTokens?: number } | undefined;
@@ -425,9 +369,8 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
           inputSchema: z.object({ ref: Ref, value: z.string(), why: Why }),
           execute: ({ ref, value, why }) => perform('select', ref, why, value),
         }),
-        // Barge-in is honoured at EVERY tool boundary. Checking only the
-        // acting tools meant an operator who pressed Take Over while the agent
-        // was reading a value, finishing, or giving up waited forever.
+        // Honour barge-in at every tool boundary, including extract, finish
+        // and giveUp.
         extract: tool({
           description:
             'Record that a value on screen is part of the answer. Use this for every output — ' +
@@ -441,8 +384,8 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
             const interrupted = await honourBargeIn('extract');
             if (interrupted) return interrupted;
             const node = nodeByRef(ref);
-            // Extraction targets are anchor-only: the node's text IS the data,
-            // so using it as the identity would pin the artifact to one member.
+            // Extraction targets are anchor-only: the node's text is the value
+            // being read, so it cannot also be the locator.
             const described = describeNode(obs, node, 'extraction');
             const value = node.name || node.value;
             if (!described.verified) {
@@ -451,16 +394,8 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
               return `WARNING: "${as}" cannot be relocated on a fresh page (${described.problem}). ` +
                      `Pick a node that sits next to a stable label instead.`;
             }
-            /**
-             * An anchor made of run DATA is as useless as naming the output by
-             * its own value -- it just moves the problem one cell sideways.
-             * Observed live: a results table where the model anchored `wins` to
-             * "1990" and `losses` to "44". Perfectly correct for that run, and
-             * resolvable for no other team.
-             *
-             * A label is text that stays put across invocations; a figure does
-             * not. Bare numbers, currency and dates are the giveaway.
-             */
+            // Reject anchors that look like data (numbers, currency, dates).
+            // E.g. anchoring `wins` to "1990" only resolves for that one row.
             const anchorText = described.descriptor.anchor?.text ?? '';
             const looksLikeData =
               anchorText !== '' &&
@@ -524,8 +459,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
           execute: async ({ reason, blocking }) => {
             outcome = 'gave_up';
             blockedReason = `${reason} — blocked on: ${blocking}`;
-            // The run is over and a human is wanted. Do not make them wait for
-            // a step boundary that will never come.
+            // The run is ending; yield now rather than waiting for a step boundary.
             if (opts.session) opts.session.agentActive = false;
             log.append('agent', 'escalate', { reason, blocking },
               log.saveScreenshot(await surface.screenshot(), 'stuck'));
@@ -552,8 +486,7 @@ export async function runDiscovery(opts: DiscoveryOptions): Promise<DiscoveryTra
     return trace;
   } catch (err) {
     if (opts.session) opts.session.agentActive = false;
-    // An abort is the timeout firing, not a fault: whatever the run achieved
-    // up to that point is still worth keeping and inspecting.
+    // An abort means the timeout fired; keep the partial trace.
     const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError' || /abort/i.test(err.message));
     log.append('system', timedOut ? 'discovery.timeout' : 'discovery.error',
       { message: String(err), afterMs: Date.now() - Date.parse(startedAt), steps: steps.length });

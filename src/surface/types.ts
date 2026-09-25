@@ -1,13 +1,11 @@
 import type { Role, TargetDescriptor, ResolutionTier } from '../schema/target.js';
 
 /**
- * EPHEMERAL TYPES — none of this is ever persisted.
+ * Ephemeral types, never persisted.
  *
- * This is the other half of the seam. `Observation` is whatever a Surface can
- * see *right now*; `TargetDescriptor` (schema/target.ts) is what a saved
- * artifact remembers. Keeping them in separate files is the point: if a
- * platform detail can reach a stored artifact, the artifact stops being
- * portable across surfaces and tenants.
+ * `Observation` is what a Surface sees right now; `TargetDescriptor`
+ * (schema/target.ts) is what a saved artifact stores. Keeping them apart stops
+ * platform details from leaking into artifacts.
  */
 
 export type SurfaceKind = 'web' | 'desktop';
@@ -17,7 +15,7 @@ export type SurfaceKind = 'web' | 'desktop';
  * platform exposes (web AX tree via CDP, macOS AXUIElement, Windows UIA).
  */
 export interface UINode {
-  /** Stable only within THIS observation. Never persisted. */
+  /** Stable only within this observation. Never persisted. */
   ref: number;
   role: Role;
   /** Accessible name. Frequently empty on legacy surfaces — see anchorText. */
@@ -26,18 +24,13 @@ export interface UINode {
   states: ReadonlyArray<'disabled' | 'focused' | 'checked' | 'expanded' | 'readonly' | 'required'>;
   /** Named frame/window this node lives in. */
   frame: string;
-  /**
-   * Recovered label for a control the platform exposes anonymously — the text
-   * in the adjacent cell, the preceding sibling, and so on. This is what makes
-   * an unnamed legacy input addressable at all.
-   */
+  /** Nearby label text (adjacent cell, preceding sibling, ...), for controls with no accessible name. */
   anchorText?: string;
   anchorRelation?: string;
   /**
-   * The control's own type where the platform exposes one (`password`,
-   * `email`, `tel`...). Unlike a label this cannot be omitted by a careless
-   * author, which makes it the only trustworthy signal that a field holds a
-   * secret. ParaBank's login inputs carry no accessible name at all.
+   * The control's input type where available (`password`, `email`, ...).
+   * Unlike a label it cannot be omitted, so it is the reliable signal for a
+   * secret field.
    */
   inputType?: string;
   bounds?: { x: number; y: number; width: number; height: number };
@@ -52,11 +45,8 @@ export interface FrameInfo {
 }
 
 /**
- * The URL that actually identifies the screen.
- *
- * On a frameset the top document never navigates, so page.url() is a constant
- * and useless as a location. The content frame -- the one carrying the most
- * perceivable nodes -- is what a human would call "the page you are on".
+ * The URL that identifies the screen. In a frameset the top document never
+ * navigates, so this uses the frame with the most perceivable nodes.
  */
 export function contentLocation(o: Observation): string {
   if (o.frames.length <= 1) return o.location;
@@ -90,13 +80,8 @@ export interface Action {
 }
 
 /**
- * Resolution is a THREE-way outcome, not two.
- *
- * `ambiguous` exists as a first-class failure because the common recorder bug
- * is silently taking the first of several matches. In a bank back-office that
- * means acting on the wrong member's row. A descriptor that matches three
- * controls is an under-specified descriptor — an artifact defect to surface,
- * not a coin flip to resolve at runtime.
+ * Resolution result. `ambiguous` is a failure rather than "take the first
+ * match", because the first match may be the wrong record's row.
  */
 export type ResolveResult =
   | { ok: true; node: UINode; via: ResolutionTier }
@@ -110,13 +95,8 @@ export type RawInput =
   | { type: 'text'; text: string };
 
 /**
- * The surface abstraction.
- *
- * Everything above the Surface — the artifact schema, the replay engine, the
- * policy layer, the escalation state machine — is written against this
- * interface and nothing else. Adding a desktop surface should require
- * implementing this and changing nothing else. That claim is the whole
- * heterogeneity story, so the interface is deliberately small.
+ * The surface abstraction. Schema, replay, policy and handoff code depend only
+ * on this interface, so a desktop surface only needs to implement it.
  */
 export interface Surface {
   readonly kind: SurfaceKind;
@@ -125,12 +105,8 @@ export interface Surface {
   observe(): Promise<Observation>;
 
   /**
-   * Locate a described control within an observation.
-   *
-   * Intentionally PURE and synchronous: it takes an Observation rather than
-   * touching the live surface. Anchor matching and ambiguity detection are the
-   * subtlest logic in the system, and this signature makes them unit-testable
-   * against fixture observations with no browser and no target app running.
+   * Locate a described control within an observation. Pure and synchronous,
+   * so it can be tested against fixture observations without a browser.
    */
   resolve(observation: Observation, target: TargetDescriptor, params?: Record<string, unknown>): ResolveResult;
 
@@ -143,18 +119,13 @@ export interface Surface {
   navigate(url: string): Promise<void>;
 
   // --- Human-in-the-loop handoff -----------------------------------------
-  // The session must outlive the automation that started it: a human takes
-  // over THIS session, not a fresh one.
+  // An operator takes over the same session the automation was using.
 
   /** Begin streaming frames to an operator console. */
   startStream(onFrame: (jpegBase64: string) => void): Promise<void>;
   stopStream(): Promise<void>;
 
-  /**
-   * Inject operator input into the live session. Callers must gate this on the
-   * control token — the Surface deliberately does not police who is driving,
-   * because that decision belongs to the escalation state machine.
-   */
+  /** Inject operator input. Callers must check the control token first. */
   dispatchRawInput(event: RawInput): Promise<void>;
 
   close(): Promise<void>;

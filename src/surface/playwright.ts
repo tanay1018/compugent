@@ -9,42 +9,34 @@ import { resolveTarget } from './resolve.js';
 /**
  * Web surface driven through the Chrome DevTools Protocol.
  *
- * Perception is the ACCESSIBILITY TREE, not the DOM. That choice is what
- * makes the surface abstraction credible — the same node shape comes out of
- * macOS AXUIElement and Windows UIA — and it is ~10x cheaper in tokens than
- * feeding a model raw markup.
+ * Perception uses the accessibility tree rather than the DOM: the same node
+ * shape is available from macOS AX and Windows UIA, and it is roughly 10x
+ * smaller than raw markup.
  *
- * Acting uses real input events dispatched at resolved coordinates rather
- * than element.click(). Same reason: it is the primitive that also serves the
- * visual fallback tier and operator input forwarding, and it exercises the
- * app the way a person does rather than bypassing its handlers.
+ * Actions are real input events dispatched at the node's coordinates rather
+ * than element.click(), so the app's own handlers run, and the same primitive
+ * serves operator input forwarding.
  */
 
 /**
- * Recovers a human-meaningful label for a control the platform exposes
- * anonymously. Runs in-page.
+ * Find a human-readable label for a node, with its relation. Runs in-page.
  *
- * This function is why the system works on legacy screens at all. Measured
- * against the bundled target app, the accessibility tree reports the member
- * lookup field as an unnamed `textbox` — the string "Member ID" is simply the
- * text of a neighbouring table cell, with no programmatic association. Walking
- * to that neighbour is what a human does visually, and it is the same
- * relation ("nearest label to the left") that a desktop driver would compute
+ * On table-layout apps the accessibility tree exposes inputs with no name
+ * (e.g. the target app's member lookup field); "Member ID" is just the text of
+ * the neighbouring cell. A desktop driver would compute the same relation
  * geometrically.
  */
 const NEARBY_FN = `function () {
   const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
   const out = { nearby: '', rel: '', inputType: '' };
 
-  // A StaticText accessibility node resolves to a DOM TEXT NODE, not an
-  // element -- and text nodes have no closest()/previousElementSibling. Values
-  // we need to EXTRACT (a balance in a table cell) are exactly these nodes, so
-  // climbing to the parent element first is what makes outputs addressable.
+  // StaticText nodes resolve to DOM text nodes, which have no closest() or
+  // previousElementSibling. Start from the parent element so extracted values
+  // (e.g. a balance in a table cell) can be anchored.
   const el = this.nodeType === 3 ? this.parentElement : this;
   if (!el || !el.getAttribute) return out;
 
-  // Captured before any label lookup, because a control with NO label is
-  // exactly the case where the type is the only thing that identifies it.
+  // Captured first: for an unlabelled control the input type may be all we have.
   out.inputType = el.type ? String(el.type).toLowerCase() : '';
 
   const withType = (o) => Object.assign({}, o, { inputType: out.inputType });
@@ -66,9 +58,8 @@ const NEARBY_FN = `function () {
     }
     const row = td.closest('tr');
     if (row && row.previousElementSibling) {
-      // First cell only: the whole row's textContent concatenates label AND
-      // value ("Savings$4,182.55"), which would bake this run's data into the
-      // anchor and pin the artifact to one member.
+      // First cell only. The row's full textContent includes the value
+      // ("Savings$4,182.55"), which would put run data into the anchor.
       const firstCell = row.previousElementSibling.querySelector('td');
       const t = clean(firstCell ? firstCell.textContent : '');
       if (t) return withType({ nearby: t, rel: 'follows' });
@@ -105,16 +96,12 @@ export class PlaywrightSurface implements Surface {
     await cdp.send('Runtime.enable');
     await cdp.send('Page.enable');
     const surface = new PlaywrightSurface(browser, page, cdp);
-    // We drive the page with raw CDP input, so Playwright never learns that a
-    // click triggered a navigation and its auto-waiting cannot help us. Track
-    // navigation ourselves instead of guessing with a sleep.
+    // Input goes over raw CDP, so Playwright's auto-waiting never sees the
+    // resulting navigations. Track them here instead.
     cdp.on('Page.frameNavigated', () => { surface.lastNavAt = Date.now(); });
     cdp.on('Page.loadEventFired', () => { surface.lastNavAt = Date.now(); });
-    // In-flight request tracking. document.readyState says nothing about a
-    // table still being fetched: a modern app finishes loading and THEN asks
-    // the server for its rows. Observing in that gap yields an empty screen,
-    // and a model that sees an empty screen clicks the link again -- which is
-    // what "it kept refreshing the page" actually is.
+    // Track in-flight requests. readyState is 'complete' before an async table
+    // has fetched its rows, and observing in that gap shows an empty screen.
     cdp.send('Network.enable').catch(() => {});
     cdp.on('Network.requestWillBeSent', () => { surface.inFlight += 1; });
     const settled = () => { surface.inFlight = Math.max(0, surface.inFlight - 1); surface.lastNetAt = Date.now(); };
@@ -130,9 +117,8 @@ export class PlaywrightSurface implements Surface {
   private async frames(): Promise<FrameInfo[]> {
     const { frameTree } = await this.cdp.send('Page.getFrameTree');
     const out: FrameInfo[] = [];
-    // Frames are keyed by id, never by index: frame ORDER is not stable across
-    // app versions. The frameset root has an empty name, which would otherwise
-    // collide with a child frame legitimately named "main".
+    // Key frames by id, not index (order is not stable across versions). The
+    // frameset root has an empty name, which could collide with a child frame.
     const walk = (n: any, depth: number): void => {
       out.push({
         id: n.frame.id,
@@ -149,7 +135,7 @@ export class PlaywrightSurface implements Surface {
     await this.cdp.send('DOM.getDocument', { depth: -1, pierce: true });
     const frames = await this.frames();
     const nodes: UINode[] = [];
-    /** Anchoring is a second pass so a budget can be spent on what matters. */
+    /** Anchoring runs as a separate, budgeted pass (see below). */
     const candidates: UINode[] = [];
     let ref = 0;
 
@@ -168,9 +154,8 @@ export class PlaywrightSurface implements Surface {
         const role = normaliseWebRole(raw);
         if (!ACTIONABLE.has(role) && !INFORMATIONAL.has(role)) continue;
 
-        // Long prose (a product description, a terms blob) is never a target
-        // and never an output -- it is pure token cost. One page of untruncated
-        // body copy took a discovery run to 124K input tokens.
+        // Truncate long prose: it is never a target or an output, and one
+        // untruncated product description pushed a run to 124K input tokens.
         const name = String(ax.name?.value ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
         const value = String(ax.value?.value ?? '').trim().slice(0, 200);
         // Informational nodes with no text carry nothing; actionable ones are
@@ -191,42 +176,22 @@ export class PlaywrightSurface implements Surface {
           ref: ++ref, role, name, value, states, frame: f.name, handle: ax.backendDOMNodeId,
         };
 
-        // Anchor EVERY actionable control, not just anonymous ones.
-        //
-        // The obvious optimisation -- skip enrichment when the node already has
-        // an accessible name -- is wrong, because browsers synthesise names.
-        // Chrome reports `name: "Submit"` for an <input type="image"> whose
-        // author supplied no alt text at all. An artifact that trusted that
-        // name would be pinned to a browser default rather than to app
-        // content. Recording name AND anchor together is what makes the
-        // descriptor survive either one changing.
-        //
-        // Cost is two CDP round trips per control. Bounded in practice
-        // (actionable controls are a small fraction of a screen) but it is the
-        // obvious place to batch if a wide results grid ever makes it hurt.
+        // Anchor named controls too: browsers synthesise names (Chrome reports
+        // "Submit" for an <input type="image"> with no alt text), so recording
+        // both name and anchor lets a descriptor survive either one changing.
+        // Costs two CDP round trips per node; a candidate for batching.
         if (ACTIONABLE.has(role) || role === 'text' || role === 'cell') candidates.push(node);
         nodes.push(node);
       }
     }
 
     /**
-     * Anchor pass, in priority order and within a budget.
+     * Anchor pass, in priority order within a budget.
      *
-     * Enriching inline meant a flat cut-off partway through the document, and
-     * on a large page the anchoring silently switched off exactly where it was
-     * needed: a Wikipedia infobox -- clean label/value rows, the structure this
-     * system exists to read -- arrived with 82 unanchored cells because three
-     * hundred navigation links had already spent the budget.
-     *
-     * Priority is by how much the anchor is WORTH, not by role importance.
-     * Ranking all controls first was backwards: an article with 1577 links
-     * spent the entire budget on things whose own text already names them, and
-     * reached none of the 82 infobox cells. An anonymous control has no
-     * identity without its anchor; a cell is half of a label/value pair; a
-     * named link needs neither.
-     *
-     * Two CDP round trips each, so the budget is real — and on a very large
-     * page it will not cover everything. It now covers the right things.
+     * Priority is by how much the anchor adds: unnamed controls first (the
+     * anchor is their only identity), then cells (half of a label/value pair),
+     * then named controls. Enriching in document order let ~1500 navigation
+     * links on a Wikipedia article use up the budget before any infobox cell.
      */
     const priority = (n: UINode) =>
       ACTIONABLE.has(n.role) && n.name === '' ? 0   // anonymous control: the anchor IS its identity
@@ -258,8 +223,7 @@ export class PlaywrightSurface implements Surface {
       });
       const v = r.result?.value as { nearby?: string; rel?: string; inputType?: string } | undefined;
       if (!v) return null;
-      // An unlabelled control still matters: its TYPE may be the only thing
-      // telling us it holds a secret.
+      // Keep the input type even without a label: it may mark a password field.
       if (!v.nearby || !v.rel) return v.inputType ? { nearby: '', rel: '', inputType: v.inputType } : null;
       return { nearby: v.nearby, rel: v.rel, ...(v.inputType ? { inputType: v.inputType } : {}) };
     } catch {
@@ -273,10 +237,8 @@ export class PlaywrightSurface implements Surface {
   }
 
   private async centreOf(node: UINode): Promise<{ x: number; y: number }> {
-    // Scroll first. getBoxModel reports LAYOUT coordinates, so an element below
-    // the fold yields a point outside the viewport and the dispatched click
-    // lands on nothing -- silently, because the event is still delivered. The
-    // bundled target app never caught this: everything fits on one screen.
+    // Scroll first: getBoxModel returns layout coordinates, so a click on an
+    // element below the fold would land outside the viewport without error.
     await this.cdp
       .send('DOM.scrollIntoViewIfNeeded', { backendNodeId: node.handle as number })
       .catch(() => {});
@@ -322,21 +284,9 @@ export class PlaywrightSurface implements Surface {
     await this.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
 
     if (action.kind === 'type') {
-      /**
-       * Clear the field before inserting.
-       *
-       * The previous approach dispatched a raw Cmd+A key event and trusted the
-       * browser to treat it as select-all. Raw CDP key events do not reliably
-       * trigger browser-level shortcuts, so on any field that already held a
-       * value the new text was APPENDED. Every input in the bundled app starts
-       * empty, which hid this completely until a real site's search box --
-       * which retains its query -- produced "wireless mousewireless mouse" and
-       * the run spent its whole budget trying to correct itself.
-       *
-       * Selecting the element's own contents is not a shortcut the page can
-       * swallow, and it still leaves the field focused so insertText lands and
-       * the app's own input handlers fire.
-       */
+      // Select the field's contents before inserting, so a prefilled value is
+      // replaced rather than appended to. A raw Cmd+A key event over CDP does
+      // not reliably trigger select-all.
       try {
         const { object } = await this.cdp.send('DOM.resolveNode', { backendNodeId: node.handle as number });
         if (object.objectId) {
@@ -363,8 +313,7 @@ export class PlaywrightSurface implements Surface {
     }
   }
 
-  /** Viewport centre of a node. Exposed because an operator console forwards
-   *  RAW COORDINATES -- it has no notion of selectors or descriptors. */
+  /** Viewport centre of a node. The operator console works in raw coordinates. */
   async boundsOf(node: UINode): Promise<{ x: number; y: number }> {
     return this.centreOf(node);
   }
@@ -392,40 +341,28 @@ export class PlaywrightSurface implements Surface {
   lastNetAt = 0;
 
   /**
-   * Settle helper. Waits for the document to be ready AND for navigation
-   * activity to go quiet, rather than sleeping for a guessed interval.
-   *
-   * The quiet period matters because a legacy app can chain redirects
-   * (lookup -> interstitial -> detail); returning after the first one would
-   * observe a page that is about to be replaced.
+   * Wait for the document to be ready and navigation to go quiet. The quiet
+   * period covers chained redirects (lookup -> interstitial -> detail).
    */
   async waitForStable({ timeoutMs = 15000, quietMs = 150, graceMs = 400,
                        networkQuietMs = 350, networkDeadlineMs = 2500 } = {}): Promise<void> {
-    // A click dispatched over CDP returns before the browser has even started
-    // navigating. Without a grace window, this returns instantly against the
-    // page that is about to be replaced -- and the caller observes stale state.
+    // A CDP click returns before navigation starts, so allow a short grace
+    // window before treating the page as settled.
     const startedAt = Date.now();
     const navAtEntry = this.lastNavAt;
     const deadline = startedAt + timeoutMs;
 
     while (Date.now() < deadline) {
       const navigated = this.lastNavAt !== navAtEntry;
-      // Still inside the grace window and nothing has moved yet: keep waiting,
-      // a navigation may be in flight.
+      // Inside the grace window with no navigation yet: keep waiting.
       if (!navigated && Date.now() - startedAt < graceMs) {
         await new Promise((r) => setTimeout(r, 40));
         continue;
       }
       const ready = await this.page.evaluate(() => document.readyState === 'complete').catch(() => false);
-      // Ready AND navigation quiet AND nothing still being fetched.
-      //
-      // The last condition is what lets an async-rendered table finish
-      // arriving -- but it is BEST EFFORT, on its own short deadline. A real
-      // site never goes network-idle: analytics, ad beacons and trackers keep
-      // firing indefinitely, so waiting for silence burned the full timeout on
-      // every single observation (20s a step, on a 133-node page). After the
-      // deadline we proceed on document-ready alone, which is what we did
-      // before async content was a consideration at all.
+      // Ready, navigation quiet, and no requests in flight. The network check
+      // is best effort with its own short deadline, because real sites keep
+      // firing analytics requests and never go fully idle.
       const waitedLongEnough = Date.now() - startedAt > networkDeadlineMs;
       const netQuiet = waitedLongEnough || (this.inFlight === 0 && Date.now() - this.lastNetAt > networkQuietMs);
       if (ready && Date.now() - this.lastNavAt > quietMs && netQuiet) return;
@@ -434,13 +371,8 @@ export class PlaywrightSurface implements Surface {
   }
 
   /**
-   * Wait until an observation satisfies a predicate.
-   *
-   * This is the primitive replay actually needs: a checkpoint is a condition
-   * on observable state, so waiting for it and asserting it are the same
-   * operation. Returns the satisfying observation, or null on timeout — the
-   * caller decides whether a timeout is a recoverable condition or a failure,
-   * because that distinction belongs to the error taxonomy, not here.
+   * Observe until the predicate holds. Returns the matching observation, or
+   * null on timeout; the caller decides what a timeout means.
    */
   async waitUntil(
     predicate: (o: Observation) => boolean,
@@ -457,8 +389,7 @@ export class PlaywrightSurface implements Surface {
   }
 
   // --- Handoff -----------------------------------------------------------
-  // The session outlives the automation that started it, so an operator takes
-  // over THIS session rather than a fresh one.
+  // An operator takes over this same session rather than a new one.
 
   private streaming = false;
 
@@ -467,8 +398,8 @@ export class PlaywrightSurface implements Surface {
     this.streaming = true;
     this.cdp.on('Page.screencastFrame', (f: any) => {
       onFrame(f.data);
-      // Acking is mandatory: without it Chrome stops emitting after a couple
-      // of frames. The stream is change-driven, so an idle page costs nothing.
+      // Each frame must be acked or Chrome stops sending. Frames are only sent
+      // on change.
       this.cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
     });
     await this.cdp.send('Page.startScreencast', {
@@ -483,9 +414,8 @@ export class PlaywrightSurface implements Surface {
   }
 
   /**
-   * Inject operator input. Note this takes RAW coordinates and keys — it has
-   * no idea what it is clicking, by design. Whether the operator is allowed to
-   * drive is the control token's business, not the Surface's.
+   * Inject operator input as raw coordinates and keys. Whether the operator
+   * may drive is checked by the control token, not here.
    */
   async dispatchRawInput(e: RawInput): Promise<void> {
     if (e.type === 'mouse') {
@@ -503,18 +433,12 @@ export class PlaywrightSurface implements Surface {
   }
 
   /**
-   * Capture what a HUMAN does in this session, semantically.
+   * Record what a human does in this session as labelled actions ("typed into
+   * Member ID") rather than pixels, using capture-phase DOM listeners and the
+   * same label lookup as perception.
    *
-   * Recording pixels would satisfy nobody: 3.6 asks us to record what the
-   * human did, and in a regulated environment an auditor needs "typed into the
-   * Member ID field", not a video. Hooking DOM events at the capture phase and
-   * resolving a label for the target gives the same vocabulary the agent's own
-   * steps use, so both actors land in one log with one shape.
-   *
-   * Note this fires for agent-driven input too, because we dispatch real
-   * events. Attribution is therefore decided by WHO HOLDS THE TOKEN, not by
-   * the event — which is the honest answer, and the reason the control token
-   * is the single source of truth about who is driving.
+   * These listeners also fire for agent input (we dispatch real events), so
+   * the caller attributes events by who holds the control token.
    */
   async installOperatorCapture(onEvent: (e: { kind: string; label: string; tag: string; value?: string }) => void): Promise<void> {
     await this.page.exposeBinding('__cua_op', (_src, ev) => {
@@ -524,9 +448,8 @@ export class PlaywrightSurface implements Surface {
       const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
       const labelFor = (el) => {
         if (!el || !el.getAttribute) return '';
-        // Prefer the nearest real CONTROL. A click that lands on a layout
-        // container would otherwise be logged as sixty characters of page
-        // body, which tells an auditor nothing about what was done.
+        // Prefer the nearest control; a click on a layout container would
+        // otherwise be logged as a chunk of page text.
         const ctl = el.closest && el.closest('a,button,input,select,textarea,[role=button],[role=link]');
         const t = ctl || el;
         const a = t.getAttribute && (t.getAttribute('aria-label') || t.getAttribute('title') || t.getAttribute('alt'));

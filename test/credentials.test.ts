@@ -6,8 +6,7 @@ import { CapabilityArtifact } from '../src/schema/artifact.js';
 const policy = defaultPolicy('http://localhost:8710');
 
 test('automation is REFUSED a credential field, not merely redacted afterwards', () => {
-  // Redacting the log is a consolation prize: by then the value has been typed
-  // into a live system by something that cannot be held accountable for it.
+  // Credential fields are refused outright, not just redacted in the log.
   for (const label of ['Password', 'PIN', 'SSN', 'Card Number', 'Security Code']) {
     const d = checkCredentialField(policy, { kind: 'type', text: 'anything' }, label);
     assert.equal(d.allow, false, `${label} must be refused`);
@@ -17,7 +16,7 @@ test('automation is REFUSED a credential field, not merely redacted afterwards',
 
 test('ordinary fields are untouched', () => {
   for (const label of ['Member ID', 'Search Type', 'Account Number']) {
-    // "Account Number" IS in the sensitive list — deliberately, it is regulated.
+    // "Account Number" is in the sensitive list because it is regulated.
     const expected = isSensitiveField(policy, label);
     assert.equal(checkCredentialField(policy, { kind: 'type', text: 'x' }, label).allow, expected ? false : true);
   }
@@ -43,9 +42,7 @@ const base = {
 const target = { role: 'textbox' as const, name: 'Password', nameMatch: 'normalized' as const, fallbacks: [] };
 
 test('an artifact may DECLARE that a step needs a human, without holding the value', () => {
-  // This is how a flow behind a login is expressible at all: not a param (the
-  // caller would hold it), not a literal (the file would), not automation's to
-  // type. Replay escalates when it reaches one.
+  // Operator-supplied values are how login flows are expressed; replay escalates on them.
   const a = CapabilityArtifact.parse({
     ...base,
     steps: [{
@@ -68,9 +65,8 @@ test('a stored literal that looks like a credential is rejected outright', () =>
 });
 
 test('a password field with NO label is still refused', () => {
-  // The case that actually leaked. ParaBank's login inputs carry no accessible
-  // name and no anchor text, so a check that reads only labels permitted them
-  // and the password reached both the trace and the run log.
+  // Regression: ParaBank's login inputs have no name or anchor, so a
+  // label-only check let the password through.
   const d = checkCredentialField(policy, { kind: 'type', text: 'secret' }, undefined, 'password');
   assert.equal(d.allow, false);
   assert.equal(d.allow === false && d.code, 'credential');
@@ -78,7 +74,6 @@ test('a password field with NO label is still refused', () => {
 });
 
 test('an unlabelled ordinary text field is still usable', () => {
-  // The refusal must not swallow every anonymous input — legacy screens are
-  // full of them, and anchoring is how the rest of the system finds them.
+  // Other unlabelled inputs must still be allowed.
   assert.equal(checkCredentialField(policy, { kind: 'type', text: 'x' }, undefined, 'text').allow, true);
 });

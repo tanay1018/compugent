@@ -125,7 +125,7 @@ function renderInspector() {
   });
 
   $('artifact-note').textContent = fellThrough
-    ? `Step 3’s name is text Wikipedia composed for one company, so it stops matching as soon as you change the input — and the capability keeps working anyway, because the anchor carries "${value}". That fallthrough is the whole reason targeting is tiered.`
+    ? `Step 3’s name is text Wikipedia composed for one company, so it stops matching when you change the input. The step still resolves through its anchor, "${value}". This is why targeting falls back from name to anchor.`
     : 'Every descriptor matches on its recorded value. Try another company: step 3’s name is a string Wikipedia composed, and it will stop matching.';
 }
 
@@ -355,5 +355,5 @@ fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
     main.href = `https://github.com/${REPO}#running-it`;
     main.textContent = 'Build and run from source';
     const n = $('dl')?.parentElement?.querySelector('.note');
-    if (n) n.textContent = 'No packaged build is published yet — the repository has the commands to run it from source in one step.';
+    if (n) n.textContent = 'No packaged build is published yet. See the repository to run it from source.';
   });

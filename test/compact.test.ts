@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import type { ModelMessage } from 'ai';
 import { compactObservations } from '../src/discovery/compact.js';
 
-/** A realistically sized screen. The bundled legacy app renders ~15 nodes;
- *  a Wikipedia article renders 1393. Five lines would understate the problem. */
+/** A realistically sized screen (the target app renders ~15 nodes, Wikipedia ~1400). */
 const OBS = (loc: string) =>
   `location: ${loc}\n\nframe "main"\n` +
   ['  [1] textbox anchored-to="Member ID" (inSameRowAs)',
@@ -49,8 +48,8 @@ test('the goal survives compaction of the opening prompt', () => {
 });
 
 test('a ten-step conversation shrinks by most of its bulk', () => {
-  // Uncompacted, every step resends every prior screen. Compacted, exactly one
-  // screen is ever full size, so the payload stops growing with step count.
+  // After compaction only one screen is full size, so payload size stops
+  // growing with step count.
   const many: ModelMessage[] = [userMsg('read a balance', '/lookup')];
   for (let i = 0; i < 10; i++) many.push(toolMsg(`/screen${i}`));
 

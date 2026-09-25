@@ -1,17 +1,16 @@
 # Case study site
 
-Static. No framework, and no dependencies — `build.mjs` uses only Node builtins.
+Static site with no framework or dependencies; `build.mjs` uses only Node builtins.
 
 ```bash
 node build.mjs                 # regenerate data/ from ../evidence and ../artifacts
 python3 -m http.server 8777    # then open http://localhost:8777
 ```
 
-`build.mjs` is the whole pipeline: it reads the featured runs' `run.jsonl`,
-copies only the screenshots an event actually references, and writes
-`data/runs.json`. Nothing on the page is authored by hand, so the case study
-cannot drift away from what the system does — re-record a run and the site
-changes with it.
+`build.mjs` reads the featured runs' `run.jsonl`, copies only the screenshots
+those events reference, and writes `data/runs.json`. The run player and the
+capability demo are generated from this data rather than written by hand, so
+re-recording a run updates the site.
 
 ## Deploy
 

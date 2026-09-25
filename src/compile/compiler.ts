@@ -10,24 +10,17 @@ import type { DiscoveryTrace, TraceStep } from '../discovery/agent.js';
 /**
  * Compile a discovery trace into a capability artifact.
  *
- * Two passes, deliberately separated:
+ * Two passes:
  *
- *   MECHANICAL  steps, targets, waypoints, outputs, effects and the checkpoint
- *               fall straight out of the trace, because the model's action
- *               vocabulary was constrained to what a step can express.
+ *   generalise  one LLM call decides which literals are parameters (e.g. "12345"
+ *               becomes `memberId: string`) and writes the capability's
+ *               description and output types.
+ *   mechanical  steps, targets, waypoints, outputs, effects and the checkpoint
+ *               are derived directly from the trace. This works because the
+ *               discovery tools map one-to-one onto step kinds.
  *
- *   GENERALISE  one LLM call decides which run-constants are really PARAMETERS
- *               and gives the capability a contract a calling agent can read.
- *               "12345" has to become `memberId: string`, or the artifact only
- *               ever works for Sarah Chen.
- *
- * The model is in this path exactly once, offline, on a run a human is about
- * to review. Replay never calls it. That is the whole point of the artifact.
- *
- * The generalisation pass is VALIDATED, not trusted: every proposed parameter
- * must correspond to a literal that actually appears in the trace at the step
- * it claims. A hallucinated parameter is dropped and recorded as a warning
- * rather than silently written into a contract.
+ * The model's proposal is validated against the trace: a parameter whose
+ * literal does not appear at the step it names is dropped with a warning.
  */
 
 const Proposal = z.object({
@@ -62,36 +55,22 @@ export interface CompileOptions {
   tenant: string;
   model?: string;
   version?: number;
-  /**
-   * Save a run that never finished. Off by default: quietly turning a blocked
-   * run into a capability is how an un-invocable artifact ends up in a catalog.
-   */
+  /** Save a run that never finished, as an `incomplete` (non-invocable) artifact. */
   allowPartial?: boolean;
-  /**
-   * Capabilities already in the catalogue, so re-recording one produces a new
-   * VERSION of it rather than a new capability beside it.
-   */
+  /** Existing capabilities, so re-recording one produces a new version of it rather than a new id. */
   knownCapabilities?: { id: string; description: string }[];
 }
 
 /**
- * A discovery trace is a WALK, not a route.
+ * Remove detours from a discovery trace so replay takes the direct route.
  *
- * The model explores: it tries a screen, finds it is a dead end, goes back and
- * takes a different turn. Recording that verbatim makes replay re-enact the
- * exploration — slower every single call, and with more chances to fail, for
- * work whose result was thrown away.
+ * Steps are grouped by the location they act on. When the walk leaves a
+ * location and later returns to it, everything from that location's first
+ * visit onward is dropped. Consecutive steps on one screen are kept.
  *
- * So cycles are excised. Steps are grouped by the state they act on; when the
- * walk LEAVES a state and later returns to it, everything from that state's
- * first visit onward is dropped. Consecutive steps on one screen are not a
- * cycle — typing into a field and clicking the button beside it is ordinary
- * sequential work.
- *
- * The assumption worth stating: re-entering a screen gets it fresh. That holds
- * for server-rendered apps, which is the target here, and can fail on a SPA
- * that preserves form state across navigation. Anything dropped is therefore
- * listed in the artifact's warnings, and artifacts compile as draft.
+ * Assumes re-entering a screen gives a fresh state. That holds for
+ * server-rendered apps but may not for an SPA that keeps form state, so dropped
+ * steps are listed in the artifact's warnings.
  */
 function pruneCycles(steps: TraceStep[], entryUrl: string): { kept: TraceStep[]; dropped: TraceStep[] } {
   const stateAt = (i: number): string =>
@@ -131,18 +110,12 @@ export interface CompileResult {
 }
 
 /**
- * The state a step expects BEFORE it acts.
+ * The state a step expects before it acts: the control it will use exists.
  *
- * Deliberately node existence and NOT a URL match. Legacy apps render the same
- * screen at many different URLs — a form handler that re-renders its own form,
- * a POST target, a post-login landing route. Pinning a waypoint to the URL
- * observed during recording makes re-localisation fail on a screen that is
- * visibly correct, which is exactly what happened the first time an operator
- * signed back in at /signin and got handed the lookup form.
- *
- * What a step actually depends on is that the control it is about to use is
- * there. Location remains useful for outcome detection, where it discriminates
- * between screens rather than identifying one.
+ * Not a URL match, because legacy apps render the same screen at several URLs
+ * (a form posting to itself, a post-login landing route). A URL waypoint made
+ * re-localisation fail after an operator signed in at /signin and landed on
+ * the lookup form.
  */
 function waypointFor(step: TraceStep, _locationBefore: string): StateAssertion | undefined {
   return step.target ? { kind: 'nodeExists', target: step.target } : undefined;
@@ -161,8 +134,7 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       `work are kept, but it will not be invocable.`,
     );
   }
-  // A run that gave up before acting has nothing to preserve. Saying so beats
-  // letting the schema's min(1) surface as a raw validation error.
+  // Give a clear error instead of the schema's min(1) validation failure.
   if (trace.steps.filter((s) => s.kind !== 'extract').length === 0) {
     throw new Error(
       `nothing to compile: the run recorded no actions` +
@@ -178,13 +150,9 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       (trace.checkpoint ? '' : '; no checkpoint was established, so success cannot be verified');
 
   // --- Pass 1: generalise -------------------------------------------------
-  /**
-   * Compilation is a SINGLE call, and the judgement it makes -- which literals
-   * are parameters, what the contract looks like -- is baked into every future
-   * invocation. Discovery is a multi-step loop and is where the money goes. So
-   * they get separate knobs: run discovery on something cheap, keep compilation
-   * on something you trust. One call at premium rates is rounding error.
-   */
+  // COMPILE_MODEL is separate from DISCOVERY_MODEL: this is one call, but its
+  // choices are baked into every future invocation, so it can justify a
+  // stronger model than the discovery loop.
   const modelId = opts.model ?? process.env.COMPILE_MODEL ?? process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
   const traceForModel = trace.steps.map((s) => ({
     index: s.index, kind: s.kind, rationale: s.rationale,
@@ -202,16 +170,8 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       'search mode a form uses)? Getting this wrong either pins the capability to one record, or exposes a knob no ' +
       'caller should have to think about.\n\n' +
       'Copy literalValue exactly as given. Do not invent parameters that are not literals in the trace.\n\n' +
-      /**
-       * Identity has to be stable across recordings or the version chain
-       * breaks. Re-recording the same Wikipedia lookup produced
-       * `company.readWikipediaInfobox`, `wikipedia.readCompanyInfobox`,
-       * `wikipedia.getCompanyInfobox` and `company.getWikipediaInfoboxFacts`
-       * -- four capabilities that were one capability, none of them a new
-       * version of another, so approval and supersession had nothing to hold
-       * onto. The fix a naming convention cannot provide is telling the model
-       * what already exists.
-       */
+      // Ids must be stable across re-recordings for versioning to work. Without
+      // the catalogue, the same Wikipedia lookup was given four different ids.
       'IDENTITY: if the capability below is one the catalogue already contains -- the same task on ' +
       'the same surface, however differently it was worded or recorded -- reuse that id EXACTLY. ' +
       'It will be saved as a new version of it. Only mint a new id for a capability that is ' +
@@ -230,19 +190,11 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
   const inputs: ParamSpec[] = [];
 
   /**
-   * A parameter the caller could not possibly supply is not a parameter.
-   *
-   * Asked to generalise a Wikipedia lookup, the model proposed `companyName`
-   * ("Bank of America") and also `suggestionLabel` ("Bank of America American
-   * multinational banking and financial services corporation") -- the second
-   * being a string Wikipedia composed FROM the first. As a required input it
-   * is unanswerable: to call the capability you would have to already know the
-   * description of the article you are trying to find.
-   *
-   * Containment is the giveaway. One proposed value sitting inside another
-   * means the surface derived it, so the longer one is dropped and its step
-   * falls back to the anchor tier -- which holds the short value, and is the
-   * tier that generalises anyway.
+   * Drop parameters whose value contains another parameter's value. These are
+   * strings the surface composed from an input (e.g. a Wikipedia suggestion
+   * "Bank of America American multinational banking..." built from
+   * companyName), which a caller could not supply. The step then resolves
+   * through its anchor instead.
    */
   const derived = new Set(
     proposal.parameters.filter((p) =>
@@ -269,10 +221,8 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       continue;
     }
 
-    // A parameter may generalise either a typed VALUE ("12345" into a field) or
-    // the step's TARGET ("click the row for Sarah Chen"). Both are real; a
-    // validator that only knew about values rejected genuine target parameters
-    // and pinned the capability to whatever record was recorded.
+    // A parameter may come from a typed value ("12345" into a field) or from
+    // the step's target ("click the row for Sarah Chen").
     const fromValue = step.literal !== undefined && step.literal === p.literalValue;
     const fromTarget =
       step.target.name === p.literalValue || step.target.anchor?.text === p.literalValue;
@@ -285,11 +235,8 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       continue;
     }
 
-    // One parameter may legitimately drive several steps -- a zip code typed
-    // into a search box and echoed into the result header is still ONE input.
-    // The proposal carries one entry per step, so pushing blindly produced a
-    // duplicate in the tool schema's `required` array and offered the caller
-    // the same argument twice.
+    // One parameter can drive several steps; the proposal has one entry per
+    // step, so de-duplicate by name.
     const existing = inputs.find((i) => i.name === p.name);
     const spec = existing ?? ParamSpec.parse({
       name: p.name, type: p.type, required: true, description: p.description,
@@ -306,12 +253,8 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     if (!s.outputName) continue;
     const proposed = proposal.outputs.find((o) => o.name === s.outputName);
     if (!proposed) warnings.push(`output "${s.outputName}" was recorded but not typed by the compiler; defaulting to string/text`);
-    /**
-     * If an output came back reading exactly what a parameter went in as, it
-     * is an echo of the input, and the artifact should assert that rather than
-     * merely report it. Purely mechanical -- the values either matched on the
-     * recorded run or they did not, so there is nothing for a model to judge.
-     */
+    // An output that read back exactly an input's value is an echo of it;
+    // replay asserts the match (mustMatchParam) to catch the wrong record.
     const echoes = inputs.find((p) => p.example !== undefined && p.example === s.observedValue);
 
     outputs.push(
@@ -332,27 +275,15 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     }
   }
 
-  /**
-   * A parameter can appear in a step's TARGET as well as its value — "click
-   * the row for member 12345". Substituting it back into the descriptor is
-   * what stops such a step being pinned to the record it was recorded on.
-   */
+  /** Replace parameter values inside a target descriptor with `{{param}}` placeholders. */
   const parameteriseTarget = (t: TargetDescriptor): TargetDescriptor => {
     let out = t;
     for (const p of inputs) {
       if (!p.example) continue;
 
-      /**
-       * Whole-string equality was too strict. A surface routinely embeds the
-       * value in a longer string it composed itself -- Wikipedia's checkpoint
-       * anchor is "Talk:Bank of America", not "Bank of America" -- and an
-       * exact match leaves that pinned to the recorded record forever.
-       *
-       * Substituting inside the string is only safe when the value is
-       * distinctive enough that its appearance is not a coincidence. A short
-       * example ("1", "NY") occurs inside unrelated text constantly, so the
-       * substitution is restricted to values long enough to mean something.
-       */
+      // Substring substitution handles values embedded in longer text (e.g.
+      // "Talk:Bank of America"). Short values like "1" or "NY" would match by
+      // coincidence, so only values of 4+ characters are substituted.
       const embed = (text: string): string =>
         p.example!.length >= 4 && text.includes(p.example!)
           ? text.split(p.example!).join(`{{${p.name}}}`)
@@ -361,23 +292,10 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
       if (out.name === p.example) {
         out = { ...out, name: `{{${p.name}}}` };
       } else if (out.name && p.example!.length >= 4 && out.name.includes(p.example!)) {
-        /**
-         * The parameter is embedded in a name the SURFACE composed -- Wikipedia's
-         * suggestion reads "Bank of America American multinational banking and
-         * financial services corporation" -- and the rest of that string is data
-         * too, so the name cannot be generalised.
-         *
-         * Loosening it to a `contains` match on just the parameter was tried and
-         * is worse: every one of the eleven suggestions contains "Bank of
-         * America", so the name tier went from missing cleanly to matching
-         * everything, and the step failed as ambiguous even for the value it was
-         * recorded on.
-         *
-         * Left pinned, the name tier simply misses on a new value and resolution
-         * falls through to the ANCHOR, which holds `{{companyName}}` and does
-         * generalise. That fallthrough is what the tiers are for; the warning
-         * tells a reviewer the name is not what is doing the work.
-         */
+        // The name embeds the parameter inside other surface-composed text, so
+        // it cannot be generalised. A `contains` match would be ambiguous (every
+        // suggestion contains the company name), so the name stays pinned: it
+        // misses on new values and resolution falls through to the anchor.
         warnings.push(
           `step target name ${JSON.stringify(out.name)} embeds "${p.name}" in text the surface ` +
           `composed, so it stays pinned to the recorded value. This step generalises through its ` +
@@ -391,9 +309,7 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     return out;
   };
 
-  /**
-   * An assertion carries the literal too, in whichever field its variant uses.
-   */
+  /** Same substitution for assertions, in whichever field the variant uses. */
   const parameteriseAssertion = (a: StateAssertion): StateAssertion => {
     if (a.kind === 'nodeExists' || a.kind === 'nodeAbsent') return { ...a, target: parameteriseTarget(a.target) };
     if (a.kind === 'all') return { ...a, of: a.of.map((x) => parameteriseAssertion(x) as typeof x) };
@@ -409,18 +325,8 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
 
   // Extraction is described by `outputs`, not replayed as an action.
   const actionSteps = trace.steps.filter((s) => s.kind !== 'extract');
-  /**
-   * A `type` step aimed at a non-input element looks like junk and is not.
-   *
-   * The weather trace types the zip into the textbox and then types it again
-   * into a `text` node, resolved by "ordinal 0 of 10 matching text nodes".
-   * Dropping it as unreplayable was tried, and the capability stopped working:
-   * that second type carries the newline that submits the form, so the run
-   * never left the search page. The ordinal is genuinely fragile, but it is
-   * load-bearing, and "this step cannot matter" was simply false.
-   *
-   * Left in, with the uniqueness warning it already carries.
-   */
+  // `type` steps aimed at non-input nodes are kept. In the weather trace such a
+  // step carries the newline that submits the form, so dropping it broke replay.
   const { kept, dropped } = pruneCycles(actionSteps, trace.entryUrl);
   if (dropped.length) {
     warnings.push(
@@ -475,15 +381,11 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
     },
     inputs,
     outputs,
-    // Populated in Phase 5: an outcome signature is a claim about wording, and
-    // wording is exactly what drifts. They are learned from runs that actually
-    // produce the state, never guessed from a happy path.
+    // Filled in later by learn-outcomes, from runs that actually produce each state.
     outcomes: [],
     steps,
-    // The checkpoint proves the run ARRIVED, so it has to generalise with the
-    // steps that get there. Left literal, a capability parameterised over
-    // companies walked correctly to the Microsoft article and then declared
-    // failure because the page did not mention Bank of America.
+    // Parameterised too, or the checkpoint would only hold for the recorded
+    // input (e.g. still looking for "Bank of America" on the Microsoft page).
     ...(trace.checkpoint ? { checkpoint: parameteriseAssertion(trace.checkpoint) } : {}),
     approval: complete ? 'draft' : 'incomplete',
     ...(incompleteReason ? { incompleteReason } : {}),
@@ -499,5 +401,5 @@ export async function compileTrace(opts: CompileOptions): Promise<CompileResult>
   return { artifact, warnings };
 }
 
-/** Exposed for tests: cycle elimination is pure and worth pinning down. */
+/** Exposed for tests. */
 export const __testing = { pruneCycles };

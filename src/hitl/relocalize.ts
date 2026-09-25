@@ -3,20 +3,13 @@ import { evaluateAssertion } from '../schema/assertion.js';
 import type { Observation } from '../surface/types.js';
 
 /**
- * Where are we?
+ * Work out where a run is after an operator hands back control.
  *
- * After a human takes over, the step index is meaningless. They may have gone
- * forward, gone backward, wandered somewhere unrelated, finished the task
- * outright, or — the adversarial case — moved somewhere that superficially
- * resembles the plan. So resumption is not "continue at k+1"; it is a
- * LOCALISATION problem:
- *
- *     The plan is a map, not a program counter.
- *     You never trust the index; you trust the observed state.
- *     When observation is ambiguous, you stop.
- *
- * That last line is the safety property. Guessing where you are, in a bank,
- * is worse than admitting you do not know.
+ * The operator may have moved forward, backward, somewhere unrelated, or
+ * finished the task, so the old step index is not used. Instead the current
+ * screen is checked against the checkpoint and each step's waypoint. If the
+ * result is ambiguous in a way that matters, re-localisation stops rather
+ * than guessing.
  */
 export type Localization =
   | { kind: 'completed'; detail: string }
@@ -25,11 +18,8 @@ export type Localization =
   | { kind: 'off_plan'; detail: string };
 
 export function localize(a: CapabilityArtifact, o: Observation): Localization {
-  // Checked FIRST: a human who simply finished the task is the happiest
-  // outcome, and resuming into a completed flow would redo work.
-  //
-  // An incomplete artifact has no checkpoint, so "did the human finish it?"
-  // is unanswerable — fall through to waypoints, which still localise.
+  // Check the checkpoint first: if the operator finished the task, only
+  // outputs need reading. Incomplete artifacts have none, so skip to waypoints.
   if (a.checkpoint) {
     const done = evaluateAssertion(o, a.checkpoint);
     if (done.held) return { kind: 'completed', detail: `checkpoint holds (${done.detail})` };
@@ -41,15 +31,9 @@ export function localize(a: CapabilityArtifact, o: Observation): Localization {
     return { kind: 'located', stepIndex: matches[0]!, detail: `waypoint for step ${matches[0]} holds` };
   }
   if (matches.length > 1) {
-    // Several steps can legitimately share a screen — typing into a field and
-    // clicking the button beside it both happen on the same form, so their
-    // waypoints both hold. Refusing outright would make resumption impossible
-    // for any multi-step screen.
-    //
-    // Ambiguity only MATTERS when the consequences differ. If everything from
-    // the earliest candidate onward is safe to redo, resume there: re-typing a
-    // member ID costs nothing. If an irreversible step is in the ambiguous
-    // set, we genuinely cannot tell whether it has run, and we stop.
+    // Several steps can share a screen (type into a field, click the button
+    // beside it). If all candidates are safe to redo, resume at the earliest.
+    // If one is irreversible, we cannot tell whether it ran, so stop.
     const earliest = Math.min(...matches);
     const risky = a.steps.filter((s) => matches.includes(s.index) && s.effect === 'irreversible').map((s) => s.index);
     if (risky.length === 0) {
@@ -85,16 +69,11 @@ export type ReentryDecision =
   | { safe: false; reason: string };
 
 /**
- * Is it safe to hand control back and resume here?
- *
- * The scenario this exists for: the operator already submitted the form, then
- * handed back. Localisation lands us before that step. Resuming naively opens
- * a SECOND sub-account — in a bank, with a customer's money. So re-entry is
- * effect-aware:
+ * Is it safe to resume from here? Covers the case where the operator already
+ * submitted a form and localisation lands before that step.
  *
  *   read / reversible   free to re-execute
- *   irreversible        only after its idempotency probe answers "already
- *                       done?" — and an indeterminate answer is not a yes
+ *   irreversible        only if its idempotency probe gives a definite answer
  */
 export function planReentry(a: CapabilityArtifact, loc: Localization, o: Observation): ReentryDecision {
   if (loc.kind === 'off_plan') {

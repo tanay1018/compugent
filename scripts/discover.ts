@@ -68,7 +68,7 @@ try {
     const t = s.target;
     const id = t.name ? `"${t.name}"` : t.anchor ? `${t.anchor.relation} "${t.anchor.text}"` : '?';
     console.log(`  ${String(s.index).padStart(2)}. ${s.kind.padEnd(7)} ${t.role.padEnd(8)} ${id}`);
-    if (s.literal !== undefined) console.log(`      value   : ${JSON.stringify(s.literal)}   <- Phase 4 lifts this to a typed parameter`);
+    if (s.literal !== undefined) console.log(`      value   : ${JSON.stringify(s.literal)}   <- may become a parameter at compile time`);
     if (s.outputName) console.log(`      output  : ${s.outputName} = ${JSON.stringify(s.observedValue)}`);
     console.log(`      why     : ${s.rationale}`);
     console.log(`      effect  : ${s.effect}${s.targetVerified ? '' : '   [UNVERIFIED DESCRIPTOR]'}`);

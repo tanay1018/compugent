@@ -13,8 +13,7 @@ test('control has no "both" state: exactly one holder, or nobody mid-transfer', 
   assert.ok(t.canAgentAct && !t.canOperatorAct);
 
   t.requestPause();
-  // Still the agent's until it yields at a step boundary — a click already in
-  // flight must not be interrupted halfway.
+  // Still the agent's until it yields at a step boundary.
   assert.equal(t.holder, 'agent');
   assert.ok(t.pauseRequested);
 
@@ -23,7 +22,7 @@ test('control has no "both" state: exactly one holder, or nobody mid-transfer', 
   assert.ok(t.canOperatorAct && !t.canAgentAct);
 
   t.requestResume();
-  // Control does NOT snap back to the agent: we do not know where we are yet.
+  // Control does not return to the agent until re-localisation.
   assert.equal(t.holder, 'nobody');
   assert.ok(!t.canAgentAct && !t.canOperatorAct);
 
@@ -77,9 +76,7 @@ const A = artifact([
     waypoint: { kind: 'nodeExists', target: target('Search', 'button') } },
 ]);
 
-// Waypoints must DISCRIMINATE. An earlier draft of this fixture gave both
-// steps the same waypoint and localize() correctly called it ambiguous —
-// which is the behaviour under test two cases up.
+// Each step needs a distinct waypoint here; identical ones would be (correctly) ambiguous.
 const withSubmit = artifact([
   { id: 's1', index: 1, kind: 'type', target: target('Member ID'), effect: 'reversible',
     waypoint: { kind: 'nodeExists', target: target('Member ID') } },
@@ -117,9 +114,8 @@ test('no matching waypoint is OFF PLAN — automation refuses to guess', () => {
 });
 
 test('steps sharing a screen resume at the earliest when all are safe to redo', () => {
-  // Typing into a field and clicking the button beside it both happen on the
-  // same form, so both waypoints hold. Refusing here would make resumption
-  // impossible for any multi-step screen; re-typing a member ID costs nothing.
+  // Both waypoints hold on the same form; both steps are safe to redo, so
+  // resume at the earliest.
   const l = localize(A, obs([
     node({ role: 'textbox', name: 'Member ID' }),
     node({ role: 'button', name: 'Search' }),
@@ -129,8 +125,7 @@ test('steps sharing a screen resume at the earliest when all are safe to redo', 
 });
 
 test('but ambiguity involving an IRREVERSIBLE step stops the run', () => {
-  // Here the consequences differ: we cannot tell whether the submit already
-  // happened, and guessing would post it twice.
+  // An irreversible step is among the candidates, so stop rather than guess.
   const o = obs([node({ role: 'textbox', name: 'Member ID' }), node({ role: 'button', name: 'Submit' })]);
   const l = localize(withSubmit, o);
   assert.equal(l.kind, 'ambiguous');
@@ -138,8 +133,7 @@ test('but ambiguity involving an IRREVERSIBLE step stops the run', () => {
 });
 
 test('an irreversible step the operator ALREADY performed is skipped, not repeated', () => {
-  // The scenario: the human submitted the form, then handed back. Resuming
-  // naively would open a second sub-account.
+  // The operator already submitted the form before handing back.
   const o = obs([node({ role: 'textbox', name: 'Member ID' }), node({ role: 'text', name: 'Sub-account created' })]);
   const d = planReentry(withSubmit, localize(withSubmit, o), o);
   assert.equal(d.safe, true);
@@ -155,10 +149,8 @@ test('an irreversible step that has NOT happened needs an operator decision', ()
 });
 
 test('a pending handover cannot outlive the automation loop', () => {
-  // The bug: an operator pressed Take Over while the agent was calling a tool
-  // that was not one of the acting three. The loop then ENDED, so it never
-  // reached another step boundary, and nothing else was watching. Control sat
-  // on pause_requested forever and the button read "Yielding…" indefinitely.
+  // Regression: a pause requested just before the loop ended was never
+  // completed, leaving control on pause_requested.
   const t = new ControlToken();
   let active = true;
   // Mirrors HandoffSession's setter: clearing the flag completes the handover.

@@ -2,10 +2,8 @@
  * MemberDesk 7.2 — a fictional back-office product by fictional vendor
  * "Corelink", used here as a stand-in for the real thing.
  *
- * Two tenants run the SAME vendor product, configured, branded and versioned
- * differently — which is the multi-tenant reality the brief describes. The
- * knobs that produce tenant variance are the same knobs that dial up how
- * hostile the surface is, so one mechanism serves both.
+ * Two tenants run the same product with different configuration, branding and
+ * version. The same settings control how hard the UI is to automate:
  *
  *   L0  semantic markup, real <label for> — the "modern web app" case
  *   L1  frameset + nested tables, no test ids, labels only positionally
@@ -20,12 +18,10 @@ export interface TenantConfig {
   institution: string;
   vendorProduct: string;
   hostility: Hostility;
-  /** Per-tenant wording. Same field, different label — the drift that breaks
-   *  name-based targeting across tenants running one product. */
+  /** Per-tenant wording: same field, different label. */
   labels: { memberId: string; searchType: string; submit: string; panel: string };
   theme: { bar: string; face: string };
-  /** Default of the search-type control. A tenant that ships a different
-   *  default silently changes what an artifact does — see REPORT.md §4. */
+  /** Default of the search-type control. A different default changes what an artifact does (REPORT.md §4.5). */
   defaultSearchType: 'M' | 'S';
 }
 
@@ -60,9 +56,7 @@ export const MEMBERS: Record<string, MemberRecord> = {
   '12345': { name: 'Sarah Chen',  status: 'Active',     savings: '4,182.55',  checking: '1,204.10' },
   '67890': { name: 'Marcus Webb', status: 'Active',     savings: '812.30',    checking: '95.00' },
   '55501': { name: 'Dana Ortiz',  status: 'Restricted', savings: '15,900.00', checking: '3,410.75' },
-  // Real members that happen to trigger a runtime condition on lookup. Keeping
-  // them real matters: a "slow load" fault that returned somebody else's record
-  // would be testing two different things at once.
+  // Real members whose lookup triggers a fault, so each fault tests one thing.
   '40001': { name: 'Ivan Petrov',  status: 'Active',     savings: '229.14',    checking: '18.60' },
   '40002': { name: 'Priya Raman',  status: 'Active',     savings: '7,020.00',  checking: '640.25' },
 };
@@ -82,9 +76,8 @@ export const FAULTS: Record<string, Fault> = {
   '40003': 'permission_denied',  // expected BUSINESS OUTCOME
   '40004': 'server_error',       // HARD FAILURE — stop, surface, debug
   '40005': 'session_expired',    // ESCALATE — automation cannot re-authenticate
-  // Renders a perfectly valid detail screen for the WRONG member: the case a
-  // checkpoint cannot catch, because arriving at the right SCREEN is not the
-  // same as arriving at the right RECORD.
+  // Renders a valid detail screen for the wrong member. The checkpoint passes;
+  // only mustMatchParam catches it.
   '40006': 'wrong_record',
 };
 
