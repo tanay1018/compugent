@@ -1,51 +1,35 @@
-# Design system — Operator Console
+# Operator console UI
 
-The design spec for the desktop app. Written before the CSS, so the interface
-is a system rather than a pile of decisions.
+Visual spec for the desktop app (`electron/shell.html`) and the case-study site
+(`site/styles.css`). Both read from the tokens defined here.
 
----
+## 1. Purpose
 
-## 1. What this is
+The console is used to supervise automation of bank back-office software. An
+automation and a human share one live session, and some actions cannot be
+undone. The UI has to make three things obvious without any clicks:
 
-An operator console for driving **regulated bank back-office software**. Two
-actors — an automation and a human — share one live session, and one of them
-can do things that cannot be undone.
+1. **Who is driving** (agent or operator)?
+2. **Is this discovery** (a model working it out) **or replay** (an artifact
+   executing)?
+3. **What has already happened that cannot be undone?**
 
-That tension is the product. It decides the whole design:
+Changes that make any of these harder to answer are wrong. Everything else is
+secondary.
 
-> **Who is driving, and what can't be taken back.**
-> Those two facts must be readable from across a room. Everything else is
-> secondary.
-
-Not a dashboard (nothing here is a metric). Not a chat UI (the model is not
-the subject). It is a **control room**: a live view, a record of what happened,
-and an unambiguous handle on control.
-
-### Anti-patterns — what this deliberately is not
-
-The templated default for "AI tool, dark theme" is a violet-to-blue gradient
-hero, rounded-2xl cards with an accent bar, emoji section markers, and
-everything centered. None of that appears here. Specifically banned:
-
-- gradients of any kind, and violet/indigo as an accent
-- emoji as iconography
-- decorative accent bars on cards
-- centered body copy
-- `border-radius` above 8px on anything that holds data
-- more than one typeface family
-
----
+Style constraints: no gradients, no emoji as icons, no decorative accent bars,
+no centred body copy, a maximum corner radius of 8px on anything holding data,
+and one typeface family.
 
 ## 2. Color
 
-Dark by default, because this runs beside a legacy banking app all day and a
-bright shell would be the brightest thing on the screen.
+Dark by default: the console sits beside a legacy app all day, and a bright
+shell would compete with it.
 
 ### Ground
 
-A cool near-black. Not pure black — pure black makes the legacy app's own beige
-chrome scream — and the neutral is biased toward the accent hue so it reads as
-chosen.
+A cool near-black, biased toward the accent hue. Pure black makes the legacy
+app's beige chrome look harsh.
 
 | token | hex | role |
 |---|---|---|
@@ -53,60 +37,53 @@ chosen.
 | `--surface` | `#161920` | panels, rails |
 | `--surface-2` | `#1D2129` | raised: cards, inputs, hover |
 | `--line` | `#252A34` | hairlines between regions |
-| `--line-2` | `#333945` | borders on interactive things |
+| `--line-2` | `#333945` | borders on interactive elements |
 | `--ink` | `#E4E8EE` | primary text |
 | `--ink-2` | `#98A1B2` | secondary text |
 | `--ink-3` | `#646D7E` | labels, disabled, metadata |
 
-### Actor — who is driving
+### Actor: who is driving
 
-Two hues, used on **chrome only**: the control badge, the stage border, the
-rail marker on an event. Seeing them anywhere else is a bug.
+Used on **chrome only**: the control badge, the stage border, the rail marker
+on an event.
 
 | token | hex | role |
 |---|---|---|
 | `--agent` | `#6E9BF2` | automation holds control |
-| `--human` | `#D99A4E` | a person holds control, **or is needed** |
+| `--human` | `#D99A4E` | a person holds control, or is needed |
 
-`--human` doing double duty is deliberate, not a collision. An escalation *is*
-the operator's business; the interface should not need two colors to say
-"a human is involved here."
+`--human` covers both cases on purpose: an escalation is the operator's
+business.
 
-### Status — what happened
+### Status: what happened
 
-Used on **data only**: outcome pills, result panels, step marks. Never on
-chrome, so status and actor never compete.
+Used on **data only**: outcome pills, result panels, step marks. Keeping status
+off the chrome stops it competing with the actor colors.
 
 | token | hex | role |
 |---|---|---|
-| `--ok` | `#5FB88A` | success; a business outcome the caller asked for |
+| `--ok` | `#5FB88A` | success, or a business outcome the caller asked for |
 | `--warn` | `#D99A4E` | recoverable, escalated, draft, fragile |
 | `--bad` | `#DD6E5A` | hard failure, refused by policy, irreversible |
 | `--info` | `#6E9BF2` | in progress, informational |
 
-`--warn` and `--human` are the same value on purpose — both mean "needs
-attention from a person."
+`--warn` shares its value with `--human`: both mean a person should look.
 
 ### Rules
 
-- Interactions **increase** contrast. Hover raises the surface, never dims it.
-- On the stage (which shows a light legacy app), tint the surrounding border
-  toward the actor hue rather than using a neutral — the boundary between
-  our chrome and their app must be unmistakable.
-- Irreversible is the only thing allowed to use `--bad` outside a failure.
-
----
+- Hover and focus increase contrast; they never dim.
+- The stage border is tinted with the current actor's hue, so the boundary
+  between the console and the embedded app is always clear.
+- `--bad` appears outside failures only to mark irreversible actions.
 
 ## 3. Type
 
-One family. Distinctiveness comes from the scale and the spacing, not from a
-novelty face — and a bundled webfont is a load failure waiting to happen in a
-desktop app that must work offline.
+One family, so there is no webfont to fail to load in an offline desktop app.
 
 - **UI**: `-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`
-- **Data**: `ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace` — used
-  for anything a person might need to *compare or copy*: identifiers, targets,
-  values, versions, token counts.
+- **Data**: `ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace`, for
+  anything a person may compare or copy: ids, targets, values, versions, token
+  counts.
 
 | step | size / line | weight | use |
 |---|---|---|---|
@@ -117,89 +94,52 @@ desktop app that must work offline.
 | `dense` | 12 / 1.5 | 400 | event feed, table data |
 | `label` | 11 / 1.4 | 600 | uppercase, `0.08em` tracking, `--ink-3` |
 
-Rules, from the Vercel guidelines:
-
-- Buttons and headings use **Title Case**. Sentence case in prose.
-- `font-variant-numeric: tabular-nums` wherever digits are compared —
-  token counts, timings, balances, version numbers.
-- Placeholders end with an ellipsis to signal emptiness.
-- Never letter-space lowercase body text.
-
----
+- Buttons and headings use Title Case; prose uses sentence case.
+- `font-variant-numeric: tabular-nums` wherever digits are compared.
+- Placeholders end with an ellipsis.
+- No letter-spacing on lowercase body text.
 
 ## 4. Space and shape
 
-4px base, 8px rhythm. Spacing is `4 · 8 · 12 · 16 · 24 · 32 · 48`.
+4px base, 8px rhythm: `4 · 8 · 12 · 16 · 24 · 32 · 48`.
 
-- `radius-sm` **4px** — pills, chips, inputs, buttons
-- `radius` **6px** — cards, panels
-- Nothing larger. Rounded-everything reads as a template.
-- Hairlines are 1px `--line`; interactive borders 1px `--line-2`.
-- No shadows except on things that genuinely float (drawer, popover), and then
-  only as a large soft cast, never a glow.
-- **No dead zones**: a label and its control share one hit target.
-
----
+- `radius-sm` 4px: pills, chips, inputs, buttons
+- `radius` 6px: cards, panels
+- Hairlines are 1px `--line`; interactive borders are 1px `--line-2`.
+- Shadows only on floating elements (drawer, popover), as a large soft cast.
+- A label and its control share one hit target.
 
 ## 5. Components
 
-### Control badge
-The loudest element. A dot plus the holder in `label` type, tinted by actor,
-on a tinted surface. Present at all times — there is no state where "who is
-driving" is unanswered, including mid-transfer, which reads `HANDING OVER`.
+**Control badge.** The most prominent element: a dot and the holder's name in
+`label` type, tinted by actor. Always present, including mid-transfer, which
+reads `HANDING OVER`.
 
-### Stage
-The live session. A 1px border tinted by the current actor, so the frame
-itself says who is driving. When the operator holds control the border is
-`--human` and a persistent hint sits below it. Never a glow.
+**Stage.** The live session, with a 1px border tinted by the current actor.
+While the operator holds control the border is `--human` and a hint sits below
+it.
 
-### Event feed
-One row per event: a mark, the actor's rail tint, and a **sentence**. Not JSON.
-Agent rows carry a cool left rail; operator rows carry a warm one and a raised
-surface, so a handoff reads as a visible seam in the history.
-
-Marks are glyphs, never emoji: `✓` done · `◆` read · `●` finished ·
+**Event feed.** One row per event: a mark, an actor rail, and a sentence rather
+than JSON. Operator rows use a warm rail and a raised surface, so a handoff is
+visible in the history. Marks: `✓` done · `◆` read · `●` finished ·
 `!` needs a human · `✗` refused · `↻` recovered · `·` incidental.
 
-### Capability card
-A capability is an **object**, not a form. The card states what it is before
-it offers anything to do: id, version and approval, one-line description, its
-typed contract (inputs → outputs, plus the outcomes it may return instead), and
-only then a Run control.
+**Capability card.** Shows what the capability is before offering to run it:
+id, version and approval, description, typed contract (inputs → outputs, plus
+possible outcomes), then the Run control. Approval pill colors: `approved`
+`--ok`, `draft` `--warn`, `incomplete` `--bad`.
 
-Approval state is a pill: `approved` `--ok` · `draft` `--warn` ·
-`incomplete` `--bad`.
+**Buttons.** Default is `--surface-2` with a `--line-2` border; one primary per
+view. Loading keeps the label and adds a spinner. Buttons are disabled only
+while a request is in flight. Irreversible actions use `--bad` on the border
+and label, not a filled red block.
 
-### Buttons
-Default is quiet: `--surface-2` with a `--line-2` border. One primary per view.
-- Loading keeps its label and adds a spinner. It never becomes "Loading…".
-- Never pre-disabled — disabled only while a request is in flight.
-- Destructive or irreversible actions take `--bad` on the border and label,
-  never a filled red block.
-
-### States
-Every surface designs four: **empty**, **loading**, **populated**, **error**.
-An empty catalog explains how to fill it and links to the action. No dead ends.
-
----
+**States.** Every view handles empty, loading, populated and error. An empty
+catalog explains how to add a capability and links to the action.
 
 ## 6. Motion
 
-Motion explains cause and effect. Nothing announces itself.
-
 - `120ms ease-out` for state changes; `180ms` for the drawer.
-- Never `transition: all` — list the properties.
-- No entrance animations on data. A row that fades in is a row you can't scan.
+- Transition named properties, never `all`.
+- No entrance animations on data rows.
 - Respect `prefers-reduced-motion`.
-
----
-
-## 7. The one thing to get right
-
-A person watching this should be able to answer, without clicking:
-
-1. **Who is driving?**
-2. **Is this the model figuring it out, or an artifact replaying?**
-3. **What has it already done that cannot be undone?**
-
-If a change makes any of those harder to answer, it is the wrong change.

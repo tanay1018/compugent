@@ -1,9 +1,8 @@
 # Design Report
 
-Design write up for the computer use automation take home. `README.md` has setup and the demo path. `evidence/README.md` indexes the recorded runs.
+Design write-up for the computer-use automation take-home. `README.md` has setup and usage; `evidence/README.md` indexes the recorded runs.
 
-> **The model discovers. The artifact is the capability. Replay never calls the model.**
-> Every decision below serves one of those three sentences.
+The core split: a model is used to discover a flow once, the result is compiled into a versioned artifact, and replay executes that artifact without calling a model.
 
 ## 1. Architecture
 
@@ -31,19 +30,19 @@ flowchart LR
 
 `src/schema` (persisted) never imports `src/surface` (ephemeral).
 
-A platform handle, CSS selector or pixel coordinate that reaches a saved artifact makes it non portable across surfaces and tenants. The rule is held by import direction.
+A platform handle, CSS selector or pixel coordinate that reaches a saved artifact makes it non-portable across surfaces and tenants. The rule is held by import direction.
 
 ### 1.3 Perception
 
-* **How.** Every frame's accessibility tree over CDP, filtered to actionable and informational roles, normalised to a 19 value role vocabulary. Frames keyed by name, never index.
+* **How.** Every frame's accessibility tree over CDP, filtered to actionable and informational roles, normalised to a 19-value role vocabulary. Frames keyed by name, never index.
 * **Why.** The only representation that exists on modern web, legacy web and desktop. An order of magnitude smaller than HTML, which matters because discovery resends the screen every step.
-* **Rejected.** DOM selectors: absent on table layout apps, meaningless on desktop. Screenshot plus coordinates: a coordinate is not an identity. Kept only as a designed last tier.
+* **Rejected.** DOM selectors: absent on table layout apps, meaningless on desktop. Screenshot plus coordinates: a coordinate is not an identity. Reserved as a designed, unbuilt last tier.
 
 ### 1.4 Anchor enrichment
 
 The lookup field on the target app is a `textbox` with an empty name. "Member ID" is the adjacent `<td>`.
 
-* **How.** An in page function walks outward from every control (and every text or cell node, since outputs live there) and returns the first label found, with the relation:
+* **How.** An in-page function walks outward from every control (and every text or cell node, since outputs live there) and returns the first label found, with the relation:
 
 | order | source | relation |
 |---|---|---|
@@ -55,24 +54,27 @@ The lookup field on the target app is a `textbox` with an empty name. "Member ID
 
 * **Why on named controls too.** Chrome synthesises `"Submit"` for an image input with no alt text. Trusting it pins the artifact to a browser default. Name and anchor are recorded together.
 
-Two budgets fight on a real page, and both had to change. Anchoring is a prioritised second pass — anonymous controls first (the anchor *is* their identity), then cells, then named controls, then loose prose — because enrichment costs two CDP round trips per node. And the render budget no longer ranks all controls above all data: on the Bank of America article, ~2000 links consumed the 140 node cap before the first infobox cell, so the model could not see ISIN anywhere on screen and went looking for it in the **edit view of a live encyclopedia**. Controls and anchored data now each get a guaranteed share, and all 39 anchored infobox cells render.
+Large pages need two budgets:
+
+* **Enrichment.** Anchoring costs two CDP round trips per node, so it runs as a prioritised pass: unnamed controls first (the anchor is their only identity), then cells, then named controls, then other text.
+* **Rendering.** Controls and anchored data each get a reserved share of the 140 node cap. When controls were ranked above all data, the ~2000 links on the Bank of America article filled the cap before the first infobox cell, and the model could not see the ISIN row. With the split, all 39 anchored infobox cells render.
 
 ### 1.5 Acting
 
-* **How.** Scroll into view, box model centre, `Input.dispatchMouseEvent`. Typing is select all then `insertText`, so a prefilled field is overwritten, not appended to.
+* **How.** Scroll into view, box-model centre, `Input.dispatchMouseEvent`. Typing is select-all then `insertText`, so a prefilled field is overwritten, not appended to.
 * **Why.** Real events exercise the app's own handlers, and the same primitive forwards an operator's input during a handoff.
 * **Rejected.** `element.click()`. It bypasses handlers and adds a second locating mechanism beside the artifact's own.
 
 ### 1.6 Discovery loop
 
 * Tools: `click`, `type`, `select`, `extract`, `finish`, `giveUp`. The model sees the rendered observation, never HTML.
-* Stops on `finish`, `giveUp`, 20 steps, or 240 s wall clock.
+* Stops on `finish`, `giveUp`, 20 steps, or 240 s wall-clock.
 * The tool set equals the step kinds an artifact can hold. That is what makes compilation mechanical.
-* Three record time gates:
+* Three record-time gates:
   1. every synthesised descriptor is resolved back against its observation; a miss marks the step `fragile`
   2. an output anchored to a number, a currency or its own value is rejected
   3. an irreversible action may not be repeated in one run (a ParaBank run once opened two accounts)
-* **One action per step, enforced.** A model may emit several tool calls in one step and the SDK will run them all, back to back. For a chat tool that is throughput; for a UI it is incoherent — every action changes the screen, so the second call was chosen against a screen that no longer exists when it runs, and nothing re-perceives in between to notice. On weather.gov the model emitted `click("Go")` and `type("10001")` together; they executed 48 ms apart, pressing Go on an empty form. The submit did nothing, and the run spent four minutes and seven more Go clicks reasoning about a failure whose cause had already scrolled out of the context. The extra call is now refused rather than queued: the model is told why and handed a fresh observation. Same task, same model: eleven flailing steps became four, and the run succeeded in about fifty seconds.
+* **One action per step.** The SDK will execute several tool calls from one model step back to back, but each UI action changes the screen, so later calls target a screen that no longer exists. On weather.gov the model emitted `click("Go")` and `type("10001")` together; they ran 48 ms apart and submitted an empty form, and the run timed out. Extra calls in a step are now refused, and the model gets a fresh observation. The same task on the same model then finished in four steps, about 50 s.
 * Cost: stale observations compacted before every call (74 percent fewer input characters on a sample run), reasoning effort `low`, 140 node cap.
 
 ### 1.7 Compilation
@@ -84,7 +86,7 @@ Two budgets fight on a real page, and both had to change. Anchoring is a priorit
 
 ### 1.8 Operator console
 
-* Zero dependency HTTP in the runner process. Screencast out over server sent events, control and raw input back over POST.
+* Zero-dependency HTTP in the runner process. Screencast out over server-sent events, control and raw input back over POST.
 * The session stays in the runner. That is the shape of attaching to a containerised session in production. The Electron app is a window around this page.
 
 ## 2. Artifact schema
@@ -241,7 +243,7 @@ Four variants, not one status field: a caller that handles only success and fail
 
 ### 3.6 Measured, not asserted
 
-`--repeat N` reports distinct statuses, outputs and resolution paths. The third column is the early warning: a step alternating between name and anchor is a descriptor drifting under a healthy looking result.
+`--repeat N` reports distinct statuses, outputs and resolution paths. The third column is the early warning: a step alternating between name and anchor is a descriptor drifting under a healthy-looking result.
 
 Consistency is reported separately from working, because three identical failures are perfectly consistent. An earlier version printed `STABLE` for them and exited 0, which would have let a broken capability pass any CI gate built on `--repeat`.
 
@@ -262,11 +264,9 @@ $ npm run verify -- wikipedia.readCompanyInfobox \
   wikipedia.readCompanyInfobox v2 → approved, on 2 verified cases.
 ```
 
-This is the rung that makes `approved` mean something stronger than `draft` rather than merely later, and it caught a real defect the day it was written. A weather.gov capability anchored its temperature to `precededBy "Overcast"` — the current conditions text, which is *data wearing the shape of a label*. The compiler could not know; it sees one trace. Verify ran it against a second ZIP and reported PINNED, because Beverly Hills was not overcast. Twenty four hours later New York read "Fair" and the capability failed on its own recorded ZIP as well.
+This makes `approved` mean more than "a later draft". Example: a weather.gov capability anchored its temperature to `precededBy "Overcast"`, the current-conditions text. From a single trace the compiler cannot tell that this is data rather than a label. Verify ran it against a second ZIP and reported PINNED because Beverly Hills was not overcast; a day later New York read "Fair" and it failed on its own recorded ZIP too. It was never approved, whereas a single passing replay on the day of recording would have looked fine.
 
-It was never approved. The model produced it, the compiler accepted it, and the gate refused it — which is the ladder doing exactly what it is for. A single green replay on the day of recording would have shipped it.
-
-The rule that falls out: **an anchor must be a label, not a value.** `inSameRowAs "ISIN"` holds because every company article has an ISIN row. `precededBy "Overcast"` holds until the weather changes.
+The rule: **an anchor must be a label, not a value.** `inSameRowAs "ISIN"` holds because every company article has an ISIN row. `precededBy "Overcast"` holds until the weather changes.
 
 ### 3.8 UI drift
 
@@ -293,7 +293,7 @@ Everything above it is written against this interface only. `UINode.ref` is vali
 | image inputs, no alt | synthesised name recorded beside the anchor; the anchor carries `harbor` |
 | canvas, WebGL | nothing to perceive; fails, and says so |
 
-Measured: works wherever a screen reader would (Wikipedia, Hacker News, ParaBank, a React SPA). Bot walls are detected before a model call is spent.
+Measured: works where a screen reader would (Wikipedia, Hacker News, ParaBank, a React SPA). Bot walls are detected before a model call is spent.
 
 ### 4.3 Desktop, designed and stubbed
 
@@ -301,10 +301,10 @@ Measured: works wherever a screen reader would (Wikipedia, Hacker News, ParaBank
 
 * Perception: `AXUIElement` or UIA walked into the same `UINode` shape.
 * Anchoring: `inSameRowAs` becomes geometric adjacency. Win32 and Swing dialogs expose unlabelled edits whose only identity is the text to their left.
-* Process: out of process driver over JSON RPC on stdio. This is why `Surface` is coarse and async.
+* Process: out-of-process driver over JSON-RPC on stdio. This is why `Surface` is coarse and async.
 * Visual tier: `fallbacks[].kind = "visual"` with OCR text and an anchor offset is reserved for Citrix and canvas. Not built.
 
-### 4.4 Multitenant
+### 4.4 Multi-tenant
 
 Built:
 
@@ -350,13 +350,13 @@ stateDiagram-v2
   operator --> resume_requested : hand back
   resume_requested --> relocalizing
   relocalizing --> agent : located, reentry safe
-  relocalizing --> operator : off plan or ambiguous
+  relocalizing --> operator : off-plan or ambiguous
 ```
 
-* No "both" state. Holder is `agent`, `operator`, or `nobody` mid transfer. Illegal transitions throw.
+* No "both" state. Holder is `agent`, `operator`, or `nobody` mid-transfer. Illegal transitions throw.
 * While the agent holds, operator input raises a pause request; it never reaches the page. While the operator holds, the executor is blocked.
-* Barge in lands at step boundaries. Waits are interruptible, actions are not, so every event has one actor.
-* Found by use: a loop that stopped with a pause pending left the console on "handing over" forever. The session now yields automatically.
+* Barge-in lands at step boundaries. Waits are interruptible, actions are not, so every event has one actor.
+* If a run ends while a pause is pending, the session yields to the operator automatically. Previously the console stayed on "handing over".
 
 ### 5.3 Handoff
 
@@ -379,12 +379,12 @@ sequenceDiagram
   S->>S: localize · planReentry
   alt safe
     S->>R: replay(resumeFrom, skipNavigation)
-  else off plan · ambiguous · no probe
+  else off-plan · ambiguous · no probe
     S->>H: session stays with the human
   end
 ```
 
-* Same browser, no re login. Frames stream out; input is dispatched over CDP only while the operator holds the token.
+* Same browser, no re-login. Frames stream out; input is dispatched over CDP only while the operator holds the token.
 * Human actions are captured semantically: a page listener reports click, input and submit with the nearest control's label, by the same cell walk perception uses. Password fields carry no value.
 * Attribution is by token holder, because the agent's own events fire the same listeners.
 * `--simulate` drives a scripted operator through the same gated path for reproducible evidence.
@@ -401,9 +401,9 @@ sequenceDiagram
 | several hold, one irreversible | stop; cannot tell whether it ran |
 | none hold | stop; automation does not guess |
 
-For every irreversible step from the resume point: probe holds, skip; probe does not hold, operator decides; no probe, refuse. This is what prevents a second subaccount after the operator already submitted.
+For every irreversible step from the resume point: probe holds, skip; probe does not hold, operator decides; no probe, refuse. This is what prevents a second sub-account after the operator already submitted.
 
-Discovery hand back has no relocalisation. There is no plan to be lost against; the model re observes and the interrupted tool call is explicitly not performed.
+Discovery handback has no relocalisation. There is no plan to be lost against; the model re-observes and the interrupted tool call is explicitly not performed.
 
 ## 6. Safety
 
@@ -423,7 +423,7 @@ The entry URL is checked before the browser moves.
 ### 6.2 Classify once, enforce always
 
 * Effect is proposed at compile time from the control's label and reviewed with the artifact.
-* Replay enforces the declared effect and never reclassifies. Guessing whether a button is destructive mid run is where duplicates get posted.
+* Replay enforces the declared effect and never reclassifies. Guessing whether a button is destructive mid-run is where duplicates get posted.
 * Typing is reversible; the submit commits. Creation is irreversible: an earlier list missed account opening and a run opened a second savings account.
 
 ### 6.3 Irreversible steps
@@ -436,16 +436,16 @@ The entry URL is checked before the browser moves.
 
 ### 6.4 Credentials
 
-* Refused, not redacted. Redacting after the value was typed into a live system is a consolation prize.
-* Input type first (`password` is refused regardless of label), then label patterns. A label only check once let ParaBank's unlabelled login through and a password reached the trace.
+* Refused, not redacted. Redacting the log afterwards does not undo typing the value into a live system.
+* Input type first (`password` is refused regardless of label), then label patterns. A label-only check once let ParaBank's unlabelled login through and a password reached the trace.
 * A refused field never enters the trace, so it can never enter an artifact. The schema also rejects a literal matching `^(pw|pass|pin|secret|token)`.
-* Replay re checks the field itself. An artifact is a file, and a file can be edited.
+* Replay re-checks the field itself. An artifact is a file, and a file can be edited.
 
 ### 6.5 Redaction
 
 * Applied in `RunLog.append`, on the way in. Patterns: SSN, 13 to 19 digit card numbers, 9 to 17 digit account numbers, email.
 * Sensitive inputs and outputs are `[REDACTED]` in `run.jsonl` and `result.json`. The caller gets real values; the evidence directory does not.
-* `.env` is git ignored. Only discovery and compile read the key.
+* `.env` is git-ignored. Only discovery and compile read the key.
 
 ### 6.6 Limits
 
@@ -463,15 +463,15 @@ The entry URL is checked before the browser moves.
 | visual / OCR tier | `visual` fallback kind | only matters for canvas and Citrix |
 | CSS / XPath fallbacks | accepted by the schema | surface specific; only `text` runs |
 | tenant overlays | `harbor` tenant, `recordedTenant` | format designed in 4.4 |
-| compiler authored probes and `produces` | schema requires probes; replay honours them | a trace with an irreversible step needs the probe added by hand before it parses |
-| default state assertions | waypoint vocabulary | the dropdown drift class in 4.5 |
-| assisted LLM fallback | escalation machinery | bounded, single step, published as a new draft |
+| compiler-authored probes and `produces` | schema requires probes; replay honours them | a trace with an irreversible step needs the probe added by hand before it parses |
+| default-state assertions | waypoint vocabulary | the dropdown drift class in 4.5 |
+| assisted LLM fallback | escalation machinery | bounded, single-step, published as a new draft |
 | catalog endpoint | `toToolSchema()`, desktop catalog | no network surface for an external agent |
 | screenshot redaction, console auth | | |
 
 ### 7.1 Known limits on real sites
 
-These are measured, not suspected. Each is a real page the system handles badly.
+Each row is a real page the system handles badly.
 
 | limit | what happens | why it is not a tuning problem |
 |---|---|---|
@@ -479,14 +479,14 @@ These are measured, not suspected. Each is a real page the system handles badly.
 | **Values with no label** | weather.gov puts nothing label-shaped beside the temperature (`Current conditions at / STATION / Fair / 79°F`) | no anchor *choice* fixes it; the page has no label to anchor to. Caught by the gate (§3.7), never approved |
 | **Definition-list layouts** | openlibrary.org yields 133 nodes and **zero** anchored | anchoring reaches for a table row or preceding text; a `<dl>` presents neither. Needs a third relation kind, not a bigger budget |
 | **JSON in text nodes** | finance.yahoo.com anchored a control to `[{"fullExchangeName":"Nasd…` | embedded JSON is indistinguishable from prose to the AX tree; needs a shape filter on anchor candidates |
-| **No prompt caching** | `cached=0` on every model call | the gateway is not reusing the prefix. Pure cost, no correctness impact, and the largest single saving still on the table |
+| **No prompt caching** | `cached=0` on every model call | compaction rewrites history every step, and the remaining stable prefix (~450 token system prompt) is below Anthropic's 1024 token minimum. Cost only, no correctness impact |
 
-The honest summary: this works on pages whose structure carries meaning — label/value rows, named controls, tables. It degrades on pages that are visually structured but semantically flat, and it does not work at all where a CDN decides it shouldn't.
+In short: this works on pages whose structure carries meaning (label/value rows, named controls, tables). It degrades on pages that are visually structured but semantically flat, and does not work behind bot protection.
 
 Next, in order:
 
-1. prompt prefix caching — the cheapest large win, and the one the token traces keep pointing at
-2. a `describedBy` anchor relation for definition lists, which is the one structural gap with real sites behind it
-3. tenant overlay plus default state assertions from the compiler
-4. compiler generated idempotency probes: a `nodeExists` on the confirmation the recorded run saw after the step
-5. bounded single step recovery on replay failure, gated by the existing draft rule
+1. prompt prefix caching, which needs a stable prefix long enough to cache
+2. a `describedBy` anchor relation for definition lists
+3. tenant overlay plus default-state assertions from the compiler
+4. compiler-generated idempotency probes: a `nodeExists` on the confirmation the recorded run saw after the step
+5. bounded single-step recovery on replay failure, gated by the existing draft rule

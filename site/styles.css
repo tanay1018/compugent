@@ -1,8 +1,6 @@
 /*
- * Minimalist-technical: Swiss structure, restrained colour, monospace for
- * anything the machine produced. Tokens come from DESIGN.md so the site and
- * the tool it documents share one language — actor hues on chrome, status
- * hues on data, and never the reverse.
+ * Tokens come from DESIGN.md, shared with the desktop app: actor hues on
+ * chrome, status hues on data. Monospace for machine-produced values.
  */
 :root{
   --bg:#0E1014; --surface:#161920; --surface-2:#1D2129; --surface-3:#232833;
