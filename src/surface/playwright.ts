@@ -1,4 +1,4 @@
-import { chromium, type Browser, type Page, type CDPSession } from 'playwright';
+import { chromium, type Browser, type Page, type CDPSession, type Dialog } from 'playwright';
 import type { TargetDescriptor } from '../schema/target.js';
 import type {
   Action, FrameInfo, Observation, RawInput, ResolveResult, Surface, SurfaceKind, UINode,
@@ -96,6 +96,9 @@ export class PlaywrightSurface implements Surface {
     await cdp.send('Runtime.enable');
     await cdp.send('Page.enable');
     const surface = new PlaywrightSurface(browser, page, cdp);
+    // Keep native dialogs open instead of letting Playwright auto-dismiss them,
+    // so an unexpected alert/confirm is seen and handled like any other screen.
+    page.on('dialog', (d) => { surface.dialog = d; surface.lastNavAt = Date.now(); });
     // Input goes over raw CDP, so Playwright's auto-waiting never sees the
     // resulting navigations. Track them here instead.
     cdp.on('Page.frameNavigated', () => { surface.lastNavAt = Date.now(); });
@@ -111,7 +114,21 @@ export class PlaywrightSurface implements Surface {
   }
 
   async navigate(url: string): Promise<void> {
-    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    // A dialog left open would block the navigation.
+    if (this.dialog) { await this.dialog.dismiss().catch(() => {}); this.dialog = null; }
+    // A dialog raised while the page loads blocks DOMContentLoaded, so stop
+    // waiting as soon as one opens; the next observation reports it.
+    const nav = this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    nav.catch(() => {});
+    let poll: ReturnType<typeof setInterval> | undefined;
+    const dialogOpened = new Promise<void>((resolve) => {
+      poll = setInterval(() => { if (this.dialog) resolve(); }, 50);
+    });
+    try {
+      await Promise.race([nav, dialogOpened]);
+    } finally {
+      clearInterval(poll);
+    }
   }
 
   private async frames(): Promise<FrameInfo[]> {
@@ -131,7 +148,33 @@ export class PlaywrightSurface implements Surface {
     return out;
   }
 
+  /** A native alert / confirm / prompt currently blocking the page. */
+  private dialog: Dialog | null = null;
+
+  /**
+   * While a native dialog is open the page's scripts are blocked, so the
+   * observation is the dialog itself: its message as text and OK / Cancel as
+   * buttons. Outcome detection, recovery and discovery then work unchanged.
+   */
+  private dialogObservation(d: Dialog): Observation {
+    const message = d.message().replace(/\s+/g, ' ').trim().slice(0, 200) || `(${d.type()})`;
+    const node = (ref: number, role: UINode['role'], name: string, handle: string): UINode =>
+      ({ ref, role, name, value: '', states: [], frame: 'dialog', handle });
+    const nodes: UINode[] = [
+      node(1, 'dialog', message, 'dialog'),
+      node(2, 'text', message, 'dialog:text'),
+      node(3, 'button', 'OK', 'dialog:accept'),
+    ];
+    if (d.type() !== 'alert') nodes.push(node(4, 'button', 'Cancel', 'dialog:dismiss'));
+    return {
+      surfaceKind: 'web', capturedAt: new Date().toISOString(),
+      frames: [{ id: 'dialog', name: 'dialog', url: this.page.url() }],
+      nodes, location: this.page.url(),
+    };
+  }
+
   async observe(): Promise<Observation> {
+    if (this.dialog) return this.dialogObservation(this.dialog);
     await this.cdp.send('DOM.getDocument', { depth: -1, pierce: true });
     const frames = await this.frames();
     const nodes: UINode[] = [];
@@ -251,6 +294,13 @@ export class PlaywrightSurface implements Surface {
   }
 
   async act(_observation: Observation, node: UINode, action: Action): Promise<void> {
+    if (typeof node.handle === 'string' && node.handle.startsWith('dialog:')) {
+      const d = this.dialog;
+      this.dialog = null;
+      if (d) await (node.handle === 'dialog:accept' ? d.accept() : d.dismiss());
+      this.lastNavAt = Date.now();
+      return;
+    }
     if (action.kind === 'navigate') {
       if (!action.url) throw new Error('navigate action requires a url');
       return this.navigate(action.url);
@@ -331,7 +381,26 @@ export class PlaywrightSurface implements Surface {
   }
 
   async screenshot(): Promise<Buffer> {
+    if (this.dialog) return this.renderDialog(this.dialog);
     return this.page.screenshot({ fullPage: false });
+  }
+
+  /**
+   * The page cannot be captured while a native dialog blocks it (Playwright
+   * waits forever, CDP errors), so render the dialog's type and message on a
+   * separate blank page instead.
+   */
+  private async renderDialog(d: Dialog): Promise<Buffer> {
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const p = await this.browser.newPage({ viewport: { width: 640, height: 180 } });
+    try {
+      await p.setContent(`<body style="font:14px system-ui;margin:24px">
+        <div style="color:#666;font-size:12px">native ${esc(d.type())} dialog on ${esc(this.page.url())}</div>
+        <div style="border:1px solid #999;padding:16px;margin-top:8px">${esc(d.message())}</div></body>`);
+      return await p.screenshot();
+    } finally {
+      await p.close();
+    }
   }
 
   /** @internal — updated from CDP navigation events. */
@@ -353,6 +422,8 @@ export class PlaywrightSurface implements Surface {
     const deadline = startedAt + timeoutMs;
 
     while (Date.now() < deadline) {
+      // An open dialog blocks the page; there is nothing more to wait for.
+      if (this.dialog) return;
       const navigated = this.lastNavAt !== navAtEntry;
       // Inside the grace window with no navigation yet: keep waiting.
       if (!navigated && Date.now() - startedAt < graceMs) {

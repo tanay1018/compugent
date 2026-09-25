@@ -21,7 +21,7 @@ export interface TenantConfig {
   /** Per-tenant wording: same field, different label. */
   labels: { memberId: string; searchType: string; submit: string; panel: string };
   theme: { bar: string; face: string };
-  /** Default of the search-type control. A different default changes what an artifact does (REPORT.md §4.5). */
+  /** Default of the search-type control. A different default changes what an artifact does (docs/detailed-report.md §4.5). */
   defaultSearchType: 'M' | 'S';
 }
 
@@ -59,6 +59,7 @@ export const MEMBERS: Record<string, MemberRecord> = {
   // Real members whose lookup triggers a fault, so each fault tests one thing.
   '40001': { name: 'Ivan Petrov',  status: 'Active',     savings: '229.14',    checking: '18.60' },
   '40002': { name: 'Priya Raman',  status: 'Active',     savings: '7,020.00',  checking: '640.25' },
+  '40007': { name: 'Tom Alvarez',  status: 'Active',     savings: '3,318.40',  checking: '702.90' },
 };
 
 /**
@@ -67,7 +68,8 @@ export const MEMBERS: Record<string, MemberRecord> = {
  */
 export type Fault =
   | 'none' | 'not_found' | 'slow' | 'interstitial'
-  | 'permission_denied' | 'server_error' | 'session_expired' | 'wrong_record';
+  | 'permission_denied' | 'server_error' | 'session_expired' | 'wrong_record'
+  | 'invalid_input' | 'native_dialog';
 
 export const FAULTS: Record<string, Fault> = {
   '99999': 'not_found',          // expected BUSINESS OUTCOME — not a crash
@@ -79,7 +81,13 @@ export const FAULTS: Record<string, Fault> = {
   // Renders a valid detail screen for the wrong member. The checkpoint passes;
   // only mustMatchParam catches it.
   '40006': 'wrong_record',
+  // A native browser alert() before the detail screen renders. RECOVERABLE.
+  '40007': 'native_dialog',
 };
 
+/** Member IDs are five digits; anything else fails form validation. BUSINESS OUTCOME. */
+export const isValidMemberId = (id: string): boolean => /^\d{5}$/.test(id);
+
 export const faultFor = (id: string): Fault =>
-  FAULTS[id] ?? (MEMBERS[id] ? 'none' : 'not_found');
+  !isValidMemberId(id) ? 'invalid_input'
+  : FAULTS[id] ?? (MEMBERS[id] ? 'none' : 'not_found');

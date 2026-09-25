@@ -14,6 +14,10 @@ import { TENANTS, DEFAULT_TENANT, MEMBERS, faultFor, type TenantConfig } from '.
 const PORT = Number(process.env.TARGET_APP_PORT ?? 8710);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Sub-accounts opened in this server's lifetime, per member. */
+const subAccounts = new Map<string, Array<{ number: string; type: string }>>();
+const SUB_ACCOUNT_TYPES = ['Money Market', 'Share Certificate'];
+
 /** Session state, so session-expiry is a real condition rather than a mock. */
 const sessions = new Map<string, { expired: boolean }>();
 const sessionOf = (id: string) => {
@@ -36,7 +40,7 @@ function header(t: TenantConfig) {
 </tr></table>`);
 }
 
-function lookup(t: TenantConfig) {
+function lookup(t: TenantConfig, error?: string) {
   // L2 replaces the named submit with an unlabelled image input. Chrome then
   // synthesises the name "Submit", which is a browser default rather than app
   // content, so the control also gets a labelled cell to anchor to.
@@ -55,6 +59,7 @@ function lookup(t: TenantConfig) {
   <table cellpadding="3" cellspacing="1" border="0" bgcolor="#808080"><tr><td bgcolor="${t.theme.face}">
    <table cellpadding="4" cellspacing="0" border="0">
     <tr><td colspan="2" bgcolor="${t.theme.bar}"><font color="#ffffff"><b>${t.labels.panel}</b></font></td></tr>
+    ${error ? `<tr><td colspan="2"><font color="#cc0000" size="2"><b>${error}</b></font></td></tr>` : ''}
     <form action="/detail" method="get">
     <input type="hidden" name="tenant" value="${t.id}">
     <tr><td align="right"><font size="2">${t.labels.memberId}</font></td>
@@ -77,7 +82,7 @@ const banner = (t: TenantConfig, colour: string, msg: string, back = true) =>
   <font color="${colour}"><b>${msg}</b></font></td></tr></table>` +
   (back ? `<br><a href="/lookup?${qs(t)}">Return to ${t.labels.panel}</a>` : ''));
 
-function detail(t: TenantConfig, id: string) {
+function detail(t: TenantConfig, id: string, script = '') {
   const m = MEMBERS[id]!;
   return shell(t, `
 <table cellpadding="4" cellspacing="0" border="0" width="100%">
@@ -91,6 +96,43 @@ function detail(t: TenantConfig, id: string) {
  <tr bgcolor="#c0c0c0"><td><font size="2"><b>Account</b></font></td><td><font size="2"><b>Balance</b></font></td></tr>
  <tr bgcolor="#ffffff"><td><font size="2">Savings</font></td><td align="right"><font size="2">$${m.savings}</font></td></tr>
  <tr bgcolor="#ffffff"><td><font size="2">Checking</font></td><td align="right"><font size="2">$${m.checking}</font></td></tr>
+</table><br><a href="/lookup?${qs(t)}">New Search</a>
+&nbsp;|&nbsp; <a href="/subaccount?${qs(t)}&q1=${encodeURIComponent(id)}">Open Sub-Account</a>${script}`);
+}
+
+/** The form behind an irreversible action: opening a sub-account. */
+function subAccountForm(t: TenantConfig, id: string) {
+  const m = MEMBERS[id]!;
+  const existing = subAccounts.get(id) ?? [];
+  const rows = existing.length
+    ? existing.map((s) => `<tr bgcolor="#ffffff"><td><font size="2">${s.number}</font></td><td><font size="2">${s.type}</font></td></tr>`).join('')
+    : `<tr bgcolor="#ffffff"><td colspan="2"><font size="2">None</font></td></tr>`;
+  return shell(t, `
+<table cellpadding="4" cellspacing="0" border="0" width="100%">
+ <tr><td bgcolor="${t.theme.bar}"><font color="#ffffff"><b>Open Sub-Account</b></font></td></tr></table>
+<form action="/subaccount/open" method="get">
+<input type="hidden" name="tenant" value="${t.id}">
+<input type="hidden" name="q1" value="${id}">
+<table cellpadding="4" cellspacing="0" border="0">
+  <tr><td align="right"><font size="2">Member</font></td><td><b>${m.name}</b> (${id})</td></tr>
+  <tr><td align="right"><font size="2">Account Type</font></td>
+      <td><select name="type">${SUB_ACCOUNT_TYPES.map((x) => `<option>${x}</option>`).join('')}</select></td></tr>
+  <tr><td colspan="2" align="right"><input type="submit" value="Open Account"></td></tr>
+</table></form><br>
+<table cellpadding="3" cellspacing="1" border="0" bgcolor="#808080">
+ <tr bgcolor="#c0c0c0"><td><font size="2"><b>Existing Sub-Account</b></font></td><td><font size="2"><b>Type</b></font></td></tr>
+ ${rows}
+</table>`);
+}
+
+function subAccountOpened(t: TenantConfig, id: string, acct: { number: string; type: string }) {
+  return shell(t, `
+<table cellpadding="4" cellspacing="0" border="0" width="100%">
+ <tr><td bgcolor="${t.theme.bar}"><font color="#ffffff"><b>Sub-Account Opened</b></font></td></tr></table>
+<table cellpadding="4" cellspacing="0" border="0">
+  <tr><td align="right"><font size="2">Member</font></td><td>${MEMBERS[id]!.name}</td></tr>
+  <tr><td align="right"><font size="2">New Account</font></td><td>${acct.number}</td></tr>
+  <tr><td align="right"><font size="2">Account Type</font></td><td>${acct.type}</td></tr>
 </table><br><a href="/lookup?${qs(t)}">New Search</a>`);
 }
 
@@ -143,12 +185,38 @@ createServer(async (req, res) => {
         <text x="32" y="15" font-size="11" text-anchor="middle" font-family="sans-serif">${t.labels.submit}</text></svg>`,
         'image/svg+xml');
 
+    case '/subaccount': {
+      const id = u.searchParams.get('q1') ?? '';
+      if (!MEMBERS[id]) return send(200, banner(t, '#800000', 'No member found matching that ID.'));
+      return send(200, subAccountForm(t, id));
+    }
+
+    // Not idempotent on purpose: every request opens another account, which is
+    // what makes a repeated submit a real risk.
+    case '/subaccount/open': {
+      const id = u.searchParams.get('q1') ?? '';
+      const type = u.searchParams.get('type') ?? '';
+      if (!MEMBERS[id] || !SUB_ACCOUNT_TYPES.includes(type)) {
+        return send(400, banner(t, '#800000', 'Invalid sub-account request.'));
+      }
+      const list = subAccounts.get(id) ?? [];
+      const acct = { number: `S-${id}-${String(list.length + 1).padStart(2, '0')}`, type };
+      list.push(acct);
+      subAccounts.set(id, list);
+      return send(200, subAccountOpened(t, id, acct));
+    }
+
     case '/continue':
       return send(200, detail(t, u.searchParams.get('q1') ?? ''));
 
     case '/detail': {
       const id = (u.searchParams.get('q1') ?? '').trim();
       switch (faultFor(id)) {
+        case 'invalid_input':
+          return send(200, lookup(t, `${t.labels.memberId} must be exactly 5 digits.`));
+        case 'native_dialog':
+          return send(200, detail(t, id,
+            `<script>alert('This member record is flagged for compliance review. Balances are as of the prior business day.')</script>`));
         case 'slow':
           await sleep(8000);
           return send(200, detail(t, id));      // the RIGHT member, just late

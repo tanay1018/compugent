@@ -24,6 +24,11 @@ const PROBES: OutcomeProbe[] = [
     message: 'A scheduled-maintenance interstitial was dismissed.', recoverBy: 'dismissNewControl' },
   { name: 'application_error', classification: 'hard_failure', inputs: { memberId: '40004' },
     message: 'The application returned an internal error.' },
+  { name: 'invalid_member_id', classification: 'business_outcome', inputs: { memberId: 'ABC12' },
+    message: 'The member ID failed the form\'s validation: it must be exactly 5 digits.' },
+  { name: 'compliance_alert', classification: 'recoverable', inputs: { memberId: '40007' },
+    message: 'A native compliance alert was acknowledged before the detail screen.', recoverBy: 'dismissNewControl' },
+  // Last: it leaves the target app's session expired for every later run.
   { name: 'session_expired', classification: 'escalate', inputs: { memberId: '40005' },
     message: 'The session expired. Automation cannot re-authenticate; a human must sign in.' },
 ];
@@ -37,14 +42,17 @@ try {
   const outcomes = await learnOutcomes(current, PROBES, surface, baseUrl, { memberId: '12345' },
     (m) => console.log(m));
 
+  // The next free version: `current` is the approved one, which need not be the newest.
+  const version = store.nextVersion(id);
   const next = CapabilityArtifact.parse({
     ...current,
-    version: current.version + 1,
+    version,
+    approval: 'draft',
     outcomes,
     provenance: {
       ...current.provenance,
       warnings: [...current.provenance.warnings,
-        `v${current.version + 1}: ${outcomes.length} outcome signatures learned from probe runs`],
+        `v${version}: ${outcomes.length} outcome signatures learned from probe runs (based on v${current.version})`],
     },
   });
   const path = store.save(next);

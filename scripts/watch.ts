@@ -11,7 +11,7 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { PlaywrightSurface } from '../src/surface/playwright.js';
-import { defaultPolicy } from '../src/policy/allowlist.js';
+import { loadPolicy } from '../src/policy/load.js';
 import { RunLog } from '../src/run/log.js';
 import { runDiscovery } from '../src/discovery/agent.js';
 import { HandoffSession } from '../src/hitl/session.js';
@@ -41,6 +41,7 @@ const entryUrl = urlFlag >= 0 ? args[urlFlag + 1]! : `http://localhost:${port}/?
 const keepOpen = args.includes('--keep-open');
 const maxSteps = Number(process.env.MAX_STEPS ?? 25);
 
+const loaded = loadPolicy(entryUrl);
 const runId = `watch-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const log = new RunLog('evidence', runId);
 const surface = await PlaywrightSurface.launch();
@@ -68,6 +69,7 @@ try {
   console.log(`\n${bar}`);
   console.log(`  goal    ${goal}`);
   console.log(`  target  ${entryUrl}`);
+  console.log(`  policy  ${loaded.source}`);
   console.log(`  console \x1b[1m${url}\x1b[0m  ← open this to watch`);
 const MODEL = process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
 console.log(`  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'}` +
@@ -79,7 +81,7 @@ console.log(`  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'
   console.log(`${bar}\n  Take control at any time; the agent yields at the next step boundary.\n`);
 
   const trace = await runDiscovery({
-    goal, entryUrl, surface, policy: defaultPolicy(new URL(entryUrl).origin),
+    goal, entryUrl, surface, policy: loaded.policy,
     log, maxSteps, session,
   });
   log.writeJson('trace.json', trace);

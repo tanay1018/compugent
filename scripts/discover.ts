@@ -6,7 +6,7 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { PlaywrightSurface } from '../src/surface/playwright.js';
-import { defaultPolicy } from '../src/policy/allowlist.js';
+import { loadPolicy } from '../src/policy/load.js';
 import { RunLog } from '../src/run/log.js';
 import { runDiscovery } from '../src/discovery/agent.js';
 
@@ -33,6 +33,8 @@ if (!process.env.AI_GATEWAY_API_KEY) {
 const MODEL = process.env.DISCOVERY_MODEL ?? 'anthropic/claude-sonnet-5';
 console.log(`\n  model   ${MODEL}   effort=${process.env.REASONING_EFFORT ?? 'low'}` +
             (/opus|fable|gpt-5\.|gemini-3/.test(MODEL) ? '   \x1b[33m(premium tier — npm run models for cheaper)\x1b[0m' : ''));
+const loaded = loadPolicy(entryUrl);
+console.log(`  policy  ${loaded.source}`);
 const runId = `discovery-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const log = new RunLog('evidence', runId);
 const surface = await PlaywrightSurface.launch({ headless: true });
@@ -42,7 +44,7 @@ try {
     goal,
     entryUrl,
     surface,
-    policy: defaultPolicy(new URL(entryUrl).origin),
+    policy: loaded.policy,
     log,
     maxSteps: 20,
   });

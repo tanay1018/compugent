@@ -1,0 +1,11 @@
+{
+  "allowedOrigins": [
+    "http://localhost:8710",
+    "https://en.wikipedia.org",
+    "https://books.toscrape.com",
+    "https://forecast.weather.gov"
+  ],
+  "allowedPathPrefixes": ["/"],
+  "allowedActions": ["click", "type", "select", "press", "navigate", "read"],
+  "onIrreversible": "require_approval"
+}
